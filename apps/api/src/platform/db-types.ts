@@ -119,6 +119,55 @@ export interface Database {
     factor_id: ColumnType<string | null, string | null | undefined, string | null>;
     decision_reason: ColumnType<string | null, string | null | undefined, string | null>;
   };
+  applications: {
+    id: string;
+    org_id: string;
+    name: string;
+    protocol: "oidc" | "saml";
+    catalog_key: string | null;
+    status: Generated<"active" | "disabled">;
+    launch_url: Generated<string>;
+    client_id: string | null;
+    client_secret_hash: Buffer | null;
+    redirect_uris: Generated<string[]>;
+    config: Json;
+    created_at: Generated<Date>;
+    updated_at: Timestamp;
+  };
+  app_assignments: {
+    org_id: string;
+    app_id: string;
+    principal_type: "user" | "group";
+    principal_id: string;
+    created_at: Generated<Date>;
+  };
+  signing_keys: {
+    id: string;
+    org_id: string;
+    kid: string;
+    alg: Generated<string>;
+    public_jwk: Json;
+    private_key_sealed: Buffer;
+    status: Generated<"active" | "retired">;
+    created_at: Generated<Date>;
+  };
+  oidc_codes: {
+    id: string;
+    org_id: string;
+    code_hash: Buffer;
+    app_id: string;
+    user_id: string;
+    session_id: string | null;
+    redirect_uri: string;
+    scope: string;
+    nonce: string | null;
+    code_challenge: string | null;
+    auth_time: Timestamp;
+    amr: string[];
+    created_at: Generated<Date>;
+    expires_at: Timestamp;
+    used_at: NullableTimestamp;
+  };
   device_pairings: {
     id: string;
     org_id: string;

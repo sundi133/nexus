@@ -30,6 +30,14 @@ const VERBS: Record<string, string> = {
   "group.members_added": "added members to",
   "group.members_removed": "removed members from",
   "org.settings_updated": "changed security settings",
+  "sso.login": "signed in to",
+  "app.created": "added the app",
+  "app.updated": "updated the app",
+  "app.disabled": "disabled sign-in for",
+  "app.deleted": "deleted the app",
+  "app.secret_rotated": "rotated the client secret of",
+  "app.assigned": "gave access to",
+  "app.unassigned": "removed access to",
   "user.invited": "sent an invitation to",
   "user.invitation_accepted": "accepted their invitation",
   "user.imported": "imported users from CSV",
@@ -40,6 +48,7 @@ export function describe(e: AuditEvent) {
     const reason = String(e.details.reason ?? "");
     return reason === "bad_password" ? "failed to sign in (wrong password)" : `was denied sign-in (${reason.replace(/_/g, " ")})`;
   }
+  if (e.type === "sso.login" && e.outcome === "denied") return "was blocked from (not assigned)";
   if (e.type === "auth.mfa" && e.outcome === "denied" && e.details.reason === "not_me") return "reported a sign-in they didn't start (blocked)";
   if (e.type === "auth.mfa" && e.outcome === "denied" && e.details.reason === "wrong_number") return "tapped the wrong number on a sign-in (blocked)";
   if (e.type === "auth.mfa" && e.outcome !== "success") return "failed MFA verification";
@@ -50,6 +59,7 @@ function targetHref(e: AuditEvent) {
   if (!e.target.id) return null;
   if (e.target.type === "user") return `/users/${e.target.id}`;
   if (e.target.type === "group") return `/groups/${e.target.id}`;
+  if (e.target.type === "application") return `/apps/${e.target.id}`;
   return null;
 }
 

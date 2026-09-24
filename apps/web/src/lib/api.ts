@@ -41,6 +41,12 @@ export type SignInResult = {
   mfa: { required: boolean; enrollment_required: boolean; factors: ("totp" | "push" | "webauthn")[] };
 };
 
+/** Protocol endpoints (OIDC/SAML) are route handlers, not pages: they need a full browser navigation. */
+export function goTo(url: string, router: { replace: (u: string) => void }) {
+  if (url.startsWith("/oidc/") || url.startsWith("/saml/")) window.location.assign(url);
+  else router.replace(url);
+}
+
 /** Where to send the user after a sign-in step, based on the session state. */
 export function nextStepUrl(r: SignInResult, next: string) {
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";

@@ -8,7 +8,7 @@ import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/ui/misc";
-import { api, ApiProblem, bffAuth, nextStepUrl, unwrap, type SignInResult } from "@/lib/api";
+import { api, ApiProblem, bffAuth, goTo, nextStepUrl, unwrap, type SignInResult } from "@/lib/api";
 import { passkeyErrorMessage, signInWithPasskey, usePasskeysSupported, verifyWithPasskey } from "@/lib/passkeys";
 import { PushApproval } from "@/components/features/push-approval";
 
@@ -25,7 +25,7 @@ function LoginForm() {
 
   const go = (r: SignInResult) => {
     if (r.session.state === "pending_mfa") setStep("mfa");
-    else router.replace(nextStepUrl(r, next));
+    else goTo(nextStepUrl(r, next), router);
   };
 
   async function submitPassword(e: React.FormEvent) {
@@ -103,7 +103,7 @@ function MfaStep({ next, onRestart }: { next: string; onRestart: () => void }) {
   const passkeys = usePasskeysSupported();
   const session = useQuery({ queryKey: ["auth-session"], queryFn: () => unwrap(api.GET("/v1/auth/session")), retry: false });
   const factors = new Set(session.data?.factors ?? []);
-  const done = () => router.replace(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+  const done = () => goTo(next.startsWith("/") && !next.startsWith("//") ? next : "/", router);
 
   const attempt = async (fn: () => Promise<unknown>) => {
     setBusy(true);

@@ -5,7 +5,7 @@ import { ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { MfaEnroll } from "@/components/features/mfa-enroll";
-import { api, bffAuth, unwrap } from "@/lib/api";
+import { api, bffAuth, goTo, unwrap } from "@/lib/api";
 
 function SetupMfa() {
   const router = useRouter();
@@ -14,7 +14,7 @@ function SetupMfa() {
   const session = useQuery({ queryKey: ["auth-session"], queryFn: () => unwrap(api.GET("/v1/auth/session")), retry: false });
 
   useEffect(() => {
-    if (session.data?.state === "active") router.replace(next.startsWith("/") ? next : "/");
+    if (session.data?.state === "active") goTo(next.startsWith("/") && !next.startsWith("//") ? next : "/", router);
   }, [session.data?.state, next, router]);
 
   return (
@@ -29,7 +29,7 @@ function SetupMfa() {
         </p>
         {session.data ? <p className="mt-1 text-xs text-fg-subtle">{session.data.email}</p> : null}
       </div>
-      <MfaEnroll onDone={() => router.replace(next.startsWith("/") ? next : "/")} />
+      <MfaEnroll onDone={() => goTo(next.startsWith("/") && !next.startsWith("//") ? next : "/", router)} />
       <button
         type="button"
         className="block w-full text-center text-[13px] text-fg-muted hover:text-fg"

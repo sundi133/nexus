@@ -95,7 +95,7 @@ All server components are TypeScript packages in one pnpm workspace (`apps/*`), 
 | Backend language | **TypeScript on Node 22+** (Go for the endpoint agent only) | One language across API, web and mobile; zod schemas shared end-to-end; the MCP ecosystem is TS-first |
 | HTTP / API | **Hono** + `@hono/zod-openapi`: routes declare zod schemas, the OpenAPI 3.1 doc is generated from them | One definition gives validation, types and the public contract; `openapi-typescript` generates the client for web and mobile |
 | Agent RPC | **gRPC** bidi streams (protobuf, `buf`) | Efficient long-lived device connections |
-| OIDC provider | `oidc-provider` (panva) | OpenID-certified OP for Node |
+| OIDC provider | Focused in-house OP on `jose` (code flow + PKCE, discovery, JWKS, userinfo), verified in CI against `openid-client`, a certified RP | Per-tenant issuers and our session/MFA/RLS model don't fit a one-issuer-per-instance library; the certified RP keeps us honest (see ADR-014) |
 | SAML IdP | `samlify` | Maintained Node SAML IdP/SP |
 | Passwords / WebAuthn / TOTP | `@node-rs/argon2` (Argon2id), `@simplewebauthn/server`, `otpauth` | Standard, maintained |
 | Policy engine | **Cedar** (`@cedar-policy/cedar-wasm`) | Analyzable, fast, readable policies with schema validation; fits principal/action/resource |
@@ -462,4 +462,5 @@ nexus/
 | ADR-011 | Expo / React Native for mobile | Native Swift + Kotlin, Flutter | One TS team, shared API client and logic with web; native modules only where needed (Secure Enclave keys, push) |
 | ADR-012 | Content-free push sent directly to APNs/FCM; inbox as the source of truth | Rich push payloads, third-party push relays | No sensitive data in third-party infrastructure or on lock screens; consistent state across devices |
 | ADR-013 | The endpoint agent remains Go | TS/Node agent, Rust | Runs on every laptop: needs a single static binary, < 60 MB RSS, no runtime to patch |
+| ADR-014 | OIDC provider implemented on `jose`, not `oidc-provider` (2026-09-24) | `oidc-provider`, Keycloak | Tenant = issuer at `{web origin}/oidc/{slug}`; authorize runs on the console origin so the Nexus session, MFA and conditional access apply directly. Scope kept to the code flow + PKCE. Every change runs a certified relying party (`openid-client`) in tests; the OpenID conformance suite is planned before GA |
 | ADR-009 | Build the OIDC OP and SAML IdP on libraries rather than embedding Keycloak/Ory | Keycloak, Ory Hydra | The core product *is* identity; we need full control of multi-tenancy, agent flows and UX |

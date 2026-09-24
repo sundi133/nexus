@@ -5,6 +5,7 @@ import {
   FileClock,
   Home,
   KeyRound,
+  LayoutGrid,
   Laptop,
   ScrollText,
   Server,
@@ -21,7 +22,12 @@ export type NavSection = { title?: string; items: NavItem[] };
 
 // Mirrors docs/UI.md §3. "soon" marks what is on the roadmap but not built yet, so admins see where the product is going.
 export const NAV: NavSection[] = [
-  { items: [{ label: "Overview", href: "/", icon: Home, shortcut: "G O" }] },
+  {
+    items: [
+      { label: "Overview", href: "/", icon: Home, shortcut: "G O" },
+      { label: "My apps", href: "/my-apps", icon: LayoutGrid },
+    ],
+  },
   {
     title: "Identity",
     items: [
@@ -39,7 +45,7 @@ export const NAV: NavSection[] = [
   {
     title: "Access",
     items: [
-      { label: "Applications", href: "/apps", icon: AppWindow, soon: "A2" },
+      { label: "Applications", href: "/apps", icon: AppWindow },
       { label: "Conditional access", href: "/conditional-access", icon: ShieldCheck, soon: "A2" },
     ],
   },

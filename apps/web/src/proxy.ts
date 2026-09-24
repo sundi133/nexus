@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/login", "/signup", "/invite"];
+const PUBLIC = ["/login", "/signup", "/invite", "/sso/error"];
 
 /** Cheap presence check only: real authentication happens at the API on every call. */
 export function proxy(req: NextRequest) {
@@ -15,5 +15,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!bff|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico)$).*)"],
+  matcher: ["/((?!bff|oidc|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico)$).*)"],
 };
