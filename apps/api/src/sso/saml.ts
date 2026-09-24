@@ -9,7 +9,7 @@ import { audit } from "../audit/record.js";
 import type { Tx } from "../platform/db.js";
 import { bearer, json, problemResponses } from "../schemas.js";
 import { assignedAppIds } from "./apps.js";
-import { activeSamlCert, certBody } from "./saml-cert.js";
+import { activeSamlCert, certBody, publishedSamlCerts } from "./saml-cert.js";
 
 /**
  * SAML 2.0 identity provider (SPEC SSO-02): SP-initiated (HTTP-Redirect and
@@ -43,12 +43,34 @@ const SKEW_MS = 60_000;
 const FORCE_AUTHN_FRESH_MS = 2 * 60_000;
 const MAX_XML_BYTES = 64 * 1024;
 
+export const ATTRIBUTE_SOURCES = ["email", "given_name", "family_name", "display_name", "user_id", "department", "title", "groups", "static"] as const;
+
+export const AttributeMapping = z
+  .object({
+    name: z.string().trim().min(1).max(256),
+    source: z.enum(ATTRIBUTE_SOURCES),
+    value: z.string().max(2048).optional().openapi({ description: "Required when source is `static`" }),
+  })
+  .refine((a) => a.source !== "static" || !!a.value, { message: "A static attribute needs a value", path: ["value"] })
+  .openapi("SamlAttribute");
+export type AttributeMapping = z.infer<typeof AttributeMapping>;
+
+/** What apps get when no mapping is configured. */
+export const DEFAULT_ATTRIBUTES: AttributeMapping[] = [
+  { name: "email", source: "email" },
+  { name: "firstName", source: "given_name" },
+  { name: "lastName", source: "family_name" },
+  { name: "displayName", source: "display_name" },
+  { name: "groups", source: "groups" },
+];
+
 export type SamlConfig = {
   entity_id: string;
   acs_url: string;
   name_id_format: keyof typeof NAMEID;
   default_relay_state?: string;
   sign: "assertion" | "response_and_assertion";
+  attributes?: AttributeMapping[];
 };
 
 export const idpUrls = (deps: Deps, slug: string) => {
@@ -105,7 +127,23 @@ export function parseSpMetadata(xml: string): { entity_id: string; acs_url: stri
 
 // ---- Building + signing ------------------------------------------------------------
 
-type User = { id: string; email: string; given_name: string; family_name: string };
+type User = { id: string; email: string; given_name: string; family_name: string; department: string; title: string };
+
+function attributeValues(a: AttributeMapping, user: User, groups: string[]): string[] {
+  const displayName = `${user.given_name} ${user.family_name}`.trim() || user.email;
+  const v = {
+    email: [user.email],
+    given_name: [user.given_name],
+    family_name: [user.family_name],
+    display_name: [displayName],
+    user_id: [user.id],
+    department: [user.department],
+    title: [user.title],
+    groups,
+    static: [a.value ?? ""],
+  }[a.source];
+  return v.filter((x) => x !== "");
+}
 
 function sign(xml: string, elementId: string, issuerXpath: string, cert: { certPem: string; privateKeyPem: string }) {
   const sig = new SignedXml({
@@ -145,7 +183,11 @@ export function buildResponse(a: {
     `<saml:Attribute Name="${esc(name)}" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic">${values
       .map((v) => `<saml:AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">${esc(v)}</saml:AttributeValue>`)
       .join("")}</saml:Attribute>`;
-  const displayName = `${a.user.given_name} ${a.user.family_name}`.trim() || a.user.email;
+  const statements = (a.cfg.attributes ?? DEFAULT_ATTRIBUTES)
+    .map((m) => ({ name: m.name, values: attributeValues(m, a.user, a.groups) }))
+    .filter((m) => m.values.length > 0) // omit empty attributes rather than send blank values
+    .map((m) => attr(m.name, m.values))
+    .join("");
 
   const assertion =
     `<saml:Assertion xmlns:saml="${NS.saml}" ID="${assertionId}" Version="2.0" IssueInstant="${instant(now)}">` +
@@ -154,7 +196,7 @@ export function buildResponse(a: {
     `<saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData NotOnOrAfter="${notOnOrAfter}" Recipient="${esc(a.cfg.acs_url)}"${irt}/></saml:SubjectConfirmation></saml:Subject>` +
     `<saml:Conditions NotBefore="${notBefore}" NotOnOrAfter="${notOnOrAfter}"><saml:AudienceRestriction><saml:Audience>${esc(a.cfg.entity_id)}</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
     `<saml:AuthnStatement AuthnInstant="${instant(a.authnInstant)}" SessionIndex="${esc(a.sessionIndex)}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>` +
-    `<saml:AttributeStatement>${attr("email", [a.user.email])}${attr("firstName", [a.user.given_name])}${attr("lastName", [a.user.family_name])}${attr("displayName", [displayName])}${a.groups.length ? attr("groups", a.groups) : ""}</saml:AttributeStatement>` +
+    (statements ? `<saml:AttributeStatement>${statements}</saml:AttributeStatement>` : "") +
     `</saml:Assertion>`;
 
   let xml =
@@ -181,12 +223,14 @@ function statusResponse(idp: string, acsUrl: string, inResponseTo: string, secon
   return Buffer.from(xml).toString("base64");
 }
 
-export function idpMetadata(entityId: string, ssoUrl: string, certPem: string) {
+export function idpMetadata(entityId: string, ssoUrl: string, certPems: string[]) {
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<md:EntityDescriptor xmlns:md="${NS.md}" entityID="${esc(entityId)}">` +
     `<md:IDPSSODescriptor WantAuthnRequestsSigned="false" protocolSupportEnumeration="${NS.samlp}">` +
-    `<md:KeyDescriptor use="signing"><ds:KeyInfo xmlns:ds="${NS.ds}"><ds:X509Data><ds:X509Certificate>${certBody(certPem)}</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor>` +
+    certPems
+      .map((pem) => `<md:KeyDescriptor use="signing"><ds:KeyInfo xmlns:ds="${NS.ds}"><ds:X509Data><ds:X509Certificate>${certBody(pem)}</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor>`)
+      .join("") +
     `<md:NameIDFormat>${NAMEID.email}</md:NameIDFormat><md:NameIDFormat>${NAMEID.persistent}</md:NameIDFormat>` +
     `<md:SingleSignOnService Binding="${BINDING.redirect}" Location="${esc(ssoUrl)}"/>` +
     `<md:SingleSignOnService Binding="${BINDING.post}" Location="${esc(ssoUrl)}"/>` +
@@ -258,7 +302,11 @@ async function decide(
       return pageError("not_assigned", `You don't have access to ${app.name}`, "Ask your administrator to assign this app to you.", app.name);
     }
 
-    const user = await tx.selectFrom("users").select(["id", "email", "given_name", "family_name"]).where("id", "=", principal.userId).executeTakeFirstOrThrow();
+    const user = await tx
+      .selectFrom("users")
+      .select(["id", "email", "given_name", "family_name", "department", "title"])
+      .where("id", "=", principal.userId)
+      .executeTakeFirstOrThrow();
     const groups = (
       await tx
         .selectFrom("group_members")
@@ -294,10 +342,10 @@ export function registerSamlRoutes(app: App) {
     const slug = c.req.param("slug");
     const org = await orgBySlug(deps, slug);
     if (!org) return c.text("Not found", 404);
-    const cert = await deps.db.tenant(org.org_id, (tx) => activeSamlCert(tx, deps, org.org_id));
+    const certs = await deps.db.tenant(org.org_id, (tx) => publishedSamlCerts(tx, deps, org.org_id));
     const { entityId, ssoUrl } = idpUrls(deps, slug);
     c.header("Cache-Control", "public, max-age=300");
-    return c.body(idpMetadata(entityId, ssoUrl, cert.certPem), 200, { "Content-Type": "application/samlmetadata+xml" });
+    return c.body(idpMetadata(entityId, ssoUrl, certs), 200, { "Content-Type": "application/samlmetadata+xml" });
   });
 
   app.openapi(

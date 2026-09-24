@@ -21,7 +21,8 @@ export function fingerprint(certPem: string) {
   return hex.match(/.{2}/g)!.join(":");
 }
 
-async function createCert(tx: Tx, deps: Deps, orgId: string, orgName: string): Promise<SamlCert> {
+export async function createSamlCert(tx: Tx, deps: Deps, orgId: string, status: "active" | "next" = "active"): Promise<SamlCert> {
+  const { name: orgName } = await tx.selectFrom("organizations").select("name").where("id", "=", orgId).executeTakeFirstOrThrow();
   const keys = (await webcrypto.subtle.generateKey(ALG, true, ["sign", "verify"])) as webcrypto.CryptoKeyPair;
   const notBefore = new Date(Date.now() - 60_000);
   const notAfter = new Date(notBefore);
@@ -47,6 +48,7 @@ async function createCert(tx: Tx, deps: Deps, orgId: string, orgName: string): P
       kid,
       alg: "RS256",
       purpose: "saml",
+      status,
       public_jwk: JSON.stringify({}),
       private_key_sealed: deps.sealer.seal(Buffer.from(privateKeyPem), kid),
       cert_pem: certPem,
@@ -65,10 +67,7 @@ export async function activeSamlCert(tx: Tx, deps: Deps, orgId: string): Promise
     .where("status", "=", "active")
     .orderBy("created_at", "desc")
     .executeTakeFirst();
-  if (!row?.cert_pem) {
-    const org = await tx.selectFrom("organizations").select("name").where("id", "=", orgId).executeTakeFirstOrThrow();
-    return createCert(tx, deps, orgId, org.name);
-  }
+  if (!row?.cert_pem) return createSamlCert(tx, deps, orgId);
   return {
     kid: row.kid,
     certPem: row.cert_pem,
@@ -76,4 +75,16 @@ export async function activeSamlCert(tx: Tx, deps: Deps, orgId: string): Promise
     notAfter: row.not_after!,
     fingerprintSha256: fingerprint(row.cert_pem),
   };
+}
+
+/** Certificates SPs should trust right now: the active one, plus the next one during a rotation. */
+export async function publishedSamlCerts(tx: Tx, deps: Deps, orgId: string) {
+  const active = await activeSamlCert(tx, deps, orgId);
+  const next = await tx
+    .selectFrom("signing_keys")
+    .select("cert_pem")
+    .where("purpose", "=", "saml")
+    .where("status", "=", "next")
+    .executeTakeFirst();
+  return [active.certPem, ...(next?.cert_pem ? [next.cert_pem] : [])];
 }

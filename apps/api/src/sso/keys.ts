@@ -11,9 +11,10 @@ import { newId } from "../platform/ids.js";
  */
 
 type KeyRow = { kid: string; private_key_sealed: Buffer };
+const RETIRED_PUBLISH_MS = 7 * 24 * 3600_000;
 const cache = new Map<string, { kid: string; key: CryptoKey }>(); // kid → imported private key
 
-async function createKey(tx: Tx, deps: Deps, orgId: string) {
+export async function createKey(tx: Tx, deps: Deps, orgId: string) {
   const { publicKey, privateKey } = await generateKeyPair("RS256", { modulusLength: 2048, extractable: true });
   const kid = randomBytes(12).toString("base64url");
   const jwk = { ...(await exportJWK(publicKey)), kid, alg: "RS256", use: "sig" };
@@ -53,7 +54,15 @@ export async function signJwt(tx: Tx, deps: Deps, orgId: string, payload: JWTPay
 
 /** Public keys for the tenant's JWKS (active and retired). Creates the first key if none exists yet. */
 export async function publicJwks(tx: Tx, deps: Deps, orgId: string): Promise<{ keys: JWK[] }> {
-  const oidcKeys = () => tx.selectFrom("signing_keys").select("public_jwk").where("purpose", "=", "oidc").orderBy("created_at", "desc").execute();
+  // Retired keys stay published for a week so tokens they signed keep verifying through caches.
+  const oidcKeys = () =>
+    tx
+      .selectFrom("signing_keys")
+      .select("public_jwk")
+      .where("purpose", "=", "oidc")
+      .where((eb) => eb.or([eb("status", "=", "active"), eb("retired_at", ">", new Date(Date.now() - RETIRED_PUBLISH_MS))]))
+      .orderBy("created_at", "desc")
+      .execute();
   let rows = await oidcKeys();
   if (!rows.length) {
     await activeKey(tx, deps, orgId);

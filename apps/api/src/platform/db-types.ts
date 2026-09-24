@@ -148,8 +148,9 @@ export interface Database {
     alg: Generated<string>;
     public_jwk: Json;
     private_key_sealed: Buffer;
-    status: Generated<"active" | "retired">;
+    status: Generated<"next" | "active" | "retired">;
     created_at: Generated<Date>;
+    retired_at: NullableTimestamp;
     purpose: Generated<"oidc" | "saml">;
     cert_pem: string | null;
     not_after: NullableTimestamp;

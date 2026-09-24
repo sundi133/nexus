@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { AppIcon } from "@/components/features/app-icon";
 import { SamlIdpValues } from "@/components/features/saml-values";
+import { SamlAttributesEditor } from "@/components/features/saml-attributes";
 import { ConfirmAction } from "@/components/features/confirm-action";
 import { Button } from "@/components/ui/button";
 import { CopyField } from "@/components/ui/copy";
@@ -144,7 +145,6 @@ function AppDetail({ id }: { id: string }) {
                     ["ACS URL", <code key="a" className="break-all font-mono text-xs">{a.saml.acs_url}</code>],
                     ["NameID", a.saml.name_id_format === "email" ? "Email address" : "Persistent (user ID)"],
                     ["Signing", a.saml.sign === "assertion" ? "Assertion" : "Response and assertion"],
-                    ["Attributes", "email, firstName, lastName, displayName, groups"],
                     ["Launch", <code key="l" className="break-all font-mono text-xs">{a.launch_url}</code>],
                   ]}
                 />
@@ -168,6 +168,7 @@ function AppDetail({ id }: { id: string }) {
               )}
             </div>
           </Card>
+          {a.saml ? <SamlAttributesEditor key={a.updated_at} appId={a.id} attributes={a.saml.attributes} editable={can("apps:write")} /> : null}
         </TabsContent>
 
         <TabsContent value="access">

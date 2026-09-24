@@ -6,6 +6,7 @@ import { CheckCircle2, CircleAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
+import { SigningKeysCard } from "@/components/features/signing-keys";
 import { useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
@@ -178,6 +179,8 @@ export default function OrganizationSettingsPage() {
             <Skeleton className="m-4 h-32" />
           )}
         </Card>
+
+        <SigningKeysCard />
 
         <Card className="overflow-hidden">
           <CardHeader title="Change history" description="Every change to these settings: who, when and what." />

@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/ui/misc";
 import { Dialog, DialogContent } from "@/components/ui/overlay";
 import { api, ApiProblem, unwrap } from "@/lib/api";
 import { passkeyErrorMessage, usePasskeysSupported, verifyWithPasskey } from "@/lib/passkeys";
+import { PushApproval } from "@/components/features/push-approval";
 
 type Run = <T>(fn: () => Promise<T>) => Promise<T>;
 const Ctx = createContext<Run>((fn) => fn());
@@ -79,6 +80,14 @@ function StepUpDialog({ open, onDone }: { open: boolean; onDone: (ok: boolean) =
       <DialogContent title="Confirm it's you" description="This is a sensitive action. Verify with MFA to continue. You won't be asked again for 10 minutes.">
         <div className="space-y-3">
           <ErrorBanner error={error} />
+          {types.has("push") ? (
+            <PushApproval
+              onApproved={() => {
+                setCode("");
+                onDone(true);
+              }}
+            />
+          ) : null}
           {types.has("webauthn") && passkeys ? (
             <Button variant="primary" size="lg" className="w-full" loading={busy} onClick={() => attempt(verifyWithPasskey)}>
               <Fingerprint /> Use your passkey

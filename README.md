@@ -53,8 +53,8 @@ Release A1 in progress. Built:
 
 - **Identity:** tenancy with Postgres RLS, sign-up, password + TOTP (replay-safe), **passkeys and passwordless sign-in**, **push MFA via Nexus Mobile** (number matching, signed approvals, "This wasn't me" alerts), sessions, inline step-up
 - **Policy:** org MFA requirement with forced enrollment, **secure baseline** with impact preview, change history
-- **SSO:** OpenID Connect provider (code flow + PKCE, discovery, JWKS, userinfo) and SAML 2.0 IdP (SP- and IdP-initiated, signed assertions, metadata import) per organization, applications with user/group assignments, and an app launcher
+- **SSO:** OpenID Connect provider (code flow + PKCE, discovery, JWKS, userinfo) and SAML 2.0 IdP (SP- and IdP-initiated, signed assertions, metadata import) per organization, an app catalog (Slack, GitHub, AWS, Google Workspace, Atlassian, Zoom, Figma, Dropbox, Grafana…), attribute mapping, key/certificate rotation, user/group assignments, and an app launcher
 - **Directory:** users and groups, **email invitations**, **CSV import with preview**, lifecycle actions (suspend, contain, reset MFA), admin roles
 - **Visibility:** audit log, notification inbox with live updates, Overview with a "Needs attention" queue
 
-Next up: app catalog and certificate rotation, then the device agent.
+Next up: the device agent (inventory + posture), then conditional access with device trust.

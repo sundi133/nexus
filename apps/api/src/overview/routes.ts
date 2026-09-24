@@ -60,7 +60,7 @@ export function registerOverviewRoutes(app: App) {
     }),
     async (c) => {
       const p = requirePermission(c, "users:read");
-      const { counts, recent, settings } = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+      const { counts, recent, settings, certs } = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         const r = await sql<Counts>`
           WITH u AS (
             SELECT users.id, users.status,
@@ -84,7 +84,13 @@ export function registerOverviewRoutes(app: App) {
                AND ts > now() - interval '24 hours')::int                   AS failed_logins_24h
           FROM u`.execute(tx);
         const recent = await auditQuery(tx).orderBy("id", "desc").limit(8).execute();
-        return { counts: r.rows[0]!, recent, settings: await getSettings(tx, p.orgId) };
+        const certs = await tx
+          .selectFrom("signing_keys")
+          .select(["status", "not_after", "created_at"])
+          .where("purpose", "=", "saml")
+          .where("status", "in", ["active", "next"])
+          .execute();
+        return { counts: r.rows[0]!, recent, settings: await getSettings(tx, p.orgId), certs };
       });
 
       const items: z.infer<typeof Attention>[] = [];
@@ -120,6 +126,31 @@ export function registerOverviewRoutes(app: App) {
           count: 1,
           link: "/settings/organization",
           action_label: "Review baseline",
+        });
+      }
+      const activeCert = certs.find((x) => x.status === "active");
+      const nextCert = certs.find((x) => x.status === "next");
+      const daysLeft = activeCert?.not_after ? Math.floor((activeCert.not_after.getTime() - Date.now()) / 86_400_000) : null;
+      if (daysLeft !== null && daysLeft < 60 && !nextCert) {
+        items.push({
+          id: "saml_cert_expiring",
+          severity: daysLeft < 14 ? "critical" : "warning",
+          title: `SAML signing certificate expires in ${Math.max(daysLeft, 0)} days`,
+          description: "Every SAML app stops accepting sign-ins when it expires. Start a rotation and update your apps.",
+          count: 1,
+          link: "/settings/organization#certificates",
+          action_label: "Rotate certificate",
+        });
+      }
+      if (nextCert && Date.now() - nextCert.created_at.getTime() > 14 * 86_400_000) {
+        items.push({
+          id: "saml_rotation_pending",
+          severity: "info",
+          title: "A SAML certificate rotation is still pending",
+          description: "The next certificate was created over two weeks ago. Activate it once your apps trust it.",
+          count: 1,
+          link: "/settings/organization#certificates",
+          action_label: "Finish rotation",
         });
       }
       if (counts.failed_logins_24h >= 5) {

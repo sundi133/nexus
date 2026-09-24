@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { createHash, randomBytes } from "node:crypto";
 import { sql, type Insertable } from "kysely";
 import type { Database } from "../platform/db-types.js";
-import type { App, Deps } from "../context.js";
+import type { App, Deps, Principal, RequestMeta } from "../context.js";
 import { audit } from "../audit/record.js";
 import { requirePermission, requireSession } from "../auth/guard.js";
 import type { Tx } from "../platform/db.js";
@@ -11,7 +11,7 @@ import { badRequest, conflict, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, json, problemResponses } from "../schemas.js";
 import { activeSamlCert, type SamlCert } from "./saml-cert.js";
-import { idpUrls, parseSpMetadata, type SamlConfig } from "./saml.js";
+import { AttributeMapping, DEFAULT_ATTRIBUTES, idpUrls, parseSpMetadata, type SamlConfig } from "./saml.js";
 
 export const hashSecret = (s: string) => createHash("sha256").update(s).digest();
 const newClientId = () => `nx_${randomBytes(12).toString("base64url")}`;
@@ -54,6 +54,7 @@ const AppSchema = z
         name_id_format: z.enum(["email", "persistent"]),
         sign: z.enum(["assertion", "response_and_assertion"]),
         default_relay_state: z.string().nullable(),
+        attributes: z.array(AttributeMapping),
         idp_entity_id: z.string(),
         idp_sso_url: z.string(),
         idp_metadata_url: z.string(),
@@ -94,6 +95,7 @@ const SamlInput = z.object({
   name_id_format: z.enum(["email", "persistent"]).default("email"),
   sign: z.enum(["assertion", "response_and_assertion"]).default("assertion"),
   default_relay_state: z.string().max(1024).optional(),
+  attributes: z.array(AttributeMapping).max(50).optional().openapi({ description: "Omit for the defaults (email, firstName, lastName, displayName, groups)" }),
   launch_url: z.union([z.string().url(), z.literal("")]).default(""),
 });
 
@@ -112,6 +114,7 @@ const AppPatch = z
         name_id_format: z.enum(["email", "persistent"]),
         sign: z.enum(["assertion", "response_and_assertion"]),
         default_relay_state: z.string().max(1024).nullable(),
+        attributes: z.array(AttributeMapping).max(50),
       })
       .partial(),
   })
@@ -171,6 +174,7 @@ function toApp(a: AppRow, deps: Deps, slug: string, cert?: SamlCert): z.infer<ty
             name_id_format: cfg.name_id_format,
             sign: cfg.sign,
             default_relay_state: cfg.default_relay_state ?? null,
+            attributes: cfg.attributes ?? DEFAULT_ATTRIBUTES,
             idp_entity_id: idp.entityId,
             idp_sso_url: idp.ssoUrl,
             idp_metadata_url: idp.metadataUrl,
@@ -206,6 +210,90 @@ export async function assignedAppIds(tx: Tx, userId: string) {
   return new Set(rows.rows.map((r) => r.app_id));
 }
 
+export type AppInput = z.infer<typeof AppInput>;
+
+/** Creates an OIDC or SAML app. Shared by POST /v1/apps and catalog installs. */
+export async function createApplication(deps: Deps, p: Principal, meta: RequestMeta, input: AppInput, catalogKey: string | null) {
+  const id = newId();
+  let secret: string | null = null;
+  let values: Insertable<Database["applications"]>;
+  if (input.protocol === "oidc") {
+    secret = input.client_type === "confidential" ? newClientSecret() : null;
+    values = {
+      id,
+      org_id: p.orgId,
+      name: input.name,
+      protocol: "oidc",
+      catalog_key: catalogKey,
+      launch_url: input.launch_url,
+      client_id: newClientId(),
+      client_secret_hash: secret ? hashSecret(secret) : null,
+      redirect_uris: input.redirect_uris,
+      config: JSON.stringify({}),
+      updated_at: new Date(),
+    };
+  } else {
+    let sp = { entity_id: input.entity_id, acs_url: input.acs_url };
+    if (input.metadata_xml) {
+      try {
+        sp = { ...parseSpMetadata(input.metadata_xml), ...Object.fromEntries(Object.entries(sp).filter(([, v]) => v)) };
+      } catch (err) {
+        throw badRequest("invalid_metadata", (err as Error).message);
+      }
+    }
+    if (!sp.entity_id || !sp.acs_url) throw badRequest("invalid_request", "Provide the app's metadata, or its entity ID and ACS URL");
+    if (!SpUrl.safeParse(sp.acs_url).success) throw badRequest("invalid_acs_url", "The ACS URL must use https (http is only allowed for localhost)");
+    const cfg: SamlConfig = {
+      entity_id: sp.entity_id,
+      acs_url: sp.acs_url,
+      name_id_format: input.name_id_format,
+      sign: input.sign,
+      ...(input.default_relay_state ? { default_relay_state: input.default_relay_state } : {}),
+      ...(input.attributes ? { attributes: input.attributes } : {}),
+    };
+    const slug = await deps.db.tenant(p.orgId, orgSlug);
+    values = {
+      id,
+      org_id: p.orgId,
+      name: input.name,
+      protocol: "saml",
+      catalog_key: catalogKey,
+      // Default launch: IdP-initiated sign-in from the app launcher.
+      launch_url: input.launch_url || `${deps.cfg.publicUrl}/saml/${slug}/start/${id}`,
+      client_id: null,
+      client_secret_hash: null,
+      config: JSON.stringify(cfg),
+      updated_at: new Date(),
+    };
+  }
+  try {
+    const app = await deps.db.tenant(p.orgId, async (tx) => {
+      await tx.insertInto("applications").values(values).execute();
+      await audit(tx, p.orgId, { principal: p, meta }, {
+        type: "app.created",
+        target: { type: "application", id, display: input.name },
+        details: {
+          protocol: input.protocol,
+          catalog: catalogKey,
+          ...(input.protocol === "oidc" ? { client_type: input.client_type, redirect_uris: input.redirect_uris } : { config: JSON.parse(values.config as string) }),
+        },
+      });
+      return (await render(tx, deps, p.orgId, [await getApp(tx, id)]))[0]!;
+    });
+    return { app, client_secret: secret };
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      const constraint = (err as { constraint?: string }).constraint;
+      throw constraint === "applications_saml_entity"
+        ? conflict("entity_taken", "Another app already uses this SAML entity ID")
+        : conflict("name_taken", "An application with this name already exists");
+    }
+    throw err;
+  }
+}
+
+export const ApplicationCreated = z.object({ app: AppSchema, client_secret: z.string().nullable() }).openapi("ApplicationCreated");
+
 export function registerAppRoutes(app: App) {
   app.openapi(
     createRoute({
@@ -235,89 +323,14 @@ export function registerAppRoutes(app: App) {
       security: bearer,
       request: body(AppInput),
       responses: {
-        201: json(z.object({ app: AppSchema, client_secret: z.string().nullable() }).openapi("ApplicationCreated"), "Created"),
+        201: json(ApplicationCreated, "Created"),
         ...problemResponses,
       },
     }),
     async (c) => {
       const p = requirePermission(c, "apps:write");
-      const input = c.req.valid("json");
-      const deps = c.get("deps");
-      const id = newId();
-      let secret: string | null = null;
-      let values: Insertable<Database["applications"]>;
-      if (input.protocol === "oidc") {
-        secret = input.client_type === "confidential" ? newClientSecret() : null;
-        values = {
-          id,
-          org_id: p.orgId,
-          name: input.name,
-          protocol: "oidc",
-          catalog_key: null,
-          launch_url: input.launch_url,
-          client_id: newClientId(),
-          client_secret_hash: secret ? hashSecret(secret) : null,
-          redirect_uris: input.redirect_uris,
-          config: JSON.stringify({}),
-          updated_at: new Date(),
-        };
-      } else {
-        let sp = { entity_id: input.entity_id, acs_url: input.acs_url };
-        if (input.metadata_xml) {
-          try {
-            sp = { ...parseSpMetadata(input.metadata_xml), ...Object.fromEntries(Object.entries(sp).filter(([, v]) => v)) };
-          } catch (err) {
-            throw badRequest("invalid_metadata", (err as Error).message);
-          }
-        }
-        if (!sp.entity_id || !sp.acs_url) throw badRequest("invalid_request", "Provide the app's metadata, or its entity ID and ACS URL");
-        const acs = SpUrl.safeParse(sp.acs_url);
-        if (!acs.success) throw badRequest("invalid_acs_url", "The ACS URL must use https (http is only allowed for localhost)");
-        const cfg: SamlConfig = {
-          entity_id: sp.entity_id,
-          acs_url: sp.acs_url,
-          name_id_format: input.name_id_format,
-          sign: input.sign,
-          ...(input.default_relay_state ? { default_relay_state: input.default_relay_state } : {}),
-        };
-        const slug = await deps.db.tenant(p.orgId, orgSlug);
-        values = {
-          id,
-          org_id: p.orgId,
-          name: input.name,
-          protocol: "saml",
-          catalog_key: null,
-          // Default launch: IdP-initiated sign-in from the app launcher.
-          launch_url: input.launch_url || `${deps.cfg.publicUrl}/saml/${slug}/start/${id}`,
-          client_id: null,
-          client_secret_hash: null,
-          config: JSON.stringify(cfg),
-          updated_at: new Date(),
-        };
-      }
-      try {
-        const out = await deps.db.tenant(p.orgId, async (tx) => {
-          await tx.insertInto("applications").values(values).execute();
-          await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
-            type: "app.created",
-            target: { type: "application", id, display: input.name },
-            details:
-              input.protocol === "oidc"
-                ? { protocol: "oidc", client_type: input.client_type, redirect_uris: input.redirect_uris }
-                : { protocol: "saml", config: JSON.parse(values.config as string) },
-          });
-          return (await render(tx, deps, p.orgId, [await getApp(tx, id)]))[0]!;
-        });
-        return c.json({ app: out, client_secret: secret }, 201);
-      } catch (err) {
-        if (isUniqueViolation(err)) {
-          const constraint = (err as { constraint?: string }).constraint;
-          throw constraint === "applications_saml_entity"
-            ? conflict("entity_taken", "Another app already uses this SAML entity ID")
-            : conflict("name_taken", "An application with this name already exists");
-        }
-        throw err;
-      }
+      const out = await createApplication(c.get("deps"), p, c.get("meta"), c.req.valid("json"), null);
+      return c.json(out, 201);
     },
   );
 
