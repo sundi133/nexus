@@ -62,7 +62,11 @@ export type NexusClient = ReturnType<typeof createClient>;
 export async function unwrap<T>(p: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
   const { data, error, response } = await p;
   if (!response.ok) {
-    const problem = (error ?? { type: "about:blank", status: response.status, code: "http_error", title: response.statusText }) as Problem;
+    // A proxy or crash can answer with an empty or non-JSON body: still give callers a message.
+    const problem =
+      error && typeof error === "object" && "title" in error
+        ? (error as Problem)
+        : { type: "about:blank", status: response.status, code: "http_error", title: `Something went wrong (${response.status}${response.statusText ? ` ${response.statusText}` : ""}). Please try again.` };
     throw new ApiProblem(response.status, problem);
   }
   return data as T;

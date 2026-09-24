@@ -110,6 +110,16 @@ func (k *Key) Proof(deviceID, method, path string, body []byte, now time.Time) (
 	return k.sign(header, claims)
 }
 
+// Attest signs a browser's device-trust nonce, bound to the web origin that
+// asked, so the server can tie a sign-in session to this device. Only the
+// agent's loopback server calls this, and only for the enrolled web origin.
+func (k *Key) Attest(deviceID, nonce, origin string, now time.Time) (string, error) {
+	return k.sign(
+		map[string]any{"alg": "ES256", "typ": jwtType, "kid": deviceID},
+		map[string]any{"aud": "nexus-device-attest", "nonce": nonce, "origin": origin, "iat": now.Unix(), "exp": now.Add(60 * time.Second).Unix()},
+	)
+}
+
 func (k *Key) sign(header, claims map[string]any) (string, error) {
 	enc := base64.RawURLEncoding
 	h, err := json.Marshal(header)

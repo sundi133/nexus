@@ -14,7 +14,9 @@ async function handler(req: Request, ctx: RouteContext<"/bff/v1/[...path]">) {
   const upstream = await fetch(`${API_URL}/v1/${path.map(encodeURIComponent).join("/")}${url.search}`, {
     method: req.method,
     headers: forwardHeaders(req, token),
-    body: req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer(),
+    // A Blob, not an ArrayBuffer: fetch transfers (detaches) an ArrayBuffer on send, so a
+    // retry on a stale keep-alive socket (e.g. after an API restart) would fail.
+    body: req.method === "GET" || req.method === "HEAD" ? undefined : new Blob([await req.arrayBuffer()]),
     cache: "no-store",
     signal: req.signal,
   });

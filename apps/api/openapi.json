@@ -340,7 +340,8 @@
           "apps:write",
           "apps:assign",
           "devices:read",
-          "devices:write"
+          "devices:write",
+          "policies:write"
         ]
       },
       "Factor": {
@@ -2139,6 +2140,50 @@
               "action": {
                 "type": "string",
                 "enum": [
+                  "device_check"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "app_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "app_name"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "mfa"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "app_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "app_name"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
                   "error"
                 ]
               },
@@ -2215,6 +2260,50 @@
             "required": [
               "action",
               "reason"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "device_check"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "app_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "app_name"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "mfa"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "app_name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "reason",
+              "app_name"
             ]
           },
           {
@@ -2739,6 +2828,305 @@
           "enabled",
           "params",
           "mode"
+        ]
+      },
+      "DeviceTrustChallenge": {
+        "type": "object",
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "agent_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "challenge_id",
+          "nonce",
+          "agent_url"
+        ]
+      },
+      "TrustedDevice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "compliance": {
+            "type": "string",
+            "enum": [
+              "compliant",
+              "non_compliant",
+              "unknown"
+            ]
+          },
+          "verified_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "hostname",
+          "compliance",
+          "verified_at"
+        ]
+      },
+      "AccessPolicy": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "report_only",
+              "enforce"
+            ],
+            "default": "report_only",
+            "description": "Start in report-only to see the impact first"
+          },
+          "requirement": {
+            "type": "string",
+            "enum": [
+              "require_mfa",
+              "require_managed_device",
+              "require_compliant_device",
+              "block"
+            ]
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/AccessConditions"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "impact_7d": {
+            "type": "object",
+            "properties": {
+              "would_block": {
+                "type": "integer"
+              },
+              "blocked": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "would_block",
+              "blocked"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "requirement",
+          "conditions",
+          "id",
+          "impact_7d",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "AccessConditions": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "all"
+                ]
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "minItems": 1,
+                "maxItems": 500
+              }
+            ]
+          },
+          "users": {
+            "type": "object",
+            "properties": {
+              "include": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "all"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "groups": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 500
+                      },
+                      "users": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "maxItems": 500
+                      }
+                    },
+                    "required": [
+                      "groups",
+                      "users"
+                    ]
+                  }
+                ]
+              },
+              "exclude": {
+                "type": "object",
+                "properties": {
+                  "groups": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 500
+                  },
+                  "users": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 500
+                  }
+                },
+                "default": {
+                  "groups": [],
+                  "users": []
+                },
+                "required": [
+                  "groups",
+                  "users"
+                ]
+              }
+            },
+            "required": [
+              "include"
+            ]
+          }
+        },
+        "required": [
+          "apps",
+          "users"
+        ]
+      },
+      "AccessSimulation": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "block",
+              "needs_device",
+              "needs_mfa"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyResult"
+            }
+          }
+        },
+        "required": [
+          "outcome",
+          "reason",
+          "results"
+        ]
+      },
+      "PolicyResult": {
+        "type": "object",
+        "properties": {
+          "policy_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "report_only",
+              "enforce"
+            ]
+          },
+          "requirement": {
+            "type": "string",
+            "enum": [
+              "require_mfa",
+              "require_managed_device",
+              "require_compliant_device",
+              "block"
+            ]
+          },
+          "matched": {
+            "type": "boolean"
+          },
+          "satisfied": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy_id",
+          "name",
+          "mode",
+          "requirement",
+          "matched",
+          "satisfied",
+          "reason"
         ]
       }
     },
@@ -10412,7 +10800,7 @@
         "description": "Body `{token, device}`. The `NexusDevice` proof JWT carries the device's new public key in its `jwk` header.",
         "responses": {
           "201": {
-            "description": "Enrolled: `{device_id, organization, checkin_interval_seconds}`"
+            "description": "Enrolled: `{device_id, organization, checkin_interval_seconds, web_origin}` — `web_origin` is the only site the local agent will attest to"
           }
         }
       }
@@ -10426,7 +10814,7 @@
         "description": "Body `{device, posture, inventory?}`, signed with the device key (`kid` = device ID). Returns the next check-in intervals.",
         "responses": {
           "200": {
-            "description": "`{checkin_interval_seconds, inventory_interval_seconds, compliance}`"
+            "description": "`{checkin_interval_seconds, inventory_interval_seconds, compliance, web_origin}`"
           }
         }
       }
@@ -11457,6 +11845,755 @@
                     "data",
                     "reevaluated"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/device-trust/challenge": {
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Start proving which managed device this browser session is on",
+        "description": "Send `nonce` to the local agent at `agent_url` (`POST /v1/attest`), then submit its attestation.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTrustChallenge"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/device-trust": {
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Bind this session to the device that signed the challenge",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challenge_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  },
+                  "attestation": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "challenge_id",
+                  "attestation"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrustedDevice"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/access-policies": {
+      "get": {
+        "tags": [
+          "Conditional access"
+        ],
+        "summary": "Conditional access policies, with their 7-day impact",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccessPolicy"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Conditional access"
+        ],
+        "summary": "Create a policy (requires recent MFA)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "report_only",
+                      "enforce"
+                    ],
+                    "default": "report_only",
+                    "description": "Start in report-only to see the impact first"
+                  },
+                  "requirement": {
+                    "type": "string",
+                    "enum": [
+                      "require_mfa",
+                      "require_managed_device",
+                      "require_compliant_device",
+                      "block"
+                    ]
+                  },
+                  "conditions": {
+                    "$ref": "#/components/schemas/AccessConditions"
+                  }
+                },
+                "required": [
+                  "name",
+                  "requirement",
+                  "conditions"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccessPolicy"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/access-policies/{id}": {
+      "put": {
+        "tags": [
+          "Conditional access"
+        ],
+        "summary": "Replace a policy (requires recent MFA)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "report_only",
+                      "enforce"
+                    ],
+                    "default": "report_only",
+                    "description": "Start in report-only to see the impact first"
+                  },
+                  "requirement": {
+                    "type": "string",
+                    "enum": [
+                      "require_mfa",
+                      "require_managed_device",
+                      "require_compliant_device",
+                      "block"
+                    ]
+                  },
+                  "conditions": {
+                    "$ref": "#/components/schemas/AccessConditions"
+                  }
+                },
+                "required": [
+                  "name",
+                  "requirement",
+                  "conditions"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccessPolicy"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Conditional access"
+        ],
+        "summary": "Delete a policy (requires recent MFA)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccessPolicy"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/access-policies/simulate": {
+      "post": {
+        "tags": [
+          "Conditional access"
+        ],
+        "summary": "What-if: how would a sign-in be decided? (SPEC CA-03)",
+        "description": "Evaluates every policy, including report-only ones, as if they were enforced, and explains each result.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  },
+                  "app_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  },
+                  "mfa": {
+                    "type": "boolean"
+                  },
+                  "device_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  }
+                },
+                "required": [
+                  "user_id",
+                  "app_id",
+                  "mfa",
+                  "device_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessSimulation"
                 }
               }
             }

@@ -71,6 +71,8 @@ export interface Database {
     expires_at: Timestamp;
     revoked_at: NullableTimestamp;
     factor_id: ColumnType<string | null, string | null | undefined, string | null>;
+    device_id: ColumnType<string | null, string | null | undefined, string | null>;
+    device_verified_at: NullableTimestamp;
   };
   auth_factors: {
     id: string;
@@ -236,6 +238,26 @@ export interface Database {
     org_id: string;
     device_id: string;
     expires_at: Timestamp;
+  };
+  access_policies: {
+    id: string;
+    org_id: string;
+    name: string;
+    enabled: Generated<boolean>;
+    mode: Generated<"report_only" | "enforce">;
+    requirement: "require_mfa" | "require_managed_device" | "require_compliant_device" | "block";
+    conditions: Json;
+    created_at: Generated<Date>;
+    updated_at: Timestamp;
+  };
+  device_trust_challenges: {
+    id: string;
+    org_id: string;
+    session_id: string;
+    nonce: string;
+    created_at: Generated<Date>;
+    expires_at: Timestamp;
+    used_at: NullableTimestamp;
   };
   device_pairings: {
     id: string;

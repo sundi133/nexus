@@ -20,6 +20,7 @@ export const PERMISSIONS = [
   "apps:assign", // who can use which app
   "devices:read",
   "devices:write", // enroll/remove devices, assign users, device policies
+  "policies:write", // conditional access policies
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 

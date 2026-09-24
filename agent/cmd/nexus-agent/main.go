@@ -8,6 +8,8 @@
 package main
 
 import (
+	"sync/atomic"
+
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,6 +23,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/identity"
+	"github.com/votal-ai/nexus/agent/internal/local"
 	"github.com/votal-ai/nexus/agent/internal/run"
 	"github.com/votal-ai/nexus/agent/internal/state"
 )
@@ -103,7 +106,7 @@ func enroll(ctx context.Context, store state.Store, server, token string) error 
 	if err != nil {
 		return fmt.Errorf("enrollment failed: %w", err)
 	}
-	if err := store.Save(key, state.Enrollment{Server: server, DeviceID: res.DeviceID, Organization: res.Organization}); err != nil {
+	if err := store.Save(key, state.Enrollment{Server: server, DeviceID: res.DeviceID, Organization: res.Organization, WebOrigin: res.WebOrigin}); err != nil {
 		return fmt.Errorf("enrolled, but saving state failed: %w", err)
 	}
 	fmt.Printf("Enrolled %s in %s (device %s).\nStart reporting with: nexus-agent run\n", snap.Device.Hostname, res.Organization, res.DeviceID)
@@ -119,7 +122,19 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 	if err != nil {
 		return err
 	}
-	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect}
+	// The console origin the loopback server answers; the server may move it, so follow check-ins.
+	var origin atomic.Value
+	origin.Store(e.WebOrigin)
+	onCheckin := func(res *client.CheckinResult) {
+		if res.WebOrigin != "" && res.WebOrigin != origin.Load().(string) {
+			origin.Store(res.WebOrigin)
+			e.WebOrigin = res.WebOrigin
+			if err := store.Save(key, *e); err != nil {
+				log.Warn("could not save the console origin", "err", err)
+			}
+		}
+	}
+	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin}
 	if once {
 		res, err := loop.Once(ctx, 0)
 		if err != nil {
@@ -129,6 +144,18 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		return nil
 	}
 	log.Info("nexus agent started", "device", e.DeviceID, "server", e.Server, "version", version)
+	lsrv := &local.Server{Key: key, DeviceID: e.DeviceID, Origin: func() string { return origin.Load().(string) }, Log: log}
+	if ln, err := lsrv.Listen(); err != nil {
+		log.Warn("browser device checks unavailable", "err", err)
+	} else {
+		defer ln.Close()
+		go func() {
+			if err := lsrv.Serve(ln); err != nil {
+				log.Error("local server stopped", "err", err)
+			}
+		}()
+		log.Info("answering browser device checks", "addr", local.Addr, "origin", e.WebOrigin)
+	}
 	err = loop.Run(ctx)
 	if errors.Is(err, client.ErrNotEnrolled) {
 		log.Error("this device was removed from Nexus; clearing local enrollment")

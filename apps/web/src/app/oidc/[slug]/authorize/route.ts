@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { API_URL, forwardHeaders, SESSION_COOKIE } from "@/lib/session";
+import { interactionRedirect, type Interaction } from "@/lib/sso-redirect";
 
 /**
  * OIDC authorization endpoint on the console's origin, so the user's existing
@@ -16,16 +17,12 @@ export async function GET(req: Request, ctx: RouteContext<"/oidc/[slug]/authoriz
   });
   const origin = url.origin;
   if (!res.ok) return Response.redirect(`${origin}/sso/error?title=${encodeURIComponent("Sign-in unavailable")}`, 302);
-  const d = (await res.json()) as { action: "redirect"; location: string } | { action: "login" } | { action: "error"; title: string; message: string };
-
+  const d = (await res.json()) as { action: "redirect"; location: string } | Interaction;
   if (d.action === "redirect") return Response.redirect(d.location, 302);
-  if (d.action === "login") {
-    // Come back here after signing in; drop prompt=login so the fresh sign-in satisfies it.
-    const back = new URL(url);
-    back.searchParams.delete("prompt");
-    return Response.redirect(`${origin}/login?next=${encodeURIComponent(back.pathname + back.search)}`, 302);
-  }
-  return Response.redirect(`${origin}/sso/error?title=${encodeURIComponent(d.title)}&message=${encodeURIComponent(d.message)}`, 302);
+  // Come back here afterwards; drop prompt=login so the fresh sign-in satisfies it.
+  const back = new URL(url);
+  back.searchParams.delete("prompt");
+  return interactionRedirect(origin, d, back.pathname + back.search);
 }
 
 export const dynamic = "force-dynamic";

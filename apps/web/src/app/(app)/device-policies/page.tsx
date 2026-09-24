@@ -23,7 +23,7 @@ export default function DevicePoliciesPage() {
       <div className="mb-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary-soft px-4 py-3 text-[13px]">
         <Info className="mt-0.5 size-4 shrink-0 text-primary" />
         <p>
-          <span className="font-medium">Audit mode.</span> Non-compliant devices are flagged and their owners are told exactly what to fix. To block sign-in from them, use conditional access (coming next).
+          <span className="font-medium">Audit mode.</span> Non-compliant devices are flagged and their owners are told exactly what to fix. To block sign-in from them, add a conditional access policy that requires a compliant device.
         </p>
       </div>
       {policies.isPending ? (

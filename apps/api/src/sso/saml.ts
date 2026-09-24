@@ -10,6 +10,7 @@ import type { Tx } from "../platform/db.js";
 import { bearer, json, problemResponses } from "../schemas.js";
 import { assignedAppIds } from "./apps.js";
 import { activeSamlCert, certBody, publishedSamlCerts } from "./saml-cert.js";
+import { decideAccess, matchedSummary } from "../access/service.js";
 
 /**
  * SAML 2.0 identity provider (SPEC SSO-02): SP-initiated (HTTP-Redirect and
@@ -244,6 +245,8 @@ const SamlDecision = z
   .discriminatedUnion("action", [
     z.object({ action: z.literal("post"), acs_url: z.string(), saml_response: z.string(), relay_state: z.string().nullable() }),
     z.object({ action: z.literal("login"), reason: z.string() }),
+    z.object({ action: z.literal("device_check"), reason: z.string(), app_name: z.string() }),
+    z.object({ action: z.literal("mfa"), reason: z.string(), app_name: z.string() }),
     z.object({ action: z.literal("error"), code: z.string(), title: z.string(), message: z.string(), app_name: z.string().nullable() }),
   ])
   .openapi("SamlDecision");
@@ -302,6 +305,19 @@ async function decide(
       return pageError("not_assigned", `You don't have access to ${app.name}`, "Ask your administrator to assign this app to you.", app.name);
     }
 
+    const access = await decideAccess(tx, principal, app, meta);
+    if (access.outcome === "needs_device") return { action: "device_check", reason: access.reason, app_name: app.name };
+    if (access.outcome === "needs_mfa") return { action: "mfa", reason: access.reason, app_name: app.name };
+    if (access.outcome === "block") {
+      await audit(tx, org.org_id, { principal, meta }, {
+        type: "sso.login",
+        outcome: "denied",
+        target: { type: "application", id: app.id, display: app.name },
+        details: { protocol: "saml", reason: "access_policy", explanation: access.reason, policies: matchedSummary(access) },
+      });
+      return pageError("access_denied", `Access to ${app.name} is blocked`, access.reason, app.name);
+    }
+
     const user = await tx
       .selectFrom("users")
       .select(["id", "email", "given_name", "family_name", "department", "title"])
@@ -330,7 +346,7 @@ async function decide(
     await audit(tx, org.org_id, { principal, meta }, {
       type: "sso.login",
       target: { type: "application", id: app.id, display: app.name },
-      details: { protocol: "saml", flow: input.request ? "sp_initiated" : "idp_initiated" },
+      details: { protocol: "saml", flow: input.request ? "sp_initiated" : "idp_initiated", policies: matchedSummary(access) },
     });
     return { action: "post", acs_url: cfg.acs_url, saml_response: samlResponse, relay_state: relayState };
   });

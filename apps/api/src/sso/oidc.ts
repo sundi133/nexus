@@ -12,6 +12,7 @@ import { newId } from "../platform/ids.js";
 import { bearer, json, problemResponses } from "../schemas.js";
 import { assignedAppIds, hashSecret, issuerFor } from "./apps.js";
 import { publicJwks, signJwt } from "./keys.js";
+import { decideAccess, matchedSummary } from "../access/service.js";
 
 /**
  * OpenID Connect provider (SPEC SSO-01): authorization code flow with PKCE,
@@ -94,6 +95,8 @@ const AuthorizeDecision = z
   .discriminatedUnion("action", [
     z.object({ action: z.literal("redirect"), location: z.string() }),
     z.object({ action: z.literal("login"), reason: z.string() }),
+    z.object({ action: z.literal("device_check"), reason: z.string(), app_name: z.string() }),
+    z.object({ action: z.literal("mfa"), reason: z.string(), app_name: z.string() }),
     z.object({ action: z.literal("error"), code: z.string(), title: z.string(), message: z.string(), app_name: z.string().nullable() }),
   ])
   .openapi("AuthorizeDecision");
@@ -154,6 +157,25 @@ async function decide(deps: Deps, slug: string, q: Record<string, string>, princ
       return pageError("not_assigned", `You don't have access to ${client.name}`, "Ask your administrator to assign this app to you.", client.name);
     }
 
+    // Conditional access: after assignment, before anything is issued.
+    const access = await decideAccess(tx, principal, client, meta);
+    if (access.outcome === "needs_device") {
+      return prompt.has("none") ? back({ error: "interaction_required", error_description: access.reason }) : { action: "device_check", reason: access.reason, app_name: client.name };
+    }
+    if (access.outcome === "needs_mfa") {
+      return prompt.has("none") ? back({ error: "interaction_required", error_description: access.reason }) : { action: "mfa", reason: access.reason, app_name: client.name };
+    }
+    if (access.outcome === "block") {
+      await audit(tx, org.org_id, { principal, meta }, {
+        type: "sso.login",
+        outcome: "denied",
+        target: { type: "application", id: client.id, display: client.name },
+        details: { protocol: "oidc", reason: "access_policy", explanation: access.reason, policies: matchedSummary(access) },
+      });
+      if (prompt.has("none")) return back({ error: "access_denied", error_description: access.reason });
+      return pageError("access_denied", `Access to ${client.name} is blocked`, access.reason, client.name);
+    }
+
     const code = `nxc_${randomBytes(32).toString("base64url")}`;
     await tx
       .insertInto("oidc_codes")
@@ -176,7 +198,7 @@ async function decide(deps: Deps, slug: string, q: Record<string, string>, princ
     await audit(tx, org.org_id, { principal, meta }, {
       type: "sso.login",
       target: { type: "application", id: client.id, display: client.name },
-      details: { protocol: "oidc", scopes: [...scopes] },
+      details: { protocol: "oidc", scopes: [...scopes], policies: matchedSummary(access) },
     });
     return back({ code });
   });

@@ -130,7 +130,7 @@ export function registerAgentRoutes(app: App) {
     tags: ["Agent"],
     summary: "Enroll a device (called by the Nexus agent)",
     description: "Body `{token, device}`. The `NexusDevice` proof JWT carries the device's new public key in its `jwk` header.",
-    responses: { 201: { description: "Enrolled: `{device_id, organization, checkin_interval_seconds}`" } },
+    responses: { 201: { description: "Enrolled: `{device_id, organization, checkin_interval_seconds, web_origin}` — `web_origin` is the only site the local agent will attest to" } },
   });
   app.post("/v1/agent/enroll", async (c) => {
     const deps = c.get("deps");
@@ -187,7 +187,7 @@ export function registerAgentRoutes(app: App) {
         details: { platform: input.device.platform, os_version: input.device.os_version, serial: input.device.serial, token: tok.name, assigned_user_id: tok.assign_user_id },
       });
       const org = await tx.selectFrom("organizations").select("name").where("id", "=", found.org_id).executeTakeFirstOrThrow();
-      return { device_id: id, organization: org.name, checkin_interval_seconds: CHECKIN_INTERVAL_S };
+      return { device_id: id, organization: org.name, checkin_interval_seconds: CHECKIN_INTERVAL_S, web_origin: deps.cfg.publicUrl };
     });
     return c.json(out, 201);
   });
@@ -198,7 +198,7 @@ export function registerAgentRoutes(app: App) {
     tags: ["Agent"],
     summary: "Report posture and inventory (called by the Nexus agent every minute)",
     description: "Body `{device, posture, inventory?}`, signed with the device key (`kid` = device ID). Returns the next check-in intervals.",
-    responses: { 200: { description: "`{checkin_interval_seconds, inventory_interval_seconds, compliance}`" } },
+    responses: { 200: { description: "`{checkin_interval_seconds, inventory_interval_seconds, compliance, web_origin}`" } },
   });
   app.post("/v1/agent/checkin", async (c) => {
     const deps = c.get("deps");
@@ -238,7 +238,7 @@ export function registerAgentRoutes(app: App) {
         .returning(["id", "org_id", "hostname", "platform", "os_version", "posture", "compliance", "primary_user_id"])
         .executeTakeFirstOrThrow();
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
-      return { checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, compliance };
+      return { checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl };
     });
     return c.json(out, 200);
   });

@@ -116,6 +116,7 @@ type EnrollResult struct {
 	DeviceID        string `json:"device_id"`
 	Organization    string `json:"organization"`
 	CheckinInterval int    `json:"checkin_interval_seconds"`
+	WebOrigin       string `json:"web_origin"`
 }
 
 func (c *Client) Enroll(ctx context.Context, token string, info DeviceInfo) (*EnrollResult, error) {
@@ -128,6 +129,7 @@ type CheckinResult struct {
 	CheckinInterval   int    `json:"checkin_interval_seconds"`
 	InventoryInterval int    `json:"inventory_interval_seconds"`
 	Compliance        string `json:"compliance"`
+	WebOrigin         string `json:"web_origin"`
 }
 
 func (c *Client) Checkin(ctx context.Context, payload any) (*CheckinResult, error) {

@@ -98,7 +98,7 @@ Milestones   ▲ skeleton        ▲ dogfood SSO          ▲ pilot (A)         
 | Mobile | MOB-01, 03, 09, 10; Codes tab | MOB | 3 |
 | | | **Subtotal** | **34** |
 
-**Progress (2026-09-24):** ✅ MFA policy + forced enrollment (ORG-04, AUTH-07) · ✅ secure baseline with impact preview (OPS-01) · ✅ settings change history (OPS-06) · ✅ email invitations · ✅ CSV import with dry-run (DIR-03) · ✅ passkeys (AUTH-03/05) · ✅ push MFA + Nexus Mobile (AUTH-04, MOB-01/02/03) · ✅ OIDC SSO: provider, apps, assignments, app launcher (SSO-01, SSO-05, PORT-01) · ✅ SAML 2.0 IdP: SP- and IdP-initiated, signed assertions, metadata, SP metadata import (SSO-02, SSO-04) · ✅ app catalog with 10 templates + per-app SAML attribute mapping (SSO-03, SSO-06) · ✅ key/certificate rotation with overlap + expiry warning (SSO-07). **SSO for Release A is complete.** · ✅ Device agent (Go, macOS/Windows/Linux) with signed check-ins, enrollment tokens, inventory + posture, 5 device policies in audit mode, My devices (DEV-02..06, DPOL-01..03, PORT-03). Next: conditional access with device trust (CA-01..05); then signed installers + self-update (DEV-01, DEV-07).
+**Progress (2026-09-24):** ✅ MFA policy + forced enrollment (ORG-04, AUTH-07) · ✅ secure baseline with impact preview (OPS-01) · ✅ settings change history (OPS-06) · ✅ email invitations · ✅ CSV import with dry-run (DIR-03) · ✅ passkeys (AUTH-03/05) · ✅ push MFA + Nexus Mobile (AUTH-04, MOB-01/02/03) · ✅ OIDC SSO: provider, apps, assignments, app launcher (SSO-01, SSO-05, PORT-01) · ✅ SAML 2.0 IdP: SP- and IdP-initiated, signed assertions, metadata, SP metadata import (SSO-02, SSO-04) · ✅ app catalog with 10 templates + per-app SAML attribute mapping (SSO-03, SSO-06) · ✅ key/certificate rotation with overlap + expiry warning (SSO-07). **SSO for Release A is complete.** · ✅ Device agent (Go, macOS/Windows/Linux) with signed check-ins, enrollment tokens, inventory + posture, 5 device policies in audit mode, My devices (DEV-02..06, DPOL-01..03, PORT-03). · ✅ Conditional access with device trust: policies (require MFA / managed device / compliant device / block) scoped by app, group and user with exclusions, report-only → enforce with 7-day impact, what-if simulator, per-decision explanations in the audit log; browser sessions proven to be on a device via the agent's loopback attestation (origin-bound, single-use, 12 h); device check and MFA step-up during SSO for OIDC and SAML (CA-01..05, OPS-04, OPS-05). Next: signed installers + self-update (DEV-01, DEV-07).
 
 > Before GA: validate each catalog template against the vendor's current docs and a real tenant, and run the OpenID conformance suite.
 
@@ -112,7 +112,7 @@ Milestones   ▲ skeleton        ▲ dogfood SSO          ▲ pilot (A)         
 | Enrollment, device CA, packaging (macOS + Windows) | DEV-01, 02, 06 | DE1, SRE | 8 |
 | Inventory, posture, compliance (audit-only) | DEV-03..05, DPOL-01..03 | DE2 | 8 |
 | Agent self-update | DEV-07 | DE1 | 3 |
-| Conditional access + device trust | CA-01..05, OPS-04 "Why?", OPS-05 report-only → enforce | TL, DE1 | 7 |
+| Conditional access + device trust ✅ | CA-01..05, OPS-04 "Why?", OPS-05 report-only → enforce | TL, DE1 | 7 |
 | Console + portal | Apps, Devices, Device detail, CA builder + what-if, Portal (PORT-01..03), block page with fix steps | FE, MOB | 8 |
 | | | **Subtotal** | **42** |
 

@@ -48,7 +48,7 @@ export const NAV: NavSection[] = [
     title: "Access",
     items: [
       { label: "Applications", href: "/apps", icon: AppWindow },
-      { label: "Conditional access", href: "/conditional-access", icon: ShieldCheck, soon: "A2" },
+      { label: "Conditional access", href: "/conditional-access", icon: ShieldCheck },
     ],
   },
   {

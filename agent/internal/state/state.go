@@ -17,6 +17,8 @@ type Enrollment struct {
 	Server       string `json:"server"`
 	DeviceID     string `json:"device_id"`
 	Organization string `json:"organization"`
+	// WebOrigin is the Nexus console origin; the loopback server attests only to it.
+	WebOrigin string `json:"web_origin,omitempty"`
 }
 
 // DefaultDir is where a system-wide agent keeps its state.

@@ -1,34 +1,6 @@
-import { exportJWK, generateKeyPair, SignJWT, type CryptoKey as JoseKey } from "jose";
-import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { bootApp, PASSWORD, uniqueEmail } from "./harness.js";
-
-/** A software device agent: P-256 key + signed proofs, exactly what the Go agent sends. */
-class SoftDevice {
-  id = "";
-  private key!: { privateKey: JoseKey; publicKey: JoseKey };
-  async init() {
-    this.key = await generateKeyPair("ES256", { extractable: true });
-    return this;
-  }
-  async proof(path: string, body: string, opts: { method?: string; iatOffset?: number; jti?: string; enroll?: boolean; bodyForHash?: string } = {}) {
-    const iat = Math.floor(Date.now() / 1000) + (opts.iatOffset ?? 0);
-    const header = opts.enroll
-      ? { alg: "ES256", typ: "nexus-device+jwt", jwk: await exportJWK(this.key.publicKey) }
-      : { alg: "ES256", typ: "nexus-device+jwt", kid: this.id };
-    return new SignJWT({
-      htm: opts.method ?? "POST",
-      htu: path,
-      bsh: createHash("sha256").update(opts.bodyForHash ?? body).digest("base64url"),
-      jti: opts.jti ?? randomUUID(),
-    })
-      .setProtectedHeader(header)
-      .setAudience("nexus-agent")
-      .setIssuedAt(iat)
-      .setExpirationTime(iat + 120)
-      .sign(this.key.privateKey);
-  }
-}
+import { SoftDevice } from "./soft-device.js";
 
 let h: Awaited<ReturnType<typeof bootApp>>;
 let admin = "";

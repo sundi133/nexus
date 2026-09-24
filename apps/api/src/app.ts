@@ -22,6 +22,8 @@ import { registerCatalogRoutes } from "./sso/catalog.js";
 import { registerKeyRoutes } from "./sso/key-routes.js";
 import { registerAgentRoutes } from "./devices/agent-api.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
+import { registerDeviceTrustRoutes } from "./access/device-trust.js";
+import { registerAccessPolicyRoutes } from "./access/routes.js";
 import { ApiError, problem } from "./platform/errors.js";
 
 export const API_INFO = {
@@ -92,6 +94,8 @@ export function createApp(deps: Deps) {
   registerKeyRoutes(app);
   registerAgentRoutes(app);
   registerDeviceRoutes(app);
+  registerDeviceTrustRoutes(app);
+  registerAccessPolicyRoutes(app);
 
   app.openAPIRegistry.registerComponent("securitySchemes", "bearer", {
     type: "http",

@@ -23,6 +23,7 @@ Use `--state-dir` to keep state somewhere other than the system default (`/Libra
 - **Signed requests:** every request carries `Authorization: NexusDevice <jwt>`, an ES256 token signed by that key. It's bound to the method, path and SHA-256 of the body, lives at most 2 minutes, and has a single-use `jti`.
 - **Facts only:** the agent reports raw facts. The server decides compliance, and anything the agent can't read is reported as `unknown`, never `on`.
 - **HTTPS only:** plain HTTP is refused except to localhost.
+- **Browser device checks:** `run` also listens on `127.0.0.1:47823` (loopback only). When an app's access policy needs to know which device a browser is on, the Nexus console asks the agent to sign a one-time nonce. The agent answers only the console origin the server gave it (`web_origin`), refuses other Host headers (DNS rebinding), and includes the origin in the signed statement.
 - **Removal:** a removed device gets `device_not_enrolled`, and the agent then clears its local enrollment.
 
 ## What it reads

@@ -1,11 +1,9 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { API_URL, forwardHeaders, SESSION_COOKIE } from "./session";
+import { interactionRedirect, type Interaction } from "./sso-redirect";
 
-type Decision =
-  | { action: "post"; acs_url: string; saml_response: string; relay_state: string | null }
-  | { action: "login"; reason: string }
-  | { action: "error"; title: string; message: string };
+type Decision = { action: "post"; acs_url: string; saml_response: string; relay_state: string | null } | Interaction;
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -27,12 +25,12 @@ ${d.relay_state ? `<input type="hidden" name="RelayState" value="${esc(d.relay_s
 
 /** Asks the API for a SAML decision with the user's session, then renders it for the browser. */
 export async function samlDecision(req: Request, apiPath: string, loginNext: string) {
+  // loginNext: where to resume after any interaction (sign-in, device check, MFA)
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const origin = new URL(req.url).origin;
   const res = await fetch(`${API_URL}${apiPath}`, { headers: forwardHeaders(req, token), cache: "no-store" });
   if (!res.ok) return Response.redirect(`${origin}/sso/error?title=${encodeURIComponent("Sign-in unavailable")}`, 302);
   const d = (await res.json()) as Decision;
   if (d.action === "post") return autoPost(d);
-  if (d.action === "login") return Response.redirect(`${origin}/login?next=${encodeURIComponent(loginNext)}`, 302);
-  return Response.redirect(`${origin}/sso/error?title=${encodeURIComponent(d.title)}&message=${encodeURIComponent(d.message)}`, 302);
+  return interactionRedirect(origin, d, loginNext);
 }

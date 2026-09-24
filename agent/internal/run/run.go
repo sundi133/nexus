@@ -23,6 +23,8 @@ type Loop struct {
 	Version string
 	Log     *slog.Logger
 	Collect func(context.Context) collect.Snapshot
+	// OnCheckin, if set, sees every successful check-in result.
+	OnCheckin func(*client.CheckinResult)
 
 	lastInventory     [32]byte
 	lastInventoryTime time.Time
@@ -48,6 +50,9 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	res, err := l.Client.Checkin(ctx, payload)
 	if err == nil && sendInventory {
 		l.lastInventory, l.lastInventoryTime = sum, time.Now()
+	}
+	if err == nil && l.OnCheckin != nil {
+		l.OnCheckin(res)
 	}
 	return res, err
 }
