@@ -1,3 +1,4 @@
+import { touchUsers } from "../provisioning/service.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
 import type { App, Principal, RequestMeta } from "../context.js";
@@ -286,6 +287,7 @@ export function registerUserRoutes(app: App) {
         );
         if (Object.keys(changes).length === 0) return before;
         await tx.updateTable("users").set({ ...changes, updated_at: new Date() }).where("id", "=", id).execute();
+        await touchUsers(tx, p.orgId, [id]);
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
           type: "user.updated",
           target: { type: "user", id, display: before.email },
@@ -326,6 +328,7 @@ export function registerUserRoutes(app: App) {
         const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
           const user = await getUserOr404(tx, id);
           const effects = await run(tx, who, user);
+          await touchUsers(tx, p.orgId, [id]); // status changes reach provisioned apps
           await audit(tx, p.orgId, who, {
             type: `user.${name.replace(/-/g, "_")}`,
             target: { type: "user", id, display: user.email },
@@ -379,7 +382,7 @@ export function registerUserRoutes(app: App) {
       category: "security.alert",
       severity: "critical",
       title: `${displayName(user)} was contained`,
-      body: `Account suspended and ${effects.sessions_revoked} session(s) revoked. Devices and agents will be included once they're managed by Nexus.`,
+      body: `Account suspended, ${effects.sessions_revoked} session(s) revoked, and accounts in provisioned apps are being deactivated.`,
       entity: { type: "user", id: user.id },
       link: `/users/${user.id}`,
     });

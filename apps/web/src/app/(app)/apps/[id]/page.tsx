@@ -8,6 +8,7 @@ import { Suspense, use, useState } from "react";
 import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { AppIcon } from "@/components/features/app-icon";
+import { AppProvisioning } from "@/components/features/app-provisioning";
 import { SamlIdpValues } from "@/components/features/saml-values";
 import { SamlAttributesEditor } from "@/components/features/saml-attributes";
 import { ConfirmAction } from "@/components/features/confirm-action";
@@ -93,6 +94,7 @@ function AppDetail({ id }: { id: string }) {
           tabs={[
             { value: "setup", label: "Setup" },
             { value: "access", label: `Access (${a.assignment_count})` },
+            { value: "provisioning", label: "Provisioning" },
             { value: "activity", label: "Activity" },
           ]}
         />
@@ -211,6 +213,10 @@ function AppDetail({ id }: { id: string }) {
               <EmptyState title="Nobody can sign in yet" description="Assign a group or individual people to give them access." />
             )}
           </Card>
+        </TabsContent>
+
+        <TabsContent value="provisioning">
+          <AppProvisioning appId={id} appName={a.name} />
         </TabsContent>
 
         <TabsContent value="activity">

@@ -1,3 +1,4 @@
+import { touchAssignment } from "../provisioning/service.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { createHash, randomBytes } from "node:crypto";
 import { sql, type Insertable } from "kysely";
@@ -501,6 +502,7 @@ export function registerAppRoutes(app: App) {
           .returning(["principal_type", "principal_id"])
           .execute();
         if (added.length) {
+          await touchAssignment(tx, p.orgId, id, added);
           await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
             type: "app.assigned",
             target: { type: "application", id, display: a.name },
@@ -534,6 +536,7 @@ export function registerAppRoutes(app: App) {
           .where("principal_id", "=", principalId)
           .executeTakeFirst();
         if (Number(r.numDeletedRows) === 0) throw notFound("Assignment");
+        await touchAssignment(tx, p.orgId, id, [{ principal_type: type, principal_id: principalId }]);
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
           type: "app.unassigned",
           target: { type: "application", id, display: a.name },

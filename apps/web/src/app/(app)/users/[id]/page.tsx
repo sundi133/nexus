@@ -2,12 +2,13 @@
 
 import type { Role, UserDetail } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, KeyRound, LogOut, Mail, MoreHorizontal, Pencil, ShieldOff, Siren, UserCheck, UserX } from "lucide-react";
+import { CalendarClock, ChevronLeft, KeyRound, LogOut, Mail, MoreHorizontal, Pencil, ShieldOff, Siren, UserCheck, UserMinus, UserX } from "lucide-react";
 import Link from "next/link";
 import { use, useState } from "react";
 import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { ConfirmAction } from "@/components/features/confirm-action";
+import { OffboardDialog, offboardingKey, useOffboarding } from "@/components/features/offboard-dialog";
 import { MfaBadge, RoleBadges, UserStatusPill } from "@/components/features/user-bits";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [pending, setPending] = useState<Action | null>(null);
   const [editing, setEditing] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
+  const [offboarding, setOffboarding] = useState(false);
 
   const user = useQuery({ queryKey: qk.user(id), queryFn: () => unwrap(api.GET("/v1/users/{id}", { params: { path: { id } } })) });
   const activity = useQuery({
@@ -140,11 +142,19 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                 <MenuItem danger onSelect={() => setPending("contain")} disabled={u.status !== "active" && !sessions}>
                   <Siren /> Contain…
                 </MenuItem>
+                {u.status !== "deprovisioned" ? (
+                  <MenuItem danger onSelect={() => setOffboarding(true)}>
+                    <UserMinus /> Offboard…
+                  </MenuItem>
+                ) : null}
               </MenuContent>
             </Menu>
           ) : null}
         </div>
       </div>
+
+      <ScheduledOffboarding userId={id} enabled={can("users:lifecycle") && u.status !== "deprovisioned"} onChange={refresh} />
+      {offboarding ? <OffboardDialog userId={id} onClose={() => setOffboarding(false)} onDone={refresh} /> : null}
 
       {/* Signal strip (docs/UI.md §4.2) */}
       <Card className="mb-5 grid grid-cols-2 divide-border md:grid-cols-4 md:divide-x">
@@ -367,5 +377,33 @@ function RolesDialog({ user, open, onOpenChange, onSaved }: { user: UserDetail; 
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** A pending "offboard on their last day", with a way to cancel it. */
+function ScheduledOffboarding({ userId, enabled, onChange }: { userId: string; enabled: boolean; onChange: () => void }) {
+  const qc = useQueryClient();
+  const p = useOffboarding(userId, enabled);
+  const cancel = useMutation({
+    mutationFn: () => unwrap(api.DELETE("/v1/users/{id}/offboarding", { params: { path: { id: userId } } })),
+    onSuccess: (r) => {
+      qc.setQueryData(offboardingKey(userId), r);
+      onChange();
+      toast.success("Scheduled offboarding cancelled");
+    },
+  });
+  const s = p.data?.scheduled;
+  if (!s) return null;
+  return (
+    <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-[13px]">
+      <CalendarClock className="size-4 text-warning" />
+      <p className="flex-1">
+        <span className="font-medium">Offboarding scheduled for {formatDateTime(s.at)}</span>
+        {s.reason ? <span className="text-fg-muted"> · {s.reason}</span> : null}
+      </p>
+      <Button size="sm" variant="secondary" loading={cancel.isPending} onClick={() => cancel.mutate()}>
+        Cancel
+      </Button>
+    </div>
   );
 }

@@ -40,10 +40,10 @@ export async function enqueue(
       dedupe_key: opts.dedupeKey ?? null,
       max_attempts: opts.maxAttempts ?? 8,
     })
-    .onConflict((oc) => oc.columns(["org_id", "dedupe_key"]).where("status", "in", ["queued", "running"]).where("dedupe_key", "is not", null).doNothing())
+    .onConflict((oc) => oc.columns(["org_id", "dedupe_key"]).where("status", "=", "queued").where("dedupe_key", "is not", null).doNothing())
     .returning("id")
     .executeTakeFirst();
-  return r?.id ?? null; // null: an identical job is already pending
+  return r?.id ?? null; // null: an identical job is already queued (a running one doesn't count: it may have read stale state)
 }
 
 /** 30 s, 1 min, 2 min … capped at 1 h. */

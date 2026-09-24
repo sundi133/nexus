@@ -1,3 +1,4 @@
+import { touchUsers } from "../provisioning/service.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { randomBytes } from "node:crypto";
 import { sql } from "kysely";
@@ -164,6 +165,7 @@ export function registerInvitationRoutes(app: App) {
           .set({ password_hash: passwordHash, status: "active", last_login_at: new Date(), updated_at: new Date() })
           .where("id", "=", inv.user_id)
           .execute();
+        await touchUsers(tx, inv.org_id, [inv.user_id]);
 
         const settings = await getSettings(tx, inv.org_id);
         const isAdmin = !!(await tx.selectFrom("user_roles").select("role").where("user_id", "=", inv.user_id).executeTakeFirst());

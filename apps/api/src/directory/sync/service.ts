@@ -7,6 +7,7 @@ import { newId } from "../../platform/ids.js";
 import { enqueue, registerJobHandler, type JobRunner } from "../../platform/jobs.js";
 import { issueInvitation, sendInvite, type PendingInvite } from "../invitations.js";
 import { revokeUserSessions } from "../users.js";
+import { touchGroups, touchUsers } from "../../provisioning/service.js";
 import { plan, PROVIDER_NAME, summarize, type Local, type Plan, type Remote } from "./plan.js";
 import { fetchDirectory, ProviderError } from "./providers.js";
 
@@ -140,6 +141,16 @@ export async function applyPlan(tx: Tx, conn: Conn, p: Plan, meta: RequestMeta) 
     if (m.remove.length) await tx.deleteFrom("group_members").where("group_id", "=", gid).where("user_id", "in", m.remove).execute();
   }
 
+  // Everyone whose profile, status or groups changed: converge their app accounts.
+  const affected = new Set<string>([
+    ...p.create_users.map((r) => userIds.get(r.external_id)).filter((x): x is string => !!x),
+    ...p.update_users.map((u) => u.local_id),
+    ...p.suspend_users.map((u) => u.local_id),
+    ...p.reactivate_users.map((u) => u.local_id),
+    ...p.membership.flatMap((m) => [...m.add.map((ext) => userIds.get(ext)).filter((x): x is string => !!x), ...m.remove]),
+  ]);
+  await touchUsers(tx, conn.org_id, affected);
+  await touchGroups(tx, conn.org_id, p.membership.map((m) => groupIds.get(m.group_external_id)).filter((x): x is string => !!x));
   const summary = { ...summarize(p), create_users: created, skipped: skipped.length };
   await audit(tx, conn.org_id, { meta }, { type: "directory.synced", actor, target: { type: "directory_connection", id: conn.id, display: conn.name }, details: summary });
   return { summary, skipped, invites };

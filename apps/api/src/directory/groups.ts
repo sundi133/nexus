@@ -1,3 +1,4 @@
+import { touchGroups, touchUsers } from "../provisioning/service.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import type { App } from "../context.js";
 import { audit } from "../audit/record.js";
@@ -133,6 +134,7 @@ export function registerGroupRoutes(app: App) {
         const g = await c.get("deps").db.tenant(p.orgId, async (tx) => {
           const before = await getGroup(tx, id);
           await tx.updateTable("groups").set({ ...patch, updated_at: new Date() }).where("id", "=", id).execute();
+          if (patch.name && patch.name !== before.name) await touchGroups(tx, p.orgId, [id]);
           await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
             type: "group.updated",
             target: { type: "group", id, display: before.name },
@@ -163,7 +165,12 @@ export function registerGroupRoutes(app: App) {
       const { id } = c.req.valid("param");
       await c.get("deps").db.tenant(p.orgId, async (tx) => {
         const g = await getGroup(tx, id);
+        const members = await tx.selectFrom("group_members").select("user_id").where("group_id", "=", id).execute();
         await tx.deleteFrom("groups").where("id", "=", id).execute();
+        await tx.deleteFrom("app_assignments").where("principal_type", "=", "group").where("principal_id", "=", id).execute();
+        // Its members may lose app access; pushed copies of the group are removed from apps.
+        await touchUsers(tx, p.orgId, members.map((m) => m.user_id));
+        await touchGroups(tx, p.orgId, [id]);
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
           type: "group.deleted",
           target: { type: "group", id, display: g.name },
@@ -241,6 +248,8 @@ export function registerGroupRoutes(app: App) {
           .returning("user_id")
           .execute();
         if (added.length) {
+          await touchUsers(tx, p.orgId, added.map((a) => a.user_id));
+          await touchGroups(tx, p.orgId, [id]);
           await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
             type: "group.members_added",
             target: { type: "group", id, display: group.name },
@@ -270,6 +279,8 @@ export function registerGroupRoutes(app: App) {
         const group = await getGroup(tx, id);
         const r = await tx.deleteFrom("group_members").where("group_id", "=", id).where("user_id", "=", userId).executeTakeFirst();
         if (Number(r.numDeletedRows) === 0) throw notFound("Membership");
+        await touchUsers(tx, p.orgId, [userId]);
+        await touchGroups(tx, p.orgId, [id]);
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
           type: "group.members_removed",
           target: { type: "group", id, display: group.name },

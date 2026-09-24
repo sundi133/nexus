@@ -82,6 +82,17 @@ describe("background jobs", () => {
     expect(await job(capped)).toMatchObject({ status: "dead", attempts: 2 });
   });
 
+  it("serializes jobs with the same key, without dropping follow-up work", async () => {
+    const first = (await enq("test.echo", { msg: "k1" }, { dedupeKey: "k" }))!;
+    await owner.query("UPDATE jobs SET status = 'running', locked_until = now() + interval '1 minute' WHERE id = $1", [first]);
+    const second = await enq("test.echo", { msg: "k2" }, { dedupeKey: "k" });
+    expect(second).not.toBeNull(); // queued behind the running one, not dropped
+    expect(await h.jobs.runOnce({ orgId })).toBe(0); // waits while k1 runs
+    await owner.query("UPDATE jobs SET status = 'done' WHERE id = $1", [first]);
+    await h.jobs.runOnce({ orgId });
+    expect(seen.at(-1)).toBe("k2");
+  });
+
   it("re-runs jobs whose worker died mid-run", async () => {
     const id = (await enq("test.echo", { msg: "orphan" }))!;
     await owner.query("UPDATE jobs SET status = 'running', locked_until = now() - interval '1 second' WHERE id = $1", [id]);

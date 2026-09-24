@@ -1,3 +1,4 @@
+import { touchUsers } from "../provisioning/service.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
 import type { App } from "../context.js";
@@ -199,6 +200,7 @@ export function registerImportRoutes(app: App) {
                 .execute();
             }
             if (invite) invites.push(await issueInvitation(tx, p, id));
+            if (row.groups.length) await touchUsers(tx, p.orgId, [id]);
           }
           const summary = { created: rows.filter((x) => x.action === "create").length, skipped: rows.filter((x) => x.action === "skip").length };
           await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {

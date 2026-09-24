@@ -24,6 +24,9 @@ import { registerKeyRoutes } from "./sso/key-routes.js";
 import { registerAgentRoutes, registerReleaseDownloads } from "./devices/agent-api.js";
 import { registerAgentUpdateRoutes } from "./devices/update-routes.js";
 import { registerDirectorySyncRoutes } from "./directory/sync/routes.js";
+import { registerProvisioningRoutes } from "./provisioning/routes.js";
+import { registerOffboardingRoutes } from "./directory/offboarding.js";
+import { scheduleProvisioningReconcile } from "./provisioning/service.js";
 import { scheduleDirectorySyncs } from "./directory/sync/service.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
 import { registerDeviceTrustRoutes } from "./access/device-trust.js";
@@ -100,6 +103,8 @@ export function createApp(deps: Deps) {
   registerReleaseDownloads(app);
   registerAgentUpdateRoutes(app);
   registerDirectorySyncRoutes(app);
+  registerProvisioningRoutes(app);
+  registerOffboardingRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -117,4 +122,5 @@ export function createApp(deps: Deps) {
 /** Periodic work run by the job loop (not by HTTP requests). Features add theirs here. */
 export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleDirectorySyncs(jobs, deps);
+  scheduleProvisioningReconcile(jobs, deps);
 }

@@ -250,6 +250,38 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Timestamp;
   };
+  app_provisioning: {
+    app_id: string;
+    org_id: string;
+    enabled: Generated<boolean>;
+    base_url: string;
+    token: Buffer;
+    push_groups: Generated<boolean>;
+    on_unassign: Generated<"deactivate" | "delete">;
+    last_error: Generated<string>;
+    last_error_at: NullableTimestamp;
+    last_success_at: NullableTimestamp;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  provisioned_accounts: {
+    org_id: string;
+    app_id: string;
+    user_id: string;
+    remote_id: string | null;
+    state: "active" | "inactive" | "error";
+    attrs_hash: Generated<string>;
+    last_error: Generated<string>;
+    last_synced_at: Generated<Date>;
+  };
+  provisioned_groups: {
+    org_id: string;
+    app_id: string;
+    group_id: string;
+    remote_id: string;
+    display_name: string;
+    last_synced_at: Generated<Date>;
+  };
   directory_connections: {
     id: string;
     org_id: string;
