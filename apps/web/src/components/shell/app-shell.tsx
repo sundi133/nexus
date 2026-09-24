@@ -8,7 +8,7 @@ import { CommandPalette } from "./command-palette";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 
-const GOTO: Record<string, string> = { o: "/", u: "/users", g: "/groups", a: "/audit" };
+const GOTO: Record<string, string> = { o: "/", u: "/users", g: "/groups", a: "/audit", d: "/devices" };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [palette, setPalette] = useState(false);

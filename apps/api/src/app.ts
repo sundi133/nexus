@@ -20,6 +20,8 @@ import { registerOidcRoutes } from "./sso/oidc.js";
 import { registerSamlRoutes } from "./sso/saml.js";
 import { registerCatalogRoutes } from "./sso/catalog.js";
 import { registerKeyRoutes } from "./sso/key-routes.js";
+import { registerAgentRoutes } from "./devices/agent-api.js";
+import { registerDeviceRoutes } from "./devices/routes.js";
 import { ApiError, problem } from "./platform/errors.js";
 
 export const API_INFO = {
@@ -88,6 +90,8 @@ export function createApp(deps: Deps) {
   registerSamlRoutes(app);
   registerCatalogRoutes(app);
   registerKeyRoutes(app);
+  registerAgentRoutes(app);
+  registerDeviceRoutes(app);
 
   app.openAPIRegistry.registerComponent("securitySchemes", "bearer", {
     type: "http",

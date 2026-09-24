@@ -19,6 +19,7 @@ const SEVERITY = {
 export default function OverviewPage() {
   const { data: me } = useMe();
   const { data, isPending } = useQuery({ queryKey: qk.overview, queryFn: () => unwrap(api.GET("/v1/overview")) });
+  const apps = useQuery({ queryKey: ["apps"], queryFn: () => unwrap(api.GET("/v1/apps")), enabled: !!me?.permissions.includes("apps:read") });
 
   if (me && me.permissions.length === 0) {
     return (
@@ -38,8 +39,8 @@ export default function OverviewPage() {
     { done: !!data && mfaForEveryone, label: "Require MFA for everyone (secure baseline)", href: "/settings/organization" },
     { done: (s?.users_total ?? 0) > 1, label: "Invite your team (one by one or by CSV)", href: "/users?import=1" },
     { done: (s?.groups ?? 0) > 0, label: "Organize people into groups", href: "/groups?new=1" },
-    { done: false, label: "Enroll a device (coming in A2)", href: null },
-    { done: false, label: "Connect an app with SSO (coming in A2)", href: null },
+    { done: (s?.devices ?? 0) > 0, label: "Enroll a device with the Nexus agent", href: "/devices" },
+    { done: (apps.data?.data.length ?? 0) > 0, label: "Connect an app with SSO", href: "/apps" },
   ];
   const doneCount = checklist.filter((c) => c.done).length;
 
@@ -111,7 +112,13 @@ export default function OverviewPage() {
           href="/users?mfa=missing"
         />
         <Stat label="Sign-ins (24h)" value={s?.logins_24h} sub={s ? `${s.failed_logins_24h} failed` : undefined} href="/audit?type=auth.*" />
-        <Stat label="Admins" value={s?.admins} sub={s ? `${s.groups} groups` : undefined} href="/users?role=any_admin" />
+        <Stat
+          label="Devices"
+          value={s?.devices}
+          sub={s ? (s.devices_non_compliant ? `${s.devices_non_compliant} not compliant` : "all compliant") : undefined}
+          tone={s && s.devices_non_compliant ? "warning" : undefined}
+          href={s?.devices_non_compliant ? "/devices?compliance=non_compliant" : "/devices"}
+        />
       </div>
 
       <Card>

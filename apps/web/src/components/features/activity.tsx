@@ -31,6 +31,12 @@ const VERBS: Record<string, string> = {
   "group.members_removed": "removed members from",
   "org.settings_updated": "changed security settings",
   "sso.login": "signed in to",
+  "device.enrolled": "enrolled",
+  "device.removed": "removed the device",
+  "device.user_assigned": "changed the primary user of",
+  "device.policy_updated": "changed the device policy",
+  "device.enrollment_token_created": "created an enrollment token",
+  "device.enrollment_token_revoked": "revoked an enrollment token",
   "sso.key_rotated": "rotated the OIDC signing key",
   "sso.cert_rotation_started": "started a SAML certificate rotation",
   "sso.cert_rotated": "activated a new SAML certificate",
@@ -52,6 +58,7 @@ export function describe(e: AuditEvent) {
     const reason = String(e.details.reason ?? "");
     return reason === "bad_password" ? "failed to sign in (wrong password)" : `was denied sign-in (${reason.replace(/_/g, " ")})`;
   }
+  if (e.type === "device.compliance_changed") return `reports ${e.target.display} is ${String(e.details.to).replace("_", "-")} (was ${String(e.details.from).replace("_", "-")}):`;
   if (e.type === "sso.login" && e.outcome === "denied") return "was blocked from (not assigned)";
   if (e.type === "auth.mfa" && e.outcome === "denied" && e.details.reason === "not_me") return "reported a sign-in they didn't start (blocked)";
   if (e.type === "auth.mfa" && e.outcome === "denied" && e.details.reason === "wrong_number") return "tapped the wrong number on a sign-in (blocked)";
@@ -64,6 +71,7 @@ function targetHref(e: AuditEvent) {
   if (e.target.type === "user") return `/users/${e.target.id}`;
   if (e.target.type === "group") return `/groups/${e.target.id}`;
   if (e.target.type === "application") return `/apps/${e.target.id}`;
+  if (e.target.type === "device") return `/devices/${e.target.id}`;
   return null;
 }
 

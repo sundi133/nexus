@@ -18,15 +18,17 @@ export const PERMISSIONS = [
   "apps:read",
   "apps:write", // create/configure SSO apps and their secrets
   "apps:assign", // who can use which app
+  "devices:read",
+  "devices:write", // enroll/remove devices, assign users, device policies
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-const READ: Permission[] = ["users:read", "groups:read", "audit:read", "apps:read"];
+const READ: Permission[] = ["users:read", "groups:read", "audit:read", "apps:read", "devices:read"];
 
 const GRANTS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
   admin: PERMISSIONS.filter((p) => p !== "admins:manage"),
-  helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign"],
+  helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign", "devices:write"],
   security_analyst: [...READ, "users:lifecycle"],
   readonly: READ,
 };

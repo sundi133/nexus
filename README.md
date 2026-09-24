@@ -33,6 +33,7 @@ Open http://localhost:3100/signup and create an organization.
 apps/api              TypeScript API (Hono + zod-openapi, Kysely, Postgres RLS). SQL migrations in migrations/
 apps/web              Next.js console + BFF (holds the session in an HttpOnly cookie; proxies /bff/v1/* → API)
 apps/mobile           Nexus Mobile (Expo): authenticator + responder; see apps/mobile/README.md
+agent/                Nexus device agent (Go, stdlib only); see agent/README.md
 packages/api-client   Typed client generated from the OpenAPI spec, shared by web and mobile
 deploy/compose        Local Postgres + Mailpit
 docs/                 Spec, architecture, UI and roadmap
@@ -54,7 +55,8 @@ Release A1 in progress. Built:
 - **Identity:** tenancy with Postgres RLS, sign-up, password + TOTP (replay-safe), **passkeys and passwordless sign-in**, **push MFA via Nexus Mobile** (number matching, signed approvals, "This wasn't me" alerts), sessions, inline step-up
 - **Policy:** org MFA requirement with forced enrollment, **secure baseline** with impact preview, change history
 - **SSO:** OpenID Connect provider (code flow + PKCE, discovery, JWKS, userinfo) and SAML 2.0 IdP (SP- and IdP-initiated, signed assertions, metadata import) per organization, an app catalog (Slack, GitHub, AWS, Google Workspace, Atlassian, Zoom, Figma, Dropbox, Grafana…), attribute mapping, key/certificate rotation, user/group assignments, and an app launcher
+- **Devices:** Go agent for macOS, Windows and Linux (signed check-ins), enrollment tokens, inventory, posture checks (disk encryption, firewall, screen lock, OS version, SIP/Secure Boot), device policies, and My devices with fix instructions
 - **Directory:** users and groups, **email invitations**, **CSV import with preview**, lifecycle actions (suspend, contain, reset MFA), admin roles
 - **Visibility:** audit log, notification inbox with live updates, Overview with a "Needs attention" queue
 
-Next up: the device agent (inventory + posture), then conditional access with device trust.
+Next up: conditional access with device trust, then signed agent installers.

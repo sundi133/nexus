@@ -29,6 +29,9 @@ const Overview = z
       mfa_coverage: z.number().openapi({ description: "Share of active users with MFA, 0..1" }),
       logins_24h: z.number().int(),
       failed_logins_24h: z.number().int(),
+      devices: z.number().int(),
+      devices_non_compliant: z.number().int(),
+      devices_unknown: z.number().int(),
     }),
     needs_attention: z.array(Attention),
     recent_activity: z.array(AuditEvent),
@@ -46,6 +49,9 @@ type Counts = {
   groups: number;
   logins_24h: number;
   failed_logins_24h: number;
+  devices: number;
+  devices_non_compliant: number;
+  devices_unknown: number;
 };
 
 export function registerOverviewRoutes(app: App) {
@@ -81,7 +87,10 @@ export function registerOverviewRoutes(app: App) {
             (SELECT count(*) FROM audit_events WHERE type = 'auth.login' AND outcome = 'success'
                AND ts > now() - interval '24 hours')::int                   AS logins_24h,
             (SELECT count(*) FROM audit_events WHERE type IN ('auth.login', 'auth.mfa') AND outcome <> 'success'
-               AND ts > now() - interval '24 hours')::int                   AS failed_logins_24h
+               AND ts > now() - interval '24 hours')::int                   AS failed_logins_24h,
+            (SELECT count(*) FROM devices WHERE status = 'active')::int     AS devices,
+            (SELECT count(*) FROM devices WHERE status = 'active' AND compliance = 'non_compliant')::int AS devices_non_compliant,
+            (SELECT count(*) FROM devices WHERE status = 'active' AND compliance = 'unknown')::int AS devices_unknown
           FROM u`.execute(tx);
         const recent = await auditQuery(tx).orderBy("id", "desc").limit(8).execute();
         const certs = await tx
@@ -115,6 +124,18 @@ export function registerOverviewRoutes(app: App) {
           count: n,
           link: "/users?mfa=missing",
           action_label: "View users",
+        });
+      }
+      if (counts.devices_non_compliant > 0) {
+        const n = counts.devices_non_compliant;
+        items.push({
+          id: "devices_non_compliant",
+          severity: "warning",
+          title: `${n} device${n > 1 ? "s" : ""} not compliant`,
+          description: "Their owners have been told what to fix. Review the failing checks.",
+          count: n,
+          link: "/devices?compliance=non_compliant",
+          action_label: "Review devices",
         });
       }
       if (settings.mfa_policy !== "everyone") {

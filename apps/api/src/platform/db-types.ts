@@ -4,6 +4,10 @@ type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;
 type NullableTimestamp = ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
 type Json<T = Record<string, unknown>> = ColumnType<T, string | undefined, string>;
 
+export type DevicePlatform = "macos" | "windows" | "linux";
+export type Compliance = "compliant" | "non_compliant" | "unknown";
+export type CheckStatus = "pass" | "fail" | "unknown" | "not_applicable";
+
 export type SessionState = "pending_mfa" | "enroll_mfa" | "active";
 
 export type UserStatus = "staged" | "active" | "suspended" | "deprovisioned";
@@ -171,6 +175,67 @@ export interface Database {
     created_at: Generated<Date>;
     expires_at: Timestamp;
     used_at: NullableTimestamp;
+  };
+  device_enrollment_tokens: {
+    id: string;
+    org_id: string;
+    name: string;
+    token_hash: Buffer;
+    assign_user_id: string | null;
+    created_by: string | null;
+    max_uses: number | null;
+    uses: Generated<number>;
+    expires_at: Timestamp;
+    revoked_at: NullableTimestamp;
+    created_at: Generated<Date>;
+  };
+  devices: {
+    id: string;
+    org_id: string;
+    hostname: string;
+    platform: DevicePlatform;
+    os_name: Generated<string>;
+    os_version: Generated<string>;
+    os_build: Generated<string>;
+    arch: Generated<string>;
+    model: Generated<string>;
+    serial: Generated<string>;
+    agent_version: Generated<string>;
+    public_jwk: Json;
+    key_thumbprint: string;
+    primary_user_id: string | null;
+    enrollment_token_id: string | null;
+    status: Generated<"active" | "removed">;
+    compliance: Generated<Compliance>;
+    compliance_changed_at: NullableTimestamp;
+    inventory: Json;
+    posture: Json;
+    enrolled_at: Generated<Date>;
+    last_seen_at: NullableTimestamp;
+    last_ip: Generated<string>;
+    created_at: Generated<Date>;
+    updated_at: Timestamp;
+  };
+  device_checks: {
+    org_id: string;
+    device_id: string;
+    check_key: string;
+    status: CheckStatus;
+    detail: string;
+    updated_at: Timestamp;
+  };
+  device_policies: {
+    org_id: string;
+    check_key: string;
+    enabled: boolean;
+    params: Json;
+    updated_at: Timestamp;
+  };
+  agent_nonces: {
+    jti: string;
+    org_id: string;
+    device_id: string;
+    expires_at: Timestamp;
   };
   device_pairings: {
     id: string;

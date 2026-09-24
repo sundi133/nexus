@@ -6,6 +6,7 @@ import {
   Home,
   KeyRound,
   LayoutGrid,
+  MonitorSmartphone,
   Laptop,
   ScrollText,
   Server,
@@ -26,6 +27,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "Overview", href: "/", icon: Home, shortcut: "G O" },
       { label: "My apps", href: "/my-apps", icon: LayoutGrid },
+      { label: "My devices", href: "/my-devices", icon: MonitorSmartphone },
     ],
   },
   {
@@ -38,8 +40,8 @@ export const NAV: NavSection[] = [
   {
     title: "Devices",
     items: [
-      { label: "All devices", href: "/devices", icon: Laptop, soon: "A2" },
-      { label: "Device policies", href: "/device-policies", icon: Wrench, soon: "A2" },
+      { label: "All devices", href: "/devices", icon: Laptop, shortcut: "G D" },
+      { label: "Device policies", href: "/device-policies", icon: Wrench },
     ],
   },
   {
