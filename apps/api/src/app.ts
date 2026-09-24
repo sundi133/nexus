@@ -7,6 +7,7 @@ import { registerAuditRoutes } from "./audit/routes.js";
 import { loadPrincipal } from "./auth/guard.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
+import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
 import { registerUserRoutes } from "./directory/users.js";
 import { registerInvitationRoutes } from "./directory/invitations.js";
@@ -68,6 +69,7 @@ export function createApp(deps: Deps) {
 
   registerAuthRoutes(app);
   registerPasskeyRoutes(app);
+  registerPushRoutes(app);
   registerImportRoutes(app);
   registerUserRoutes(app);
   registerInvitationRoutes(app);

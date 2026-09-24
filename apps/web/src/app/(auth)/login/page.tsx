@@ -10,6 +10,7 @@ import { Field, Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/ui/misc";
 import { api, ApiProblem, bffAuth, nextStepUrl, unwrap, type SignInResult } from "@/lib/api";
 import { passkeyErrorMessage, signInWithPasskey, usePasskeysSupported, verifyWithPasskey } from "@/lib/passkeys";
+import { PushApproval } from "@/components/features/push-approval";
 
 function LoginForm() {
   const router = useRouter();
@@ -129,8 +130,9 @@ function MfaStep({ next, onRestart }: { next: string; onRestart: () => void }) {
         {session.data ? <p className="mt-1 text-xs text-fg-subtle">{session.data.email}</p> : null}
       </div>
       <ErrorBanner error={error} />
+      {factors.has("push") ? <PushApproval onApproved={done} autoStart={!factors.has("webauthn")} /> : null}
       {factors.has("webauthn") && passkeys ? (
-        <Button variant="primary" size="lg" className="w-full" loading={busy} onClick={() => attempt(verifyWithPasskey)}>
+        <Button variant={factors.has("push") ? "secondary" : "primary"} size="lg" className="w-full" loading={busy} onClick={() => attempt(verifyWithPasskey)}>
           <Fingerprint /> Use your passkey
         </Button>
       ) : null}
@@ -144,7 +146,7 @@ function MfaStep({ next, onRestart }: { next: string; onRestart: () => void }) {
         >
           <p className="text-center text-[13px] text-fg-muted">Enter the 6-digit code from your authenticator app.</p>
           <Input
-            autoFocus={!factors.has("webauthn")}
+            autoFocus={!factors.has("webauthn") && !factors.has("push")}
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={6}
@@ -154,7 +156,7 @@ function MfaStep({ next, onRestart }: { next: string; onRestart: () => void }) {
             className="h-11 text-center font-mono text-lg tracking-[0.5em]"
             aria-label="Verification code"
           />
-          <Button type="submit" variant={factors.has("webauthn") ? "secondary" : "primary"} size="lg" className="w-full" loading={busy} disabled={code.length !== 6}>
+          <Button type="submit" variant={factors.has("webauthn") || factors.has("push") ? "secondary" : "primary"} size="lg" className="w-full" loading={busy} disabled={code.length !== 6}>
             Verify code
           </Button>
         </form>

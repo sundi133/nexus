@@ -4,6 +4,7 @@ export type Config = {
   databaseUrl: string; // runtime role: RLS always enforced
   databaseOwnerUrl: string; // migration role
   publicUrl: string; // web origin (links, CORS)
+  apiPublicUrl: string; // how phones reach this API (a LAN IP in dev, the API domain in prod)
   trustProxy: boolean; // honor X-Forwarded-For (only behind our own BFF / load balancer)
   sealKey: Buffer; // 32 bytes; KMS-backed in prod
   rpId: string; // WebAuthn relying party ID (the web origin's host)
@@ -33,6 +34,7 @@ export function loadConfig(env = process.env): Config {
     databaseOwnerUrl:
       env.NEXUS_DATABASE_OWNER_URL ?? "postgres://nexus_owner:nexus_owner@localhost:55432/nexus",
     publicUrl: env.NEXUS_PUBLIC_URL ?? "http://localhost:3100",
+    apiPublicUrl: env.NEXUS_API_PUBLIC_URL ?? "http://localhost:8080",
     trustProxy: (env.NEXUS_TRUST_PROXY ?? (mode === "prod" ? "false" : "true")) === "true",
     sealKey,
     rpId: env.NEXUS_RP_ID ?? new URL(env.NEXUS_PUBLIC_URL ?? "http://localhost:3100").hostname,

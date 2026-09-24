@@ -4,6 +4,7 @@ import type { Db } from "./platform/db.js";
 import type { Sealer } from "./platform/seal.js";
 import type { Realtime } from "./platform/realtime.js";
 import type { Mailer } from "./platform/mailer.js";
+import type { PushSender } from "./platform/push.js";
 import type { Role } from "./rbac.js";
 import type { SessionState } from "./platform/db-types.js";
 
@@ -21,7 +22,7 @@ export type Principal = {
 
 export type RequestMeta = { ip: string; userAgent: string; requestId: string };
 
-export type Deps = { cfg: Config; db: Db; sealer: Sealer; realtime: Realtime; mailer: Mailer };
+export type Deps = { cfg: Config; db: Db; sealer: Sealer; realtime: Realtime; mailer: Mailer; push: PushSender };
 
 export type Env = {
   Variables: {

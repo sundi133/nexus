@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Fingerprint, Plus, Smartphone, Trash2 } from "lucide-react";
+import { Fingerprint, KeyRound, Plus, Smartphone, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { MfaEnroll } from "@/components/features/mfa-enroll";
@@ -25,6 +25,7 @@ export default function SecurityPage() {
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: qk.factors });
+    qc.invalidateQueries({ queryKey: qk.sessions });
     qc.invalidateQueries({ queryKey: qk.me });
     qc.invalidateQueries({ queryKey: qk.overview });
   };
@@ -64,7 +65,7 @@ export default function SecurityPage() {
             <ul className="divide-y divide-border">
               {verified.map((f) => (
                 <li key={f.id} className="flex items-center gap-3 px-4 py-3 text-[13px]">
-                  {f.type === "webauthn" ? <Fingerprint className="size-4 text-fg-muted" /> : <Smartphone className="size-4 text-fg-muted" />}
+                  {f.type === "webauthn" ? <Fingerprint className="size-4 text-fg-muted" /> : f.type === "push" ? <Smartphone className="size-4 text-primary" /> : <KeyRound className="size-4 text-fg-muted" />}
                   <div className="flex-1">
                     <p className="font-medium">{f.name}</p>
                     <p className="text-xs text-fg-muted">
@@ -86,7 +87,7 @@ export default function SecurityPage() {
               ))}
             </ul>
           ) : (
-            <EmptyState title="No sign-in methods yet" description="Passkeys are the most secure option. Push approvals from Nexus Mobile are coming next." />
+            <EmptyState title="No sign-in methods yet" description="Passkeys are the most secure option; Nexus Mobile lets you approve sign-ins with a tap." />
           )}
         </Card>
         <Card className="overflow-hidden">

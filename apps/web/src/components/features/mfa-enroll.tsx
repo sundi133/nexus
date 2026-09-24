@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Fingerprint, Smartphone } from "lucide-react";
+import { Fingerprint, KeyRound, Smartphone } from "lucide-react";
+import { PairPhone } from "./pair-phone";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -12,13 +13,15 @@ import { passkeyErrorMessage, registerPasskey, usePasskeysSupported } from "@/li
 import { cn } from "@/lib/utils";
 
 /** Choose and set up a factor. Passkeys are recommended: phishing-resistant and nothing to type. */
-export function MfaEnroll({ onDone, defaultMethod }: { onDone: () => void; defaultMethod?: "passkey" | "totp" }) {
+type Method = "passkey" | "push" | "totp";
+
+export function MfaEnroll({ onDone, defaultMethod }: { onDone: () => void; defaultMethod?: Method }) {
   const supported = usePasskeysSupported();
-  const [picked, setMethod] = useState<"passkey" | "totp" | null>(defaultMethod ?? null);
+  const [picked, setMethod] = useState<Method | null>(defaultMethod ?? null);
   const method = picked ?? (supported ? "passkey" : "totp");
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="MFA method">
+      <div className="grid gap-2" role="radiogroup" aria-label="MFA method">
         <MethodCard
           active={method === "passkey"}
           disabled={!supported}
@@ -29,14 +32,21 @@ export function MfaEnroll({ onDone, defaultMethod }: { onDone: () => void; defau
           subtitle={supported ? "Touch ID, Windows Hello or a security key" : "Not supported in this browser"}
         />
         <MethodCard
+          active={method === "push"}
+          onClick={() => setMethod("push")}
+          icon={<Smartphone />}
+          title="Nexus Mobile"
+          subtitle="Approve sign-ins with a tap"
+        />
+        <MethodCard
           active={method === "totp"}
           onClick={() => setMethod("totp")}
-          icon={<Smartphone />}
+          icon={<KeyRound />}
           title="Authenticator app"
-          subtitle="6-digit codes from an app"
+          subtitle="6-digit codes from any app"
         />
       </div>
-      {method === "passkey" ? <PasskeyEnroll onDone={onDone} /> : <TotpEnroll onDone={onDone} />}
+      {method === "passkey" ? <PasskeyEnroll onDone={onDone} /> : method === "push" ? <PairPhone onDone={onDone} /> : <TotpEnroll onDone={onDone} />}
     </div>
   );
 }
@@ -47,18 +57,25 @@ function MethodCard(props: { active: boolean; disabled?: boolean; onClick: () =>
       type="button"
       role="radio"
       aria-checked={props.active}
+      aria-label={`${props.title}: ${props.subtitle}`}
       disabled={props.disabled}
       onClick={props.onClick}
       className={cn(
-        "rounded-lg border p-3 text-left transition-colors disabled:opacity-50 [&_svg]:size-4",
+        "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
         props.active ? "border-primary bg-primary-soft" : "border-border hover:bg-bg-subtle",
       )}
     >
-      <span className="flex items-center gap-1.5 text-[13px] font-medium">
-        {props.icon} {props.title}
-        {props.badge ? <span className="ml-auto rounded bg-primary px-1.5 text-[10px] font-semibold text-primary-fg">{props.badge}</span> : null}
+      <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border", props.active ? "border-primary" : "border-border-strong")} aria-hidden>
+        {props.active ? <span className="size-2 rounded-full bg-primary" /> : null}
       </span>
-      <span className="mt-1 block text-xs text-fg-muted">{props.subtitle}</span>
+      {props.icon}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2 text-[13px] font-medium">
+          {props.title}
+          {props.badge ? <span className="rounded bg-primary px-1.5 text-[10px] font-semibold text-primary-fg">{props.badge}</span> : null}
+        </span>
+        <span className="block text-xs text-fg-muted">{props.subtitle}</span>
+      </span>
     </button>
   );
 }

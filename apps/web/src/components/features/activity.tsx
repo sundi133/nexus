@@ -40,6 +40,8 @@ export function describe(e: AuditEvent) {
     const reason = String(e.details.reason ?? "");
     return reason === "bad_password" ? "failed to sign in (wrong password)" : `was denied sign-in (${reason.replace(/_/g, " ")})`;
   }
+  if (e.type === "auth.mfa" && e.outcome === "denied" && e.details.reason === "not_me") return "reported a sign-in they didn't start (blocked)";
+  if (e.type === "auth.mfa" && e.outcome === "denied" && e.details.reason === "wrong_number") return "tapped the wrong number on a sign-in (blocked)";
   if (e.type === "auth.mfa" && e.outcome !== "success") return "failed MFA verification";
   return VERBS[e.type] ?? e.type;
 }

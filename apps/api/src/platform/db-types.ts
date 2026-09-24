@@ -66,6 +66,7 @@ export interface Database {
     last_seen_at: Timestamp;
     expires_at: Timestamp;
     revoked_at: NullableTimestamp;
+    factor_id: ColumnType<string | null, string | null | undefined, string | null>;
   };
   auth_factors: {
     id: string;
@@ -115,6 +116,28 @@ export interface Database {
     created_at: Generated<Date>;
     expires_at: Timestamp;
     decided_at: NullableTimestamp;
+    factor_id: ColumnType<string | null, string | null | undefined, string | null>;
+    decision_reason: ColumnType<string | null, string | null | undefined, string | null>;
+  };
+  device_pairings: {
+    id: string;
+    org_id: string;
+    user_id: string;
+    session_id: string | null;
+    code_hash: Buffer;
+    created_at: Generated<Date>;
+    expires_at: Timestamp;
+    used_at: NullableTimestamp;
+  };
+  push_registrations: {
+    id: string;
+    org_id: string;
+    user_id: string;
+    factor_id: string | null;
+    platform: "ios" | "android" | "web";
+    token: string;
+    created_at: Generated<Date>;
+    last_seen_at: Timestamp;
   };
   audit_events: {
     id: string;

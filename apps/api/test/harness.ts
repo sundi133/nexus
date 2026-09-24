@@ -7,6 +7,7 @@ import { migrate } from "../src/platform/migrate.js";
 import { Realtime } from "../src/platform/realtime.js";
 import { Sealer } from "../src/platform/seal.js";
 import { MemoryMailer } from "../src/platform/mailer.js";
+import { RecordingPushSender } from "../src/platform/push.js";
 
 /** Boots the real app against the nexus_test database. Tests talk HTTP to it via app.request(). */
 export async function bootApp() {
@@ -16,7 +17,8 @@ export async function bootApp() {
   const realtime = new Realtime(cfg.databaseUrl);
   await realtime.start();
   const mailer = new MemoryMailer();
-  const app = createApp({ cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer });
+  const push = new RecordingPushSender();
+  const app = createApp({ cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push });
 
   async function call<T = any>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) {
     const res = await app.request(path, {
@@ -36,6 +38,7 @@ export async function bootApp() {
     app,
     call,
     mailer,
+    push,
     close: async () => {
       await realtime.stop();
       await db.close();

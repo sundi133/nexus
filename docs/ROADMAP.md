@@ -78,7 +78,7 @@ Milestones   ▲ skeleton        ▲ dogfood SSO          ▲ pilot (A)         
 | F.4 Auth skeleton ✅ | Org sign-up ✅, password + TOTP (replay-safe) ✅, passkeys + passwordless ✅, sessions ✅, BFF cookie ✅, step-up with inline UI ✅ | BE1 | 4 |
 | F.5 Audit + notify skeleton ✅ (partial) | Audit in Postgres ✅, inbox ✅, SSE via LISTEN/NOTIFY ✅; still to do: APNs/FCM sender, ClickHouse | BE2 | 4 |
 | F.6 Web design system v0 ✅ (partial) | Tokens ✅, AppShell ✅, ⌘K ✅, inbox drawer ✅, tables/forms/dialogs ✅; still to do: Storybook | FE | 4 |
-| F.7 Mobile shell | Expo app, PKCE login, DPoP key, push registration, inbox, push-MFA approval screen | MOB | 4 |
+| F.7 Mobile shell ✅ (partial) | Expo app ✅, QR pairing ✅, Ed25519 device key ✅, push-MFA approval with number matching ✅, inbox ✅, push-token registration ✅; still to do: APNs/FCM sender, hardware-backed key, DPoP | MOB | 4 |
 | F.8 Agent spike | Go agent skeleton, gRPC stream, osquery embedded on macOS + Windows | DE1, DE2 | 6 |
 | F.9 MCP spike | Pass-through MCP proxy with JWT verification + Cedar eval | AI | 3 |
 | | | **Total** | **37** |
@@ -98,7 +98,7 @@ Milestones   ▲ skeleton        ▲ dogfood SSO          ▲ pilot (A)         
 | Mobile | MOB-01, 03, 09, 10; Codes tab | MOB | 3 |
 | | | **Subtotal** | **34** |
 
-**Progress (2026-09-24):** ✅ MFA policy + forced enrollment (ORG-04, AUTH-07) · ✅ secure baseline with impact preview (OPS-01) · ✅ settings change history (OPS-06) · ✅ email invitations · ✅ CSV import with dry-run (DIR-03) · ✅ passkeys (AUTH-03/05). Next: push MFA + Nexus Mobile, then Google/Entra sync (DIR-08) and Slack/email notification channels.
+**Progress (2026-09-24):** ✅ MFA policy + forced enrollment (ORG-04, AUTH-07) · ✅ secure baseline with impact preview (OPS-01) · ✅ settings change history (OPS-06) · ✅ email invitations · ✅ CSV import with dry-run (DIR-03) · ✅ passkeys (AUTH-03/05) · ✅ push MFA + Nexus Mobile (AUTH-04, MOB-01/02/03). Next: SSO (OIDC + SAML), then device agent + device trust.
 
 **Milestone:** Votal employees use Nexus for daily login with push MFA.
 

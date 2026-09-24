@@ -32,7 +32,8 @@ Open http://localhost:3100/signup and create an organization.
 ```
 apps/api              TypeScript API (Hono + zod-openapi, Kysely, Postgres RLS). SQL migrations in migrations/
 apps/web              Next.js console + BFF (holds the session in an HttpOnly cookie; proxies /bff/v1/* → API)
-packages/api-client   Typed client generated from the OpenAPI spec, shared by web and (soon) mobile
+apps/mobile           Nexus Mobile (Expo): authenticator + responder; see apps/mobile/README.md
+packages/api-client   Typed client generated from the OpenAPI spec, shared by web and mobile
 deploy/compose        Local Postgres + Mailpit
 docs/                 Spec, architecture, UI and roadmap
 ```
@@ -50,9 +51,9 @@ docs/                 Spec, architecture, UI and roadmap
 
 Release A1 in progress. Built:
 
-- **Identity:** tenancy with Postgres RLS, sign-up, password + TOTP (replay-safe), **passkeys and passwordless sign-in**, sessions, inline step-up for sensitive actions
+- **Identity:** tenancy with Postgres RLS, sign-up, password + TOTP (replay-safe), **passkeys and passwordless sign-in**, **push MFA via Nexus Mobile** (number matching, signed approvals, "This wasn't me" alerts), sessions, inline step-up
 - **Policy:** org MFA requirement with forced enrollment, **secure baseline** with impact preview, change history
 - **Directory:** users and groups, **email invitations**, **CSV import with preview**, lifecycle actions (suspend, contain, reset MFA), admin roles
 - **Visibility:** audit log, notification inbox with live updates, Overview with a "Needs attention" queue
 
-Next up: Nexus Mobile with push MFA.
+Next up: SSO (OIDC + SAML) and the device agent.
