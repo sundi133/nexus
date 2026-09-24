@@ -150,6 +150,9 @@ export interface Database {
     private_key_sealed: Buffer;
     status: Generated<"active" | "retired">;
     created_at: Generated<Date>;
+    purpose: Generated<"oidc" | "saml">;
+    cert_pem: string | null;
+    not_after: NullableTimestamp;
   };
   oidc_codes: {
     id: string;

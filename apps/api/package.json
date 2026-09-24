@@ -16,7 +16,9 @@
     "@hono/node-server": "^2.1.1",
     "@hono/zod-openapi": "^1.6.3",
     "@node-rs/argon2": "^2.2.1",
+    "@peculiar/x509": "^2.1.0",
     "@simplewebauthn/server": "^14.0.2",
+    "@xmldom/xmldom": "^0.9.12",
     "hono": "^4.13.9",
     "jose": "^6.2.12",
     "kysely": "^0.29.6",
@@ -24,9 +26,12 @@
     "otpauth": "^9.5.2",
     "pg": "^8.23.0",
     "uuidv7": "^1.2.1",
+    "xml-crypto": "^6.3.1",
+    "xpath": "^0.0.34",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@node-saml/node-saml": "^5.1.0",
     "@types/node": "^26.6.2",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",

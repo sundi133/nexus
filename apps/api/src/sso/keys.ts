@@ -30,6 +30,7 @@ async function activeKey(tx: Tx, deps: Deps, orgId: string) {
     (await tx
       .selectFrom("signing_keys")
       .select(["kid", "private_key_sealed"])
+      .where("purpose", "=", "oidc")
       .where("status", "=", "active")
       .orderBy("created_at", "desc")
       .executeTakeFirst()) ?? (await createKey(tx, deps, orgId));
@@ -52,10 +53,11 @@ export async function signJwt(tx: Tx, deps: Deps, orgId: string, payload: JWTPay
 
 /** Public keys for the tenant's JWKS (active and retired). Creates the first key if none exists yet. */
 export async function publicJwks(tx: Tx, deps: Deps, orgId: string): Promise<{ keys: JWK[] }> {
-  let rows = await tx.selectFrom("signing_keys").select("public_jwk").orderBy("created_at", "desc").execute();
+  const oidcKeys = () => tx.selectFrom("signing_keys").select("public_jwk").where("purpose", "=", "oidc").orderBy("created_at", "desc").execute();
+  let rows = await oidcKeys();
   if (!rows.length) {
     await activeKey(tx, deps, orgId);
-    rows = await tx.selectFrom("signing_keys").select("public_jwk").orderBy("created_at", "desc").execute();
+    rows = await oidcKeys();
   }
   return { keys: rows.map((r) => r.public_jwk as JWK) };
 }

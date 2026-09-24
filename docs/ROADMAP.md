@@ -98,7 +98,7 @@ Milestones   ▲ skeleton        ▲ dogfood SSO          ▲ pilot (A)         
 | Mobile | MOB-01, 03, 09, 10; Codes tab | MOB | 3 |
 | | | **Subtotal** | **34** |
 
-**Progress (2026-09-24):** ✅ MFA policy + forced enrollment (ORG-04, AUTH-07) · ✅ secure baseline with impact preview (OPS-01) · ✅ settings change history (OPS-06) · ✅ email invitations · ✅ CSV import with dry-run (DIR-03) · ✅ passkeys (AUTH-03/05) · ✅ push MFA + Nexus Mobile (AUTH-04, MOB-01/02/03) · ✅ OIDC SSO: provider, apps, assignments, app launcher (SSO-01, SSO-04 for OIDC, SSO-05, PORT-01). Next: SAML IdP + app catalog, then device agent + device trust.
+**Progress (2026-09-24):** ✅ MFA policy + forced enrollment (ORG-04, AUTH-07) · ✅ secure baseline with impact preview (OPS-01) · ✅ settings change history (OPS-06) · ✅ email invitations · ✅ CSV import with dry-run (DIR-03) · ✅ passkeys (AUTH-03/05) · ✅ push MFA + Nexus Mobile (AUTH-04, MOB-01/02/03) · ✅ OIDC SSO: provider, apps, assignments, app launcher (SSO-01, SSO-05, PORT-01) · ✅ SAML 2.0 IdP: SP- and IdP-initiated, signed assertions, metadata, SP metadata import (SSO-02, SSO-04). Next: app catalog (SSO-03) + certificate rotation (SSO-07), then device agent + device trust.
 
 **Milestone:** Votal employees use Nexus for daily login with push MFA.
 

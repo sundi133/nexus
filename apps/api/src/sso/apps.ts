@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { createHash, randomBytes } from "node:crypto";
-import { sql } from "kysely";
+import { sql, type Insertable } from "kysely";
+import type { Database } from "../platform/db-types.js";
 import type { App, Deps } from "../context.js";
 import { audit } from "../audit/record.js";
 import { requirePermission, requireSession } from "../auth/guard.js";
@@ -9,6 +10,8 @@ import { isUniqueViolation } from "../platform/db.js";
 import { badRequest, conflict, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, json, problemResponses } from "../schemas.js";
+import { activeSamlCert, type SamlCert } from "./saml-cert.js";
+import { idpUrls, parseSpMetadata, type SamlConfig } from "./saml.js";
 
 export const hashSecret = (s: string) => createHash("sha256").update(s).digest();
 const newClientId = () => `nx_${randomBytes(12).toString("base64url")}`;
@@ -44,14 +47,37 @@ const AppSchema = z
         discovery_url: z.string(),
       })
       .nullable(),
+    saml: z
+      .object({
+        entity_id: z.string(),
+        acs_url: z.string(),
+        name_id_format: z.enum(["email", "persistent"]),
+        sign: z.enum(["assertion", "response_and_assertion"]),
+        default_relay_state: z.string().nullable(),
+        idp_entity_id: z.string(),
+        idp_sso_url: z.string(),
+        idp_metadata_url: z.string(),
+        idp_certificate: z.string().openapi({ description: "PEM" }),
+        certificate_fingerprint: z.string().openapi({ description: "SHA-256" }),
+        certificate_expires_at: z.string(),
+      })
+      .nullable(),
     created_at: z.string(),
     updated_at: z.string(),
   })
   .openapi("Application");
 
-const AppInput = z.object({
+const SpUrl = z
+  .string()
+  .url()
+  .refine((u) => {
+    const url = new URL(u);
+    return url.protocol === "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  }, "Must use https (http is only allowed for localhost)");
+
+const OidcInput = z.object({
   name: z.string().trim().min(1).max(100),
-  protocol: z.literal("oidc").openapi({ description: "SAML apps are coming in the next release step" }),
+  protocol: z.literal("oidc"),
   client_type: z.enum(["confidential", "public"]).default("confidential").openapi({
     description: "`public` for SPAs and native apps (no secret; PKCE required)",
   }),
@@ -59,12 +85,35 @@ const AppInput = z.object({
   launch_url: z.union([z.string().url(), z.literal("")]).default(""),
 });
 
+const SamlInput = z.object({
+  name: z.string().trim().min(1).max(100),
+  protocol: z.literal("saml"),
+  metadata_xml: z.string().max(200_000).optional().openapi({ description: "The app's SAML metadata; fills entity_id and acs_url" }),
+  entity_id: z.string().trim().min(1).max(1024).optional(),
+  acs_url: SpUrl.optional(),
+  name_id_format: z.enum(["email", "persistent"]).default("email"),
+  sign: z.enum(["assertion", "response_and_assertion"]).default("assertion"),
+  default_relay_state: z.string().max(1024).optional(),
+  launch_url: z.union([z.string().url(), z.literal("")]).default(""),
+});
+
+const AppInput = z.discriminatedUnion("protocol", [OidcInput, SamlInput]).openapi("ApplicationInput");
+
 const AppPatch = z
   .object({
     name: z.string().trim().min(1).max(100),
     redirect_uris: z.array(RedirectUri).min(1).max(20),
     launch_url: z.union([z.string().url(), z.literal("")]),
     status: z.enum(["active", "disabled"]),
+    saml: z
+      .object({
+        entity_id: z.string().trim().min(1).max(1024),
+        acs_url: SpUrl,
+        name_id_format: z.enum(["email", "persistent"]),
+        sign: z.enum(["assertion", "response_and_assertion"]),
+        default_relay_state: z.string().max(1024).nullable(),
+      })
+      .partial(),
   })
   .partial()
   .openapi("ApplicationPatch");
@@ -92,8 +141,10 @@ async function orgSlug(tx: Tx) {
   return (await tx.selectFrom("organizations").select("slug").executeTakeFirstOrThrow()).slug;
 }
 
-function toApp(a: AppRow, deps: Deps, slug: string): z.infer<typeof AppSchema> {
+function toApp(a: AppRow, deps: Deps, slug: string, cert?: SamlCert): z.infer<typeof AppSchema> {
   const issuer = issuerFor(deps, slug);
+  const cfg = a.config as unknown as SamlConfig;
+  const idp = idpUrls(deps, slug);
   return {
     id: a.id,
     name: a.name,
@@ -112,9 +163,32 @@ function toApp(a: AppRow, deps: Deps, slug: string): z.infer<typeof AppSchema> {
             discovery_url: `${issuer}/.well-known/openid-configuration`,
           }
         : null,
+    saml:
+      a.protocol === "saml" && cert
+        ? {
+            entity_id: cfg.entity_id,
+            acs_url: cfg.acs_url,
+            name_id_format: cfg.name_id_format,
+            sign: cfg.sign,
+            default_relay_state: cfg.default_relay_state ?? null,
+            idp_entity_id: idp.entityId,
+            idp_sso_url: idp.ssoUrl,
+            idp_metadata_url: idp.metadataUrl,
+            idp_certificate: cert.certPem,
+            certificate_fingerprint: cert.fingerprintSha256,
+            certificate_expires_at: iso(cert.notAfter),
+          }
+        : null,
     created_at: iso(a.created_at),
     updated_at: iso(a.updated_at),
   };
+}
+
+/** Serializes apps, loading the tenant's SAML certificate only when a SAML app is present. */
+async function render(tx: Tx, deps: Deps, orgId: string, apps: AppRow[]) {
+  const slug = await orgSlug(tx);
+  const cert = apps.some((a) => a.protocol === "saml") ? await activeSamlCert(tx, deps, orgId) : undefined;
+  return apps.map((a) => toApp(a, deps, slug, cert));
 }
 
 async function getApp(tx: Tx, id: string) {
@@ -145,10 +219,7 @@ export function registerAppRoutes(app: App) {
     async (c) => {
       const p = requirePermission(c, "apps:read");
       const deps = c.get("deps");
-      const out = await deps.db.tenant(p.orgId, async (tx) => {
-        const slug = await orgSlug(tx);
-        return (await appQuery(tx)).map((a) => toApp(a, deps, slug));
-      });
+      const out = await deps.db.tenant(p.orgId, async (tx) => render(tx, deps, p.orgId, await appQuery(tx)));
       return c.json({ data: out }, 200);
     },
   );
@@ -158,8 +229,9 @@ export function registerAppRoutes(app: App) {
       method: "post",
       path: "/v1/apps",
       tags: ["Applications"],
-      summary: "Create an OIDC application",
-      description: "For confidential clients the response includes `client_secret` exactly once. Store it in the app's secret manager.",
+      summary: "Create an SSO application (OIDC or SAML)",
+      description:
+        "OIDC: confidential clients get `client_secret` exactly once. SAML: pass the app's metadata, or its entity ID and ACS URL; the response includes the IdP values to paste into the app.",
       security: bearer,
       request: body(AppInput),
       responses: {
@@ -171,36 +243,79 @@ export function registerAppRoutes(app: App) {
       const p = requirePermission(c, "apps:write");
       const input = c.req.valid("json");
       const deps = c.get("deps");
-      const secret = input.client_type === "confidential" ? newClientSecret() : null;
       const id = newId();
+      let secret: string | null = null;
+      let values: Insertable<Database["applications"]>;
+      if (input.protocol === "oidc") {
+        secret = input.client_type === "confidential" ? newClientSecret() : null;
+        values = {
+          id,
+          org_id: p.orgId,
+          name: input.name,
+          protocol: "oidc",
+          catalog_key: null,
+          launch_url: input.launch_url,
+          client_id: newClientId(),
+          client_secret_hash: secret ? hashSecret(secret) : null,
+          redirect_uris: input.redirect_uris,
+          config: JSON.stringify({}),
+          updated_at: new Date(),
+        };
+      } else {
+        let sp = { entity_id: input.entity_id, acs_url: input.acs_url };
+        if (input.metadata_xml) {
+          try {
+            sp = { ...parseSpMetadata(input.metadata_xml), ...Object.fromEntries(Object.entries(sp).filter(([, v]) => v)) };
+          } catch (err) {
+            throw badRequest("invalid_metadata", (err as Error).message);
+          }
+        }
+        if (!sp.entity_id || !sp.acs_url) throw badRequest("invalid_request", "Provide the app's metadata, or its entity ID and ACS URL");
+        const acs = SpUrl.safeParse(sp.acs_url);
+        if (!acs.success) throw badRequest("invalid_acs_url", "The ACS URL must use https (http is only allowed for localhost)");
+        const cfg: SamlConfig = {
+          entity_id: sp.entity_id,
+          acs_url: sp.acs_url,
+          name_id_format: input.name_id_format,
+          sign: input.sign,
+          ...(input.default_relay_state ? { default_relay_state: input.default_relay_state } : {}),
+        };
+        const slug = await deps.db.tenant(p.orgId, orgSlug);
+        values = {
+          id,
+          org_id: p.orgId,
+          name: input.name,
+          protocol: "saml",
+          catalog_key: null,
+          // Default launch: IdP-initiated sign-in from the app launcher.
+          launch_url: input.launch_url || `${deps.cfg.publicUrl}/saml/${slug}/start/${id}`,
+          client_id: null,
+          client_secret_hash: null,
+          config: JSON.stringify(cfg),
+          updated_at: new Date(),
+        };
+      }
       try {
         const out = await deps.db.tenant(p.orgId, async (tx) => {
-          await tx
-            .insertInto("applications")
-            .values({
-              id,
-              org_id: p.orgId,
-              name: input.name,
-              protocol: "oidc",
-              catalog_key: null,
-              launch_url: input.launch_url,
-              client_id: newClientId(),
-              client_secret_hash: secret ? hashSecret(secret) : null,
-              redirect_uris: input.redirect_uris,
-              config: JSON.stringify({}),
-              updated_at: new Date(),
-            })
-            .execute();
+          await tx.insertInto("applications").values(values).execute();
           await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
             type: "app.created",
             target: { type: "application", id, display: input.name },
-            details: { protocol: "oidc", client_type: input.client_type, redirect_uris: input.redirect_uris },
+            details:
+              input.protocol === "oidc"
+                ? { protocol: "oidc", client_type: input.client_type, redirect_uris: input.redirect_uris }
+                : { protocol: "saml", config: JSON.parse(values.config as string) },
           });
-          return toApp(await getApp(tx, id), deps, await orgSlug(tx));
+          return (await render(tx, deps, p.orgId, [await getApp(tx, id)]))[0]!;
         });
         return c.json({ app: out, client_secret: secret }, 201);
       } catch (err) {
-        if (isUniqueViolation(err)) throw conflict("name_taken", "An application with this name already exists");
+        if (isUniqueViolation(err)) {
+          const constraint = (err as { constraint?: string }).constraint;
+          throw constraint === "applications_saml_entity"
+            ? conflict("entity_taken", "Another app already uses this SAML entity ID")
+            : conflict("name_taken", "An application with this name already exists");
+        }
         throw err;
       }
     },
@@ -219,7 +334,7 @@ export function registerAppRoutes(app: App) {
     async (c) => {
       const p = requirePermission(c, "apps:read");
       const deps = c.get("deps");
-      const out = await deps.db.tenant(p.orgId, async (tx) => toApp(await getApp(tx, c.req.valid("param").id), deps, await orgSlug(tx)));
+      const out = await deps.db.tenant(p.orgId, async (tx) => (await render(tx, deps, p.orgId, [await getApp(tx, c.req.valid("param").id)]))[0]!);
       return c.json(out, 200);
     },
   );
@@ -241,7 +356,14 @@ export function registerAppRoutes(app: App) {
       const deps = c.get("deps");
       const out = await deps.db.tenant(p.orgId, async (tx) => {
         const before = await getApp(tx, id);
-        await tx.updateTable("applications").set({ ...patch, updated_at: new Date() }).where("id", "=", id).execute();
+        const { saml, ...rest } = patch;
+        if (saml && before.protocol !== "saml") throw badRequest("not_saml", "SAML settings only apply to SAML apps");
+        const config = saml ? JSON.stringify({ ...(before.config as object), ...saml }) : undefined;
+        await tx
+          .updateTable("applications")
+          .set({ ...rest, ...(config ? { config } : {}), updated_at: new Date() })
+          .where("id", "=", id)
+          .execute();
         const changes = Object.fromEntries(
           Object.entries(patch)
             .filter(([k, v]) => JSON.stringify(before[k as keyof typeof before]) !== JSON.stringify(v))
@@ -252,7 +374,7 @@ export function registerAppRoutes(app: App) {
           target: { type: "application", id, display: before.name },
           details: { changes },
         });
-        return toApp(await getApp(tx, id), deps, await orgSlug(tx));
+        return (await render(tx, deps, p.orgId, [await getApp(tx, id)]))[0]!;
       });
       return c.json(out, 200);
     },

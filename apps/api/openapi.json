@@ -1645,6 +1645,73 @@
               "discovery_url"
             ]
           },
+          "saml": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "entity_id": {
+                "type": "string"
+              },
+              "acs_url": {
+                "type": "string"
+              },
+              "name_id_format": {
+                "type": "string",
+                "enum": [
+                  "email",
+                  "persistent"
+                ]
+              },
+              "sign": {
+                "type": "string",
+                "enum": [
+                  "assertion",
+                  "response_and_assertion"
+                ]
+              },
+              "default_relay_state": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "idp_entity_id": {
+                "type": "string"
+              },
+              "idp_sso_url": {
+                "type": "string"
+              },
+              "idp_metadata_url": {
+                "type": "string"
+              },
+              "idp_certificate": {
+                "type": "string",
+                "description": "PEM"
+              },
+              "certificate_fingerprint": {
+                "type": "string",
+                "description": "SHA-256"
+              },
+              "certificate_expires_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "entity_id",
+              "acs_url",
+              "name_id_format",
+              "sign",
+              "default_relay_state",
+              "idp_entity_id",
+              "idp_sso_url",
+              "idp_metadata_url",
+              "idp_certificate",
+              "certificate_fingerprint",
+              "certificate_expires_at"
+            ]
+          },
           "created_at": {
             "type": "string"
           },
@@ -1661,6 +1728,7 @@
           "catalog_key",
           "assignment_count",
           "oidc",
+          "saml",
           "created_at",
           "updated_at"
         ]
@@ -1681,6 +1749,133 @@
         "required": [
           "app",
           "client_secret"
+        ]
+      },
+      "ApplicationInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "oidc"
+                ]
+              },
+              "client_type": {
+                "type": "string",
+                "enum": [
+                  "confidential",
+                  "public"
+                ],
+                "default": "confidential",
+                "description": "`public` for SPAs and native apps (no secret; PKCE required)"
+              },
+              "redirect_uris": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "minItems": 1,
+                "maxItems": 20
+              },
+              "launch_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "default": ""
+              }
+            },
+            "required": [
+              "name",
+              "protocol",
+              "redirect_uris"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "protocol": {
+                "type": "string",
+                "enum": [
+                  "saml"
+                ]
+              },
+              "metadata_xml": {
+                "type": "string",
+                "maxLength": 200000,
+                "description": "The app's SAML metadata; fills entity_id and acs_url"
+              },
+              "entity_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "acs_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "name_id_format": {
+                "type": "string",
+                "enum": [
+                  "email",
+                  "persistent"
+                ],
+                "default": "email"
+              },
+              "sign": {
+                "type": "string",
+                "enum": [
+                  "assertion",
+                  "response_and_assertion"
+                ],
+                "default": "assertion"
+              },
+              "default_relay_state": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "launch_url": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      ""
+                    ]
+                  }
+                ],
+                "default": ""
+              }
+            },
+            "required": [
+              "name",
+              "protocol"
+            ]
+          }
         ]
       },
       "ApplicationPatch": {
@@ -1720,6 +1915,41 @@
               "active",
               "disabled"
             ]
+          },
+          "saml": {
+            "type": "object",
+            "properties": {
+              "entity_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "acs_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "name_id_format": {
+                "type": "string",
+                "enum": [
+                  "email",
+                  "persistent"
+                ]
+              },
+              "sign": {
+                "type": "string",
+                "enum": [
+                  "assertion",
+                  "response_and_assertion"
+                ]
+              },
+              "default_relay_state": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 1024
+              }
+            }
           }
         }
       },
@@ -1814,6 +2044,90 @@
             "required": [
               "action",
               "location"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "login"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "reason"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "error"
+                ]
+              },
+              "code": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "app_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "action",
+              "code",
+              "title",
+              "message",
+              "app_name"
+            ]
+          }
+        ]
+      },
+      "SamlDecision": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "post"
+                ]
+              },
+              "acs_url": {
+                "type": "string"
+              },
+              "saml_response": {
+                "type": "string"
+              },
+              "relay_state": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "action",
+              "acs_url",
+              "saml_response",
+              "relay_state"
             ]
           },
           {
@@ -7665,8 +7979,8 @@
         "tags": [
           "Applications"
         ],
-        "summary": "Create an OIDC application",
-        "description": "For confidential clients the response includes `client_secret` exactly once. Store it in the app's secret manager.",
+        "summary": "Create an SSO application (OIDC or SAML)",
+        "description": "OIDC: confidential clients get `client_secret` exactly once. SAML: pass the app's metadata, or its entity ID and ACS URL; the response includes the IdP values to paste into the app.",
         "security": [
           {
             "bearer": []
@@ -7677,59 +7991,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
-                  },
-                  "protocol": {
-                    "type": "string",
-                    "enum": [
-                      "oidc"
-                    ],
-                    "description": "SAML apps are coming in the next release step"
-                  },
-                  "client_type": {
-                    "type": "string",
-                    "enum": [
-                      "confidential",
-                      "public"
-                    ],
-                    "default": "confidential",
-                    "description": "`public` for SPAs and native apps (no secret; PKCE required)"
-                  },
-                  "redirect_uris": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "format": "uri"
-                    },
-                    "minItems": 1,
-                    "maxItems": 20
-                  },
-                  "launch_url": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "format": "uri"
-                      },
-                      {
-                        "type": "string",
-                        "enum": [
-                          ""
-                        ]
-                      }
-                    ],
-                    "default": ""
-                  }
-                },
-                "required": [
-                  "name",
-                  "protocol",
-                  "redirect_uris"
-                ]
+                "$ref": "#/components/schemas/ApplicationInput"
               }
             }
           }
@@ -8676,6 +8938,228 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthorizeDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sso/saml/{slug}/sso": {
+      "get": {
+        "tags": [
+          "SSO (internal)"
+        ],
+        "summary": "SAML sign-in decision for the web tier (SP-initiated)",
+        "description": "The console's /saml/{slug}/sso handler forwards the SAMLRequest with the user's session and renders the result.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200000
+            },
+            "required": true,
+            "name": "SAMLRequest",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "required": false,
+            "name": "RelayState",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "redirect",
+                "post"
+              ],
+              "default": "redirect"
+            },
+            "required": false,
+            "name": "binding",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamlDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sso/saml/{slug}/start/{appId}": {
+      "get": {
+        "tags": [
+          "SSO (internal)"
+        ],
+        "summary": "SAML sign-in decision for the web tier (IdP-initiated, from the app launcher)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "appId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            },
+            "required": false,
+            "name": "RelayState",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamlDecision"
                 }
               }
             }

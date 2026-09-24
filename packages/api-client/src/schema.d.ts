@@ -5147,8 +5147,8 @@ export interface paths {
         };
         put?: never;
         /**
-         * Create an OIDC application
-         * @description For confidential clients the response includes `client_secret` exactly once. Store it in the app's secret manager.
+         * Create an SSO application (OIDC or SAML)
+         * @description OIDC: confidential clients get `client_secret` exactly once. SAML: pass the app's metadata, or its entity ID and ACS URL; the response includes the IdP values to paste into the app.
          */
         post: {
             parameters: {
@@ -5159,23 +5159,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
-                        name: string;
-                        /**
-                         * @description SAML apps are coming in the next release step
-                         * @enum {string}
-                         */
-                        protocol: "oidc";
-                        /**
-                         * @description `public` for SPAs and native apps (no secret; PKCE required)
-                         * @default confidential
-                         * @enum {string}
-                         */
-                        client_type?: "confidential" | "public";
-                        redirect_uris: string[];
-                        /** @default  */
-                        launch_url?: string | "";
-                    };
+                    "application/json": components["schemas"]["ApplicationInput"];
                 };
             };
             responses: {
@@ -5972,6 +5956,182 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sso/saml/{slug}/sso": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SAML sign-in decision for the web tier (SP-initiated)
+         * @description The console's /saml/{slug}/sso handler forwards the SAMLRequest with the user's session and renders the result.
+         */
+        get: {
+            parameters: {
+                query: {
+                    SAMLRequest: string;
+                    RelayState?: string;
+                    binding?: "redirect" | "post";
+                };
+                header?: never;
+                path: {
+                    slug: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SamlDecision"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sso/saml/{slug}/start/{appId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SAML sign-in decision for the web tier (IdP-initiated, from the app launcher) */
+        get: {
+            parameters: {
+                query?: {
+                    RelayState?: string;
+                };
+                header?: never;
+                path: {
+                    slug: string;
+                    appId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SamlDecision"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6508,6 +6668,23 @@ export interface components {
                 issuer: string;
                 discovery_url: string;
             } | null;
+            saml: {
+                entity_id: string;
+                acs_url: string;
+                /** @enum {string} */
+                name_id_format: "email" | "persistent";
+                /** @enum {string} */
+                sign: "assertion" | "response_and_assertion";
+                default_relay_state: string | null;
+                idp_entity_id: string;
+                idp_sso_url: string;
+                idp_metadata_url: string;
+                /** @description PEM */
+                idp_certificate: string;
+                /** @description SHA-256 */
+                certificate_fingerprint: string;
+                certificate_expires_at: string;
+            } | null;
             created_at: string;
             updated_at: string;
         };
@@ -6515,12 +6692,58 @@ export interface components {
             app: components["schemas"]["Application"];
             client_secret: string | null;
         };
+        ApplicationInput: {
+            name: string;
+            /** @enum {string} */
+            protocol: "oidc";
+            /**
+             * @description `public` for SPAs and native apps (no secret; PKCE required)
+             * @default confidential
+             * @enum {string}
+             */
+            client_type: "confidential" | "public";
+            redirect_uris: string[];
+            /** @default  */
+            launch_url: string | "";
+        } | {
+            name: string;
+            /** @enum {string} */
+            protocol: "saml";
+            /** @description The app's SAML metadata; fills entity_id and acs_url */
+            metadata_xml?: string;
+            entity_id?: string;
+            /** Format: uri */
+            acs_url?: string;
+            /**
+             * @default email
+             * @enum {string}
+             */
+            name_id_format: "email" | "persistent";
+            /**
+             * @default assertion
+             * @enum {string}
+             */
+            sign: "assertion" | "response_and_assertion";
+            default_relay_state?: string;
+            /** @default  */
+            launch_url: string | "";
+        };
         ApplicationPatch: {
             name?: string;
             redirect_uris?: string[];
             launch_url?: string | "";
             /** @enum {string} */
             status?: "active" | "disabled";
+            saml?: {
+                entity_id?: string;
+                /** Format: uri */
+                acs_url?: string;
+                /** @enum {string} */
+                name_id_format?: "email" | "persistent";
+                /** @enum {string} */
+                sign?: "assertion" | "response_and_assertion";
+                default_relay_state?: string | null;
+            };
         };
         ClientSecret: {
             client_secret: string;
@@ -6552,6 +6775,24 @@ export interface components {
             /** @enum {string} */
             action: "redirect";
             location: string;
+        } | {
+            /** @enum {string} */
+            action: "login";
+            reason: string;
+        } | {
+            /** @enum {string} */
+            action: "error";
+            code: string;
+            title: string;
+            message: string;
+            app_name: string | null;
+        };
+        SamlDecision: {
+            /** @enum {string} */
+            action: "post";
+            acs_url: string;
+            saml_response: string;
+            relay_state: string | null;
         } | {
             /** @enum {string} */
             action: "login";

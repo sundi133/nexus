@@ -8,6 +8,7 @@ import { Suspense, use, useState } from "react";
 import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { AppIcon } from "@/components/features/app-icon";
+import { SamlIdpValues } from "@/components/features/saml-values";
 import { ConfirmAction } from "@/components/features/confirm-action";
 import { Button } from "@/components/ui/button";
 import { CopyField } from "@/components/ui/copy";
@@ -125,25 +126,46 @@ function AppDetail({ id }: { id: string }) {
               </div>
             </Card>
           ) : null}
+          {a.saml ? (
+            <Card>
+              <CardHeader title="Values for the app" description="Paste these into the app's SAML / SSO settings." />
+              <div className="p-4">
+                <SamlIdpValues saml={a.saml} />
+              </div>
+            </Card>
+          ) : null}
           <Card>
             <CardHeader title="Settings" />
             <div className="p-4">
-              <KeyValue
-                items={[
-                  [
-                    "Redirect URIs",
-                    <ul key="r" className="space-y-1">
-                      {a.oidc?.redirect_uris.map((u) => (
-                        <li key={u}>
-                          <code className="break-all font-mono text-xs">{u}</code>
-                        </li>
-                      ))}
-                    </ul>,
-                  ],
-                  ["Launch URL", a.launch_url ? <code key="l" className="break-all font-mono text-xs">{a.launch_url}</code> : "Not set (hidden from the app launcher)"],
-                  ["Client type", a.oidc?.client_type === "public" ? "Public (PKCE)" : "Confidential (secret)"],
-                ]}
-              />
+              {a.saml ? (
+                <KeyValue
+                  items={[
+                    ["Entity ID", <code key="e" className="break-all font-mono text-xs">{a.saml.entity_id}</code>],
+                    ["ACS URL", <code key="a" className="break-all font-mono text-xs">{a.saml.acs_url}</code>],
+                    ["NameID", a.saml.name_id_format === "email" ? "Email address" : "Persistent (user ID)"],
+                    ["Signing", a.saml.sign === "assertion" ? "Assertion" : "Response and assertion"],
+                    ["Attributes", "email, firstName, lastName, displayName, groups"],
+                    ["Launch", <code key="l" className="break-all font-mono text-xs">{a.launch_url}</code>],
+                  ]}
+                />
+              ) : (
+                <KeyValue
+                  items={[
+                    [
+                      "Redirect URIs",
+                      <ul key="r" className="space-y-1">
+                        {a.oidc?.redirect_uris.map((u) => (
+                          <li key={u}>
+                            <code className="break-all font-mono text-xs">{u}</code>
+                          </li>
+                        ))}
+                      </ul>,
+                    ],
+                    ["Launch URL", a.launch_url ? <code key="l" className="break-all font-mono text-xs">{a.launch_url}</code> : "Not set (hidden from the app launcher)"],
+                    ["Client type", a.oidc?.client_type === "public" ? "Public (PKCE)" : "Confidential (secret)"],
+                  ]}
+                />
+              )}
             </div>
           </Card>
         </TabsContent>

@@ -17,6 +17,7 @@ import { registerOverviewRoutes } from "./overview/routes.js";
 import { registerOrgRoutes } from "./org/routes.js";
 import { registerAppRoutes } from "./sso/apps.js";
 import { registerOidcRoutes } from "./sso/oidc.js";
+import { registerSamlRoutes } from "./sso/saml.js";
 import { ApiError, problem } from "./platform/errors.js";
 
 export const API_INFO = {
@@ -82,6 +83,7 @@ export function createApp(deps: Deps) {
   registerOrgRoutes(app);
   registerAppRoutes(app);
   registerOidcRoutes(app);
+  registerSamlRoutes(app);
 
   app.openAPIRegistry.registerComponent("securitySchemes", "bearer", {
     type: "http",
