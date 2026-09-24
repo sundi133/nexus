@@ -139,7 +139,10 @@ function UsersView() {
                       <Avatar name={u.display_name} />
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{u.display_name}</span>
-                        <span className="block truncate text-xs text-fg-muted">{u.email}</span>
+                        <span className="block truncate text-xs text-fg-muted">
+                          {u.email}
+                          {u.managed_by ? <span className="ml-1.5 text-fg-subtle">· synced from {u.managed_by}</span> : null}
+                        </span>
                       </span>
                     </Link>
                   </TD>

@@ -244,6 +244,13 @@
           "mfa_enrolled": {
             "type": "boolean"
           },
+          "managed_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The directory this person is synced from (its values win on the next sync), or null"
+          },
           "last_login_at": {
             "type": [
               "string",
@@ -274,6 +281,7 @@
           "status",
           "roles",
           "mfa_enrolled",
+          "managed_by",
           "last_login_at",
           "created_at",
           "updated_at"
@@ -342,7 +350,8 @@
           "devices:read",
           "devices:write",
           "policies:write",
-          "devices:updates"
+          "devices:updates",
+          "directory:sync"
         ]
       },
       "Factor": {
@@ -2747,6 +2756,355 @@
           "published_at",
           "notes",
           "platforms"
+        ]
+      },
+      "DirectoryProbe": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "integer"
+          },
+          "active_users": {
+            "type": "integer"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "members": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "members"
+              ]
+            }
+          }
+        },
+        "required": [
+          "users",
+          "active_users",
+          "groups"
+        ]
+      },
+      "DirectoryConnection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "google",
+              "entra"
+            ]
+          },
+          "provider_name": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "account": {
+            "type": "string",
+            "description": "Admin email (Google) or tenant (Entra) the connection reads"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "sync_groups": {
+            "type": "boolean",
+            "default": true
+          },
+          "group_filter": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "maxItems": 100,
+            "default": [],
+            "description": "Remote group IDs to sync; empty = whole directory"
+          },
+          "deprovision": {
+            "type": "string",
+            "enum": [
+              "suspend",
+              "none"
+            ],
+            "default": "suspend"
+          },
+          "invite_new_users": {
+            "type": "boolean",
+            "default": true
+          },
+          "interval_minutes": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 1440,
+            "default": 60
+          },
+          "last_sync_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "next_sync_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_status": {
+            "type": "string",
+            "enum": [
+              "never",
+              "ok",
+              "error",
+              "needs_approval"
+            ]
+          },
+          "last_result": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "syncing": {
+            "type": "boolean"
+          },
+          "linked_users": {
+            "type": "integer"
+          },
+          "linked_groups": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "provider_name",
+          "name",
+          "account",
+          "enabled",
+          "last_sync_at",
+          "next_sync_at",
+          "last_status",
+          "last_result",
+          "last_error",
+          "syncing",
+          "linked_users",
+          "linked_groups",
+          "created_at"
+        ]
+      },
+      "DirectoryPlan": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "guard": {
+            "type": "object",
+            "properties": {
+              "tripped": {
+                "type": "boolean"
+              },
+              "suspensions": {
+                "type": "integer"
+              },
+              "threshold": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "tripped",
+              "suspensions",
+              "threshold"
+            ]
+          },
+          "create_users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "active": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "email",
+                "name",
+                "active"
+              ]
+            }
+          },
+          "link_users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email"
+              ]
+            }
+          },
+          "update_users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "changes": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "from": {
+                        "type": "string"
+                      },
+                      "to": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "from",
+                      "to"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "email",
+                "changes"
+              ]
+            }
+          },
+          "suspend_users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "reason"
+              ]
+            }
+          },
+          "reactivate_users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email"
+              ]
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "create",
+                    "link",
+                    "update",
+                    "members"
+                  ]
+                },
+                "add": {
+                  "type": "integer"
+                },
+                "remove": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "name",
+                "action",
+                "add",
+                "remove"
+              ]
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "reason"
+              ]
+            }
+          }
+        },
+        "required": [
+          "summary",
+          "guard",
+          "create_users",
+          "link_users",
+          "update_users",
+          "suspend_users",
+          "reactivate_users",
+          "groups",
+          "skipped"
         ]
       },
       "DevicePage": {
@@ -11431,6 +11789,1049 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentUpdateStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/directory/test": {
+      "post": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Check credentials and list the directory's groups (nothing is saved)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "google"
+                        ]
+                      },
+                      "admin_email": {
+                        "type": "string",
+                        "format": "email"
+                      },
+                      "customer_id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_]+$",
+                        "default": "my_customer"
+                      },
+                      "service_account_key": {
+                        "type": "string",
+                        "maxLength": 20000,
+                        "description": "The service account's JSON key file contents"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "admin_email",
+                      "service_account_key"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "entra"
+                        ]
+                      },
+                      "tenant_id": {
+                        "type": "string",
+                        "maxLength": 255
+                      },
+                      "client_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "client_secret": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "tenant_id",
+                      "client_id",
+                      "client_secret"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryProbe"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/directory/connections": {
+      "get": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Directory connections and their last sync",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DirectoryConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Connect Google Workspace or Microsoft Entra ID (requires recent MFA)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "google"
+                            ]
+                          },
+                          "admin_email": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "customer_id": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9_]+$",
+                            "default": "my_customer"
+                          },
+                          "service_account_key": {
+                            "type": "string",
+                            "maxLength": 20000,
+                            "description": "The service account's JSON key file contents"
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "admin_email",
+                          "service_account_key"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "entra"
+                            ]
+                          },
+                          "tenant_id": {
+                            "type": "string",
+                            "maxLength": 255
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "client_secret": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "tenant_id",
+                          "client_id",
+                          "client_secret"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Scheduled syncs. New connections start off so you can preview first."
+                      },
+                      "sync_groups": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "group_filter": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "maxItems": 100,
+                        "default": [],
+                        "description": "Remote group IDs to sync; empty = whole directory"
+                      },
+                      "deprovision": {
+                        "type": "string",
+                        "enum": [
+                          "suspend",
+                          "none"
+                        ],
+                        "default": "suspend"
+                      },
+                      "invite_new_users": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "interval_minutes": {
+                        "type": "integer",
+                        "minimum": 15,
+                        "maximum": 1440,
+                        "default": 60
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DirectoryConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/directory/connections/{id}": {
+      "patch": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Change a connection's settings or credentials (requires recent MFA)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Scheduled syncs. New connections start off so you can preview first."
+                  },
+                  "sync_groups": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "group_filter": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "maxItems": 100,
+                    "default": [],
+                    "description": "Remote group IDs to sync; empty = whole directory"
+                  },
+                  "deprovision": {
+                    "type": "string",
+                    "enum": [
+                      "suspend",
+                      "none"
+                    ],
+                    "default": "suspend"
+                  },
+                  "invite_new_users": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "interval_minutes": {
+                    "type": "integer",
+                    "minimum": 15,
+                    "maximum": 1440,
+                    "default": 60
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "credentials": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "google"
+                            ]
+                          },
+                          "admin_email": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "customer_id": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9_]+$",
+                            "default": "my_customer"
+                          },
+                          "service_account_key": {
+                            "type": "string",
+                            "maxLength": 20000,
+                            "description": "The service account's JSON key file contents"
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "admin_email",
+                          "service_account_key"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "entra"
+                            ]
+                          },
+                          "tenant_id": {
+                            "type": "string",
+                            "maxLength": 255
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "client_secret": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "tenant_id",
+                          "client_id",
+                          "client_secret"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DirectoryConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Disconnect (people and groups stay; they're just no longer synced). Requires recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DirectoryConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/directory/connections/{id}/test": {
+      "post": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Check a saved connection and list its groups",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryProbe"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/directory/connections/{id}/preview": {
+      "post": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Dry run: exactly what a sync would change now",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/directory/connections/{id}/sync": {
+      "post": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Sync now",
+        "description": "Runs in the background. `approved_suspensions` approves a run held by the safety limit (requires recent MFA): up to that many people may be suspended.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "approved_suspensions": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DirectoryConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
                 }
               }
             }

@@ -1,6 +1,7 @@
 import * as OTPAuth from "otpauth";
 import { randomBytes } from "node:crypto";
 import { createApp } from "../src/app.js";
+import { JobRunner } from "../src/platform/jobs.js";
 import { loadConfig, type Config } from "../src/config.js";
 import { Db } from "../src/platform/db.js";
 import { migrate } from "../src/platform/migrate.js";
@@ -18,7 +19,10 @@ export async function bootApp(overrides: Partial<Config> = {}) {
   await realtime.start();
   const mailer = new MemoryMailer();
   const push = new RecordingPushSender();
-  const app = createApp({ cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push });
+  const deps = { cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push };
+  const app = createApp(deps);
+  // Tests drive background work explicitly: jobs.runOnce({ orgId }).
+  const jobs = new JobRunner(deps);
 
   async function call<T = any>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) {
     const res = await app.request(path, {
@@ -36,6 +40,8 @@ export async function bootApp(overrides: Partial<Config> = {}) {
 
   return {
     app,
+    deps,
+    jobs,
     call,
     mailer,
     push,

@@ -73,6 +73,14 @@ const userQuery = (tx: Tx) =>
             .where("auth_factors.verified_at", "is not", null),
         )
         .as("mfa_enrolled"),
+      eb
+        .selectFrom("directory_links")
+        .innerJoin("directory_connections", "directory_connections.id", "directory_links.connection_id")
+        .whereRef("directory_links.local_id", "=", "users.id")
+        .where("directory_links.kind", "=", "user")
+        .select("directory_connections.provider")
+        .limit(1)
+        .as("managed_by"),
     ]);
 
 async function getUserOr404(tx: Tx, id: string) {

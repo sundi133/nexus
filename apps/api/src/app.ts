@@ -1,3 +1,4 @@
+import type { JobRunner } from "./platform/jobs.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { cors } from "hono/cors";
@@ -22,6 +23,8 @@ import { registerCatalogRoutes } from "./sso/catalog.js";
 import { registerKeyRoutes } from "./sso/key-routes.js";
 import { registerAgentRoutes, registerReleaseDownloads } from "./devices/agent-api.js";
 import { registerAgentUpdateRoutes } from "./devices/update-routes.js";
+import { registerDirectorySyncRoutes } from "./directory/sync/routes.js";
+import { scheduleDirectorySyncs } from "./directory/sync/service.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
 import { registerDeviceTrustRoutes } from "./access/device-trust.js";
 import { registerAccessPolicyRoutes } from "./access/routes.js";
@@ -96,6 +99,7 @@ export function createApp(deps: Deps) {
   registerAgentRoutes(app);
   registerReleaseDownloads(app);
   registerAgentUpdateRoutes(app);
+  registerDirectorySyncRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -108,4 +112,9 @@ export function createApp(deps: Deps) {
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: API_INFO, servers: [{ url: "/" }] });
 
   return app;
+}
+
+/** Periodic work run by the job loop (not by HTTP requests). Features add theirs here. */
+export function registerSchedules(jobs: JobRunner, deps: Deps) {
+  scheduleDirectorySyncs(jobs, deps);
 }

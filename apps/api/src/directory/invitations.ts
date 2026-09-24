@@ -24,7 +24,7 @@ export type PendingInvite = { email: string; token: string; orgName: string; inv
  * Creates (or re-issues) an invitation for a staged user inside the caller's
  * transaction. The email must be sent only after commit, via sendInvite().
  */
-export async function issueInvitation(tx: Tx, p: Principal, userId: string): Promise<PendingInvite> {
+export async function issueInvitation(tx: Tx, p: Pick<Principal, "orgId"> & { userId: string | null }, userId: string): Promise<PendingInvite> {
   const user = await tx.selectFrom("users").select(["email", "status"]).where("id", "=", userId).executeTakeFirst();
   if (!user) throw notFound("User");
   if (user.status !== "staged") throw conflict("not_staged", "Only users who haven't accepted an invitation can be invited");
@@ -37,13 +37,14 @@ export async function issueInvitation(tx: Tx, p: Principal, userId: string): Pro
     .execute();
   const [org, inviter] = await Promise.all([
     tx.selectFrom("organizations").select("name").where("id", "=", p.orgId).executeTakeFirstOrThrow(),
-    tx.selectFrom("users").select(["given_name", "family_name", "email"]).where("id", "=", p.userId).executeTakeFirstOrThrow(),
+    p.userId ? tx.selectFrom("users").select(["given_name", "family_name", "email"]).where("id", "=", p.userId).executeTakeFirst() : null,
   ]);
   return {
     email: user.email,
     token,
     orgName: org.name,
-    inviterName: `${inviter.given_name} ${inviter.family_name}`.trim() || inviter.email,
+    // No person behind it (e.g. directory sync): the IT team is the inviter.
+    inviterName: inviter ? `${inviter.given_name} ${inviter.family_name}`.trim() || inviter.email : "Your IT team",
     expiresAt,
   };
 }

@@ -20,6 +20,11 @@ export type Config = {
   agentReleasesDir: string;
   // Base64 Ed25519 release public keys, comma-separated. Dev reads <agent/dist>/release.pub when unset.
   agentReleaseKeys: string;
+  // Directory providers (overridable only for tests / sovereign clouds).
+  googleTokenUrl: string;
+  googleAdminBase: string;
+  entraLoginBase: string;
+  graphBase: string;
 };
 
 export function loadConfig(env = process.env): Config {
@@ -52,6 +57,10 @@ export function loadConfig(env = process.env): Config {
     pendingMfaTtlMs: 5 * 60 * 1000,
     agentReleasesDir: env.NEXUS_AGENT_RELEASES_DIR ?? fileURLToPath(new URL("../../../agent/dist/releases", import.meta.url)),
     agentReleaseKeys: env.NEXUS_AGENT_RELEASE_KEYS ?? (mode === "prod" ? "" : devReleaseKey()),
+    googleTokenUrl: env.NEXUS_GOOGLE_TOKEN_URL ?? "https://oauth2.googleapis.com/token",
+    googleAdminBase: env.NEXUS_GOOGLE_ADMIN_BASE ?? "https://admin.googleapis.com",
+    entraLoginBase: env.NEXUS_ENTRA_LOGIN_BASE ?? "https://login.microsoftonline.com",
+    graphBase: env.NEXUS_GRAPH_BASE ?? "https://graph.microsoft.com",
   };
 }
 

@@ -61,6 +61,7 @@ export const User = z
     status: UserStatus,
     roles: z.array(Role),
     mfa_enrolled: z.boolean(),
+    managed_by: z.string().nullable().openapi({ description: "The directory this person is synced from (its values win on the next sync), or null" }),
     last_login_at: Timestamp.nullable(),
     created_at: Timestamp,
     updated_at: Timestamp,
@@ -164,6 +165,7 @@ export type UserRow = {
   updated_at: Date;
   roles: string[] | null;
   mfa_enrolled: boolean | 0 | 1 | null; // Kysely SqlBool
+  managed_by?: string | null; // directory provider key
 };
 
 export const toUser = (u: UserRow): z.infer<typeof User> => ({
@@ -177,6 +179,7 @@ export const toUser = (u: UserRow): z.infer<typeof User> => ({
   status: u.status,
   roles: (u.roles ?? []) as z.infer<typeof Role>[],
   mfa_enrolled: Boolean(u.mfa_enrolled),
+  managed_by: u.managed_by === "google" ? "Google Workspace" : u.managed_by === "entra" ? "Microsoft Entra ID" : null,
   last_login_at: isoOrNull(u.last_login_at),
   created_at: iso(u.created_at),
   updated_at: iso(u.updated_at),

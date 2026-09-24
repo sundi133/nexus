@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
-import { createApp } from "./app.js";
+import { createApp, registerSchedules } from "./app.js";
+import { JobRunner } from "./platform/jobs.js";
 import { loadConfig } from "./config.js";
 import { Db } from "./platform/db.js";
 import { migrate } from "./platform/migrate.js";
@@ -15,7 +16,11 @@ const db = new Db(cfg.databaseUrl);
 const realtime = new Realtime(cfg.databaseUrl);
 await realtime.start();
 const mailer = new SmtpMailer(cfg.smtpUrl, cfg.mailFrom);
-const app = createApp({ cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push: new RecordingPushSender(true) });
+const deps = { cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push: new RecordingPushSender(true) };
+const app = createApp(deps);
+const jobs = new JobRunner(deps);
+registerSchedules(jobs, deps);
+jobs.start();
 
 const server = serve({ fetch: app.fetch, port: cfg.port }, (info) => {
   console.log(`nexus api listening on http://localhost:${info.port} (${cfg.env})`);
@@ -30,6 +35,7 @@ server.on("error", (err: NodeJS.ErrnoException) => {
 
 const shutdown = async () => {
   server.close();
+  jobs.stop();
   await realtime.stop();
   await db.close();
   process.exit(0);

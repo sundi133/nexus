@@ -94,6 +94,9 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
             {u.title ? ` · ${u.title}` : ""}
             {u.department ? ` · ${u.department}` : ""}
           </p>
+          {u.managed_by ? (
+            <p className="mt-1 text-xs text-fg-subtle">Synced from {u.managed_by}: name, email, title, department and status follow the directory.</p>
+          ) : null}
         </div>
         <div className="flex gap-2">
           {can("users:write") ? (

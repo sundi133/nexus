@@ -250,6 +250,50 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Timestamp;
   };
+  directory_connections: {
+    id: string;
+    org_id: string;
+    provider: "google" | "entra";
+    name: string;
+    config: Json;
+    secret: Buffer;
+    enabled: Generated<boolean>;
+    sync_groups: Generated<boolean>;
+    group_filter: Generated<string[]>;
+    deprovision: Generated<"suspend" | "none">;
+    invite_new_users: Generated<boolean>;
+    interval_minutes: Generated<number>;
+    last_sync_at: NullableTimestamp;
+    last_status: Generated<"never" | "ok" | "error" | "needs_approval">;
+    last_result: Json;
+    last_error: Generated<string>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  directory_links: {
+    org_id: string;
+    connection_id: string;
+    kind: "user" | "group";
+    external_id: string;
+    local_id: string;
+    suspended_by_sync: Generated<boolean>;
+  };
+  jobs: {
+    id: string;
+    org_id: string;
+    kind: string;
+    payload: Json;
+    status: Generated<"queued" | "running" | "done" | "dead">;
+    run_at: Timestamp;
+    attempts: Generated<number>;
+    max_attempts: Generated<number>;
+    locked_until: NullableTimestamp;
+    last_error: Generated<string>;
+    dedupe_key: string | null;
+    created_at: Generated<Date>;
+    finished_at: NullableTimestamp;
+  };
   agent_update_settings: {
     org_id: string;
     auto_rollout: Generated<boolean>;

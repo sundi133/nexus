@@ -3,6 +3,7 @@ import {
   AppWindow,
   Bot,
   FileClock,
+  FolderSync,
   Home,
   KeyRound,
   LayoutGrid,
@@ -36,6 +37,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "Users", href: "/users", icon: Users, shortcut: "G U" },
       { label: "Groups", href: "/groups", icon: UsersRound, shortcut: "G G" },
+      { label: "Directory sync", href: "/directory-sync", icon: FolderSync },
     ],
   },
   {
