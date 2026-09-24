@@ -1,0 +1,21 @@
+{
+  "name": "nexus",
+  "private": true,
+  "packageManager": "pnpm@8.10.2",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "db:up": "docker compose -f deploy/compose/docker-compose.yml up -d --wait",
+    "db:down": "docker compose -f deploy/compose/docker-compose.yml down",
+    "db:reset": "docker compose -f deploy/compose/docker-compose.yml down -v && pnpm db:up && pnpm --filter @nexus/api migrate",
+    "api:spec": "pnpm --filter @nexus/api spec && pnpm --filter @nexus/api-client generate"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.3",
+    "typescript": "~5.9.3"
+  }
+}

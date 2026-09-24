@@ -1,0 +1,183 @@
+# Votal Nexus — Delivery Roadmap
+
+| | |
+|---|---|
+| **Status** | Draft v0.2 |
+| **Date** | 2026-09-24 |
+| **Planning start** | 2026-10-05 |
+| **Related** | [SPEC.md](SPEC.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [UI.md](UI.md) |
+
+---
+
+## 1. Strategy in one page
+
+| Release | Coverage | When | What a customer gets | Business outcome |
+|---|---|---|---|---|
+| **Foundations** | walking skeleton | wk 1–4 | Nothing to sell; proves every layer end-to-end | Team velocity |
+| **A** | **0 → 30%**, the most important features | mo 1–5 | Workforce identity (SSO + passkey/push MFA + directory sync), **device trust** for macOS/Windows, **agent identities + MCP gateway v1**, a **mobile authenticator and responder app**, notifications, audit + SIEM | 3–5 design partners in production |
+| **B** | **30 → 80%** | mo 6–11 | Full lifecycle (SCIM, offboarding, JIT), device enforcement and commands, Linux, full AI security (drift, guardrails, OBO, self-hosted gateway), SecOps workflows (alert triage, cases, access graph), Terraform | GA, SOC 2 Type I, paid expansion |
+| **C** | 80% + | mo 12+ | LDAP, RADIUS, patch management, app deployment, SaaS discovery, macOS MDM, MSP | Enterprise breadth |
+
+**How we chose the first 30%:** a feature is in Release A if a SecOps buyer would **refuse a pilot without it** (SSO, MFA, directory sync, audit/SIEM), or if it is **the reason to pick Nexus** (device trust on every login, agent identity, contain from your phone). Everything else waits, no matter how "standard" it looks on a competitor's pricing page.
+
+## 2. How we build (applies to every epic)
+
+1. **Vertical slices, not layers.** Every feature ships through all layers at once: OpenAPI (zod) → API handler → permission → audit event → notification category (if any) → web UI → mobile (if in scope) → docs. We never build "the backend for SSO" in one quarter and "the UI" in the next.
+2. **API first, then clients.** The OpenAPI change is reviewed first (it is the contract for web, mobile, CLI and customers). Generated clients then unblock frontend and mobile work in parallel with the backend.
+3. **Definition of done** for any feature:
+   - [ ] OpenAPI documented, with examples
+   - [ ] Permission in the Cedar catalog; denied paths tested
+   - [ ] Audit event(s) emitted and visible in the explorer
+   - [ ] Report-only / preview mode, if it is a policy
+   - [ ] "Why?" explanation, if it makes an access decision
+   - [ ] Web UI with empty, loading and error states; keyboard accessible
+   - [ ] Mobile screen, if listed in SPEC §5.23 for this release
+   - [ ] Playwright E2E happy path; RLS test for new tables
+   - [ ] Public docs page and changelog entry
+4. **Dogfood from week 4.** Votal runs its own company login on Nexus as soon as the walking skeleton works.
+5. **Design partners get a Slack Connect channel** and a build every 2 weeks.
+
+## 3. Team (9 people)
+
+| Role | Code | Focus |
+|---|---|---|
+| Tech lead / architect | **TL** | Identity architecture, policy engine, security model, code review |
+| Backend engineer | **BE1** | Directory, authn, IdP (OIDC/SAML), SCIM |
+| Backend engineer | **BE2** | Platform, audit, notifications, API, integrations |
+| Device engineer | **DE1** | Agent core, macOS + Linux, enrollment, device CA, device trust |
+| Device engineer | **DE2** | Windows, posture, policies, commands |
+| Frontend engineer | **FE** | Design system, admin console, portal |
+| Mobile / frontend engineer | **MOB** | Expo app, native key modules, push; helps FE on the console |
+| Security / AI engineer | **AI** | Agent identity, MCP Gateway, guardrails integration |
+| QA / SRE / security | **SRE** | CI/CD, infrastructure, load tests, E2E, pentest, SOC 2 |
+
+The mobile engineer is hired **before month 1**. Push MFA and the responder app are in Release A, and the mobile engineer also relieves the frontend bottleneck.
+
+**Capacity:** 9 × 4.3 wk/mo × 80% focus ≈ **31 eng-weeks per month**.
+
+## 4. Timeline
+
+```
+Month:         0     1     2     3     4     5     6     7     8     9    10    11    12
+Foundations  ████
+Release A          [ A1: identity ][ A2: SSO + device trust ][ A3: agents + responder ]
+Release B                                                     [ lifecycle · devices · AI security · SecOps ]
+Release C                                                                                      [ ... ]
+Milestones   ▲ skeleton        ▲ dogfood SSO          ▲ pilot (A)                 ▲ GA (B)
+```
+
+## 5. Foundations: walking skeleton (weeks 1–4)
+
+**The one flow that proves the architecture:** a user signs in to the web console with a passkey → the mobile app gets a **push approval** → they approve with Face ID → the sign-in appears in the **audit log** and in the **notification inbox on both web and mobile**, in real time.
+
+| Epic | Scope | Owner | Eng-wks |
+|---|---|---|---|
+| F.1 Monorepo & tooling ✅ | pnpm + Turborepo, TypeScript, Hono + zod-openapi, Kysely, SQL migrations, compose deps, launch configs | TL, SRE | 3 |
+| F.2 CI/CD & environments | GitHub Actions, preview env per PR, staging, Terraform (EKS, RDS, ElastiCache, NATS via Helm, ClickHouse Cloud), Argo CD, EAS builds for mobile | SRE | 4 |
+| F.3 Platform core ✅ (partial) | Tenancy + RLS ✅, error model ✅, cursor pagination ✅, audit-in-transaction ✅; still to do: graphile-worker jobs, OTel | TL, BE2 | 5 |
+| F.4 Auth skeleton ✅ | Org sign-up ✅, password + TOTP (replay-safe) ✅, passkeys + passwordless ✅, sessions ✅, BFF cookie ✅, step-up with inline UI ✅ | BE1 | 4 |
+| F.5 Audit + notify skeleton ✅ (partial) | Audit in Postgres ✅, inbox ✅, SSE via LISTEN/NOTIFY ✅; still to do: APNs/FCM sender, ClickHouse | BE2 | 4 |
+| F.6 Web design system v0 ✅ (partial) | Tokens ✅, AppShell ✅, ⌘K ✅, inbox drawer ✅, tables/forms/dialogs ✅; still to do: Storybook | FE | 4 |
+| F.7 Mobile shell | Expo app, PKCE login, DPoP key, push registration, inbox, push-MFA approval screen | MOB | 4 |
+| F.8 Agent spike | Go agent skeleton, gRPC stream, osquery embedded on macOS + Windows | DE1, DE2 | 6 |
+| F.9 MCP spike | Pass-through MCP proxy with JWT verification + Cedar eval | AI | 3 |
+| | | **Total** | **37** |
+
+## 6. Release A: the most important 30% (months 1–5)
+
+### A1: Identity you can sign in with (months 1–2)
+
+| Epic | Requirements | Owner | Eng-wks |
+|---|---|---|---|
+| Directory + sync | DIR-01..04, DIR-08 (Google Workspace, Entra), ORG-01/02/04 | BE1 | 6 |
+| MFA & sessions | AUTH-01..08, MOB-02 (push MFA + TOTP) | BE1, MOB | 7 |
+| Admin RBAC v1 | RBAC-01, 04, 06 | TL | 3 |
+| Notifications v1 | NTF-01..04, 06 (email, Slack), 07, 08, 11 | BE2 | 5 |
+| SecOps basics | OPS-01 secure baseline, OPS-02 needs attention, OPS-06 change history, OPS-10 setup wizard | BE2, FE | 4 |
+| Console | Overview, Users, Groups, Settings (auth, notifications), onboarding checklist | FE | 6 |
+| Mobile | MOB-01, 03, 09, 10; Codes tab | MOB | 3 |
+| | | **Subtotal** | **34** |
+
+**Progress (2026-09-24):** ✅ MFA policy + forced enrollment (ORG-04, AUTH-07) · ✅ secure baseline with impact preview (OPS-01) · ✅ settings change history (OPS-06) · ✅ email invitations · ✅ CSV import with dry-run (DIR-03) · ✅ passkeys (AUTH-03/05). Next: push MFA + Nexus Mobile, then Google/Entra sync (DIR-08) and Slack/email notification channels.
+
+**Milestone:** Votal employees use Nexus for daily login with push MFA.
+
+### A2: SSO and device trust (months 2–4)
+
+| Epic | Requirements | Owner | Eng-wks |
+|---|---|---|---|
+| OIDC provider + SAML IdP + 10 catalog apps | SSO-01..05, 07 | BE1 | 8 |
+| Enrollment, device CA, packaging (macOS + Windows) | DEV-01, 02, 06 | DE1, SRE | 8 |
+| Inventory, posture, compliance (audit-only) | DEV-03..05, DPOL-01..03 | DE2 | 8 |
+| Agent self-update | DEV-07 | DE1 | 3 |
+| Conditional access + device trust | CA-01..05, OPS-04 "Why?", OPS-05 report-only → enforce | TL, DE1 | 7 |
+| Console + portal | Apps, Devices, Device detail, CA builder + what-if, Portal (PORT-01..03), block page with fix steps | FE, MOB | 8 |
+| | | **Subtotal** | **42** |
+
+**Milestone:** SSO into Slack/Google/GitHub/AWS is blocked from a laptop with FileVault off, and the user sees how to fix it.
+
+### A3: Agents, MCP and the responder (months 4–5)
+
+| Epic | Requirements | Owner | Eng-wks |
+|---|---|---|---|
+| Agent identities v1 | AGT-01..03, 06 (registry, federation, kill switch) | AI | 5 |
+| MCP Gateway v1 (hosted, streamable HTTP) | MCP-01, 03, 04, 08 | AI, TL | 6 |
+| Contain playbook | OPS-03 (user, device, agent) | BE2 | 3 |
+| Mobile responder | MOB-04, 05 | MOB | 5 |
+| Audit explorer + SIEM + webhooks + public API | AUD-01, 02, 04; INT-01..03 | BE2 | 6 |
+| Console | Agents, MCP servers & tool permissions, Audit explorer | FE | 6 |
+| Hardening | Pentest #1, load test of auth paths, SLO dashboards, runbooks | SRE | 4 |
+| | | **Subtotal** | **35** |
+
+**Release A total: ~111 eng-weeks** against ~155 of capacity (5 months), leaving **~30% buffer** for bugs, design-partner requests and signing-certificate delays.
+
+**Release A exit:** the scenario in [SPEC §7](SPEC.md#7-release-exit-criteria) passes as an automated E2E test and live with 3–5 design partners.
+
+## 7. Release B: from 30% to 80% (months 6–11)
+
+Release B runs as **five parallel tracks**, each with a lead, so the team does not serialize.
+
+| Track | Epics (requirements) | Owners | Eng-wks |
+|---|---|---|---|
+| **Lifecycle** | SCIM in/out (SCIM-01..04, DIR-07) · one-click offboarding (DIR-06, AGT-07) · dynamic groups, branding, federated login, risk signals (DIR-05, ORG-03, AUTH-09, 10) · RBAC v2 + JIT admin (RBAC-02, 03, 05, OPS-11) · access requests + reviews with Slack/mobile approvals (JIT-01..05, INT-04, MOB-06) · 30+ catalog apps, claim mapping (SSO-03, 06) | BE1, TL | 28 |
+| **Devices** | Linux agent (DEV-01) · enforcement + 20+ templates + custom policies (DPOL-01, 04, 05) · commands, scripts, device actions, tamper protection (CMD-01..05, DEV-08, 09) · live query (DEV-10) · software inventory + CVEs (SW-01) | DE1, DE2 | 22 |
+| **AI security** | Tool drift, virtual servers, rate limits, risk classes, stdio, self-hosted gateway (MCP-02, 05, 07, 09, 10) · on-behalf-of delegation + consent + chains (AGT-04, 05, 10) · guardrails (GRD-01..05, MCP-06) · agent observability + AI tool discovery (AGT-08, 09, SAAS-03) | AI, TL | 23 |
+| **SecOps** | Low-noise alerting + triage + on-call (OPS-08, AUD-08, NTF-09, 10, MOB-07) · investigation cases (OPS-09) · access graph (AUD-07) · retention, tamper-evidence, reports (AUD-03, 05, 06) · Terraform + CLI + YAML (OPS-07, INT-05) · web push + Teams (NTF-05, 06) · end-user mobile (MOB-08, PORT-04, 05) | BE2, MOB | 26 |
+| **Console & quality** | Console screens for all tracks · load/chaos tests (50k agent connections, 2k MCP calls/s) · pentest #2 · SOC 2 Type I | FE, SRE | 22 |
+| | | **Total** | **~121** |
+
+That is ~121 eng-weeks against ~186 of capacity (6 months). The larger buffer (~35%) is deliberate: Release B runs alongside supporting production customers.
+
+**Release B exit:** GA; latency NFRs met; SOC 2 Type I; offboarding revokes 100% of access in < 60 s.
+
+## 8. Release C: the long tail (month 12+)
+
+Cloud LDAP (LEG-01) · Cloud RADIUS (LEG-02) · patch management (SW-02) · app deployment (SW-03) · SaaS discovery (SAAS-01, 02) · basic macOS MDM (LEG-03) · MSP multi-org (ORG-05) · LLM API proxy (MCP-11) · SOC 2 Type II. Prioritize by paying-customer demand.
+
+## 9. Risks and mitigations
+
+| Risk | Impact | Likelihood | Mitigation |
+|---|---|---|---|
+| Windows agent reliability | Release A slip | High | osquery for collection; device lab from week 1; macOS pilots first if needed |
+| Apple / Google push or app-store review delays | Push MFA slip | Medium | TestFlight / internal track from week 4; TOTP fallback always available |
+| Signing certificates (Apple Developer ID, Windows EV) | Blocks agent + app release | Medium | **Start procurement in week 1** |
+| SAML vendor quirks | Catalog slip | High | Top 10 apps chosen by design partners; SAML test harness |
+| Push MFA fatigue attacks | Security incident | Medium | Number matching, rate limits, "Deny, this wasn't me" raises an alert; passkeys preferred |
+| MCP spec churn | Gateway rework | Medium | Thin protocol adapter; conformance tests |
+| Scope creep toward JumpCloud parity | Diluted differentiation | High | SPEC §2.2 non-goals are binding; new asks go to Release C unless a design partner blocks on them |
+
+## 10. Getting started: the first two weeks
+
+**Week 1**
+1. Lock the decisions in ARCHITECTURE §17 (ADR-001..012) and answer SPEC §9 questions 1–3.
+2. Start procurement: Apple Developer Program (org), Windows EV code-signing certificate, Google Play console, domains (`nexus.votal.ai`), AWS accounts (US + EU), APNs key, Firebase project.
+3. Scaffold the monorepo (F.1): `apps/web`, `apps/mobile`, `cmd/api`, `packages/{api-client,core,tokens,ui}`, `api/openapi/nexus.yaml`, `db/migrations`, `deploy/compose`.
+4. Write the first OpenAPI slice: `/v1/me`, `/v1/me/notifications`, `/v1/me/stream`, `/v1/me/push-registrations`, `/v1/mfa/challenges/{id}:approve`, `/v1/audit/events`.
+5. Set up the device lab (Macs + Windows PCs, ARM + x86) and 2 test phones (iOS + Android).
+
+**Week 2**
+1. Stand up `make dev`: Postgres, Redis, NATS and ClickHouse in compose, with Tilt running `api`, `worker`, `web` and `mobile` (Expo dev client).
+2. Tenancy + RLS + outbox merged, with the RLS test harness in CI.
+3. Web: AppShell, sign-in page, inbox drawer on the design-system tokens.
+4. Mobile: PKCE login against staging, push registration, a push that arrives on a real device.
+5. Recruit design partners: target 5 conversations and 3 signed pilot LOIs by the end of month 1.

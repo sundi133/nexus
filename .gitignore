@@ -1,0 +1,17 @@
+# Go
+/bin/
+*.test
+coverage.out
+
+# Node
+node_modules/
+.next/
+.turbo/
+dist/
+.expo/
+*.tsbuildinfo
+
+# Env / local
+.env
+.env.local
+.DS_Store
