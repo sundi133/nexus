@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/votal-ai/nexus/agent/internal/identity"
+	"github.com/votal-ai/nexus/agent/internal/release"
 )
 
 // Problem is the API's RFC 9457 error body.
@@ -130,10 +131,39 @@ type CheckinResult struct {
 	InventoryInterval int    `json:"inventory_interval_seconds"`
 	Compliance        string `json:"compliance"`
 	WebOrigin         string `json:"web_origin"`
+	// Update is set when the server's rollout says this device should update.
+	Update *release.Offer `json:"update"`
 }
 
 func (c *Client) Checkin(ctx context.Context, payload any) (*CheckinResult, error) {
 	var out CheckinResult
 	err := c.post(ctx, "/v1/agent/checkin", payload, &out)
 	return &out, err
+}
+
+// Download fetches a release artifact from the Nexus server. Integrity comes
+// from the release signature, which the updater checks; this only fetches.
+func (c *Client) Download(ctx context.Context, path string, max int64) (io.ReadCloser, error) {
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
+		return nil, fmt.Errorf("not a server path: %q", path)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base.String()+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "nexus-agent")
+	// Downloads can be large and slow; the context bounds them, not the 30s API timeout.
+	res, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		res.Body.Close()
+		return nil, fmt.Errorf("download: HTTP %d", res.StatusCode)
+	}
+	if res.ContentLength > max {
+		res.Body.Close()
+		return nil, fmt.Errorf("download is %d bytes, expected at most %d", res.ContentLength, max)
+	}
+	return res.Body, nil
 }

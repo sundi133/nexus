@@ -250,6 +250,35 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Timestamp;
   };
+  agent_update_settings: {
+    org_id: string;
+    auto_rollout: Generated<boolean>;
+    advance_after_hours: Generated<number>;
+    updated_at: Generated<Date>;
+  };
+  agent_rollouts: {
+    id: string;
+    org_id: string;
+    version: string;
+    stage: Generated<"canary" | "early" | "all">;
+    status: Generated<"active" | "paused" | "halted" | "completed" | "cancelled">;
+    canary_device_ids: Generated<string[]>;
+    stage_started_at: Generated<Date>;
+    failures_since: Generated<Date>;
+    halted_reason: Generated<string>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  device_updates: {
+    org_id: string;
+    device_id: string;
+    version: string;
+    state: "offered" | "installed" | "failed" | "rolled_back";
+    error: Generated<string>;
+    from_version: Generated<string>;
+    updated_at: Generated<Date>;
+  };
   device_trust_challenges: {
     id: string;
     org_id: string;

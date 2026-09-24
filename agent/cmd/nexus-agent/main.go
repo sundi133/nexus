@@ -1,15 +1,16 @@
 // nexus-agent reports device posture to Votal Nexus.
 //
+//	sudo nexus-agent install --server https://api.example.com --token nxe_…   # enroll + run at boot
+//	sudo nexus-agent uninstall [--purge]
 //	nexus-agent enroll --server https://api.example.com --token nxe_…
 //	nexus-agent run            # check in forever (run as a system service)
 //	nexus-agent run --once     # one check-in, then exit
 //	nexus-agent posture        # print what would be reported, without sending
 //	nexus-agent status         # show enrollment
+//	nexus-agent selftest       # used by the updater to vet a new binary before installing it
 package main
 
 import (
-	"sync/atomic"
-
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,18 +19,35 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/identity"
 	"github.com/votal-ai/nexus/agent/internal/local"
+	"github.com/votal-ai/nexus/agent/internal/release"
 	"github.com/votal-ai/nexus/agent/internal/run"
+	"github.com/votal-ai/nexus/agent/internal/service"
 	"github.com/votal-ai/nexus/agent/internal/state"
+	"github.com/votal-ai/nexus/agent/internal/update"
 )
 
-// version is set at build time: -ldflags "-X main.version=1.2.3"
-var version = "0.1.0-dev"
+// Set at build time:
+//
+//	-ldflags "-X main.version=1.2.3 -X main.releaseKeys=<base64 Ed25519 public key>[,<next key>]"
+//
+// Without release keys the agent can't verify, and so never installs, updates.
+var (
+	version     = "0.1.0-dev"
+	releaseKeys = ""
+	// testBreak builds deliberately broken releases to exercise the update
+	// safety nets end to end ("selftest" fails the pre-install check, "crash"
+	// dies right after starting). Empty in every real build.
+	testBreak = ""
+)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -50,10 +68,28 @@ func main() {
 		token := fs.String("token", "", "enrollment token (nxe_…)")
 		_ = fs.Parse(args)
 		err = enroll(ctx, state.Store{Dir: *stateDir}, *server, *token)
+	case "install":
+		server := fs.String("server", "", "Nexus API URL (to enroll)")
+		token := fs.String("token", "", "enrollment token (to enroll)")
+		config := fs.String("config", "", "file with server= and token= lines (MDM deployments); deleted after use")
+		_ = fs.Parse(args)
+		err = install(ctx, state.Store{Dir: *stateDir}, *server, *token, *config)
+	case "uninstall":
+		purge := fs.Bool("purge", false, "also delete the device key and enrollment")
+		_ = fs.Parse(args)
+		err = uninstall(state.Store{Dir: *stateDir}, *purge)
 	case "run":
 		once := fs.Bool("once", false, "check in once and exit")
 		_ = fs.Parse(args)
+		// Under the Windows SCM, run as a service; elsewhere launchd/systemd run us as a plain process.
+		if isSvc, serr := service.RunAsService(func(ctx context.Context) error { return runAgent(ctx, state.Store{Dir: *stateDir}, false, log) }); isSvc || serr != nil {
+			err = serr
+			break
+		}
 		err = runAgent(ctx, state.Store{Dir: *stateDir}, *once, log)
+		if errors.Is(err, update.ErrRestart) {
+			err = restart(log)
+		}
 	case "posture":
 		_ = fs.Parse(args)
 		out, _ := json.MarshalIndent(collect.Collect(ctx), "", "  ")
@@ -67,6 +103,18 @@ func main() {
 		}
 		fmt.Printf("Enrolled in %s\nDevice ID: %s\nServer:    %s\nAgent:     %s\n", e.Organization, e.DeviceID, e.Server, version)
 	case "version":
+		fmt.Println(version)
+	case "selftest":
+		// The updater runs a downloaded binary this way before swapping it in:
+		// it must start, parse its own trust anchors, and report its version.
+		if _, kerr := release.ParseKeys(releaseKeys); kerr != nil {
+			err = kerr
+			break
+		}
+		if testBreak == "selftest" {
+			err = errors.New("deliberately broken build (testBreak=selftest)")
+			break
+		}
 		fmt.Println(version)
 	default:
 		usage()
@@ -144,6 +192,19 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		return nil
 	}
 	log.Info("nexus agent started", "device", e.DeviceID, "server", e.Server, "version", version)
+	upd, err := newUpdater(store, c, log)
+	if err != nil {
+		log.Warn("self-update unavailable", "err", err)
+	} else {
+		// A freshly installed version that keeps failing is rolled back here.
+		if err := upd.Recover(); err != nil {
+			return err
+		}
+		if testBreak == "crash" {
+			return errors.New("deliberately broken build (testBreak=crash)")
+		}
+		loop.Updater = upd
+	}
 	lsrv := &local.Server{Key: key, DeviceID: e.DeviceID, Origin: func() string { return origin.Load().(string) }, Log: log}
 	if ln, err := lsrv.Listen(); err != nil {
 		log.Warn("browser device checks unavailable", "err", err)
@@ -162,4 +223,104 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		_ = store.Forget()
 	}
 	return err
+}
+
+func newUpdater(store state.Store, c *client.Client, log *slog.Logger) (*update.Updater, error) {
+	keys, err := release.ParseKeys(releaseKeys)
+	if err != nil {
+		return nil, err
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	if exe, err = filepath.EvalSymlinks(exe); err != nil {
+		return nil, err
+	}
+	if len(keys) == 0 {
+		log.Warn("this build has no release keys; updates offered by the server will be refused")
+	}
+	return &update.Updater{Keys: keys, Current: version, Exe: exe, StateDir: store.Dir, Download: c.Download, SelfTest: update.ExecSelfTest, Log: log}, nil
+}
+
+// install copies this binary to the system location, enrolls (if given a
+// token and not yet enrolled) and registers the agent to run at boot.
+func install(ctx context.Context, store state.Store, server, token, config string) error {
+	if err := requireAdmin(); err != nil {
+		return err
+	}
+	if config != "" {
+		var err error
+		if server, token, err = readConfig(config); err != nil {
+			return err
+		}
+	}
+	bin := filepath.Join(service.InstallDir, service.BinName)
+	if err := service.CopyExecutable(bin); err != nil {
+		return fmt.Errorf("installing %s: %w", bin, err)
+	}
+	if _, _, err := store.Load(); errors.Is(err, state.ErrNotEnrolled) {
+		if token == "" {
+			return errors.New("not enrolled yet: pass --server and --token (or --config)")
+		}
+		if err := enroll(ctx, store, server, token); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+	if config != "" {
+		_ = os.Remove(config) // it holds an enrollment secret
+	}
+	if err := service.Install(bin, store.Dir); err != nil {
+		return fmt.Errorf("registering the service: %w", err)
+	}
+	fmt.Printf("Installed %s and started %s.\n", bin, service.Describe())
+	return nil
+}
+
+func uninstall(store state.Store, purge bool) error {
+	if err := requireAdmin(); err != nil {
+		return err
+	}
+	if err := service.Uninstall(); err != nil {
+		return err
+	}
+	bin := filepath.Join(service.InstallDir, service.BinName)
+	for _, p := range []string{bin, bin + ".previous", bin + ".failed"} {
+		_ = os.Remove(p)
+	}
+	if purge {
+		if err := os.RemoveAll(store.Dir); err != nil {
+			return err
+		}
+		fmt.Println("Removed the agent, its device key and enrollment. Remove the device in the Nexus console too.")
+		return nil
+	}
+	fmt.Println("Removed the agent. Its device key is kept, so reinstalling resumes the same device (use --purge to delete it).")
+	return nil
+}
+
+// readConfig parses `server=` / `token=` lines, as an MDM drops them before installing the package.
+func readConfig(path string) (server, token string, err error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", err
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		k, v, ok := strings.Cut(strings.TrimSpace(line), "=")
+		if !ok {
+			continue
+		}
+		switch strings.TrimSpace(k) {
+		case "server":
+			server = strings.TrimSpace(v)
+		case "token":
+			token = strings.TrimSpace(v)
+		}
+	}
+	if server == "" || token == "" {
+		return "", "", fmt.Errorf("%s must set server= and token=", path)
+	}
+	return server, token, nil
 }

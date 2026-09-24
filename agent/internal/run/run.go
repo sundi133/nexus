@@ -12,7 +12,17 @@ import (
 
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
+	"github.com/votal-ai/nexus/agent/internal/release"
+	"github.com/votal-ai/nexus/agent/internal/update"
 )
+
+// Updater is the self-update hook (implemented by update.Updater).
+type Updater interface {
+	Apply(ctx context.Context, o release.Offer) error
+	Health(ok bool) error
+	Result() *release.Result
+	ClearResult(reported *release.Result)
+}
 
 type Checkiner interface {
 	Checkin(ctx context.Context, payload any) (*client.CheckinResult, error)
@@ -25,6 +35,8 @@ type Loop struct {
 	Collect func(context.Context) collect.Snapshot
 	// OnCheckin, if set, sees every successful check-in result.
 	OnCheckin func(*client.CheckinResult)
+	// Updater, if set, reports update outcomes and applies offered updates (Run only).
+	Updater Updater
 
 	lastInventory     [32]byte
 	lastInventoryTime time.Time
@@ -47,7 +59,16 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	if sendInventory {
 		payload["inventory"] = snap.Inventory
 	}
+	var reported *release.Result
+	if l.Updater != nil {
+		if reported = l.Updater.Result(); reported != nil {
+			payload["update_result"] = reported
+		}
+	}
 	res, err := l.Client.Checkin(ctx, payload)
+	if err == nil && reported != nil {
+		l.Updater.ClearResult(reported)
+	}
 	if err == nil && sendInventory {
 		l.lastInventory, l.lastInventoryTime = sum, time.Now()
 	}
@@ -57,12 +78,23 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	return res, err
 }
 
-// Run checks in until ctx is cancelled or the server says the device was removed.
+// Run checks in until ctx is cancelled, the server says the device was
+// removed, or an update needs a restart (update.ErrRestart).
 func (l *Loop) Run(ctx context.Context) error {
 	interval, inventoryEvery := 60*time.Second, 15*time.Minute
 	backoff := 5 * time.Second
 	for {
 		res, err := l.Once(ctx, inventoryEvery)
+		if l.Updater != nil && !errors.Is(err, client.ErrNotEnrolled) {
+			if herr := l.Updater.Health(err == nil); errors.Is(herr, update.ErrRestart) {
+				return herr
+			}
+			if err == nil && res.Update != nil {
+				if aerr := l.Updater.Apply(ctx, *res.Update); errors.Is(aerr, update.ErrRestart) {
+					return aerr
+				}
+			}
+		}
 		wait := interval
 		switch {
 		case errors.Is(err, client.ErrNotEnrolled):

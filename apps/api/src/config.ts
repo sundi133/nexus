@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 export type Config = {
   env: "dev" | "test" | "prod";
   port: number;
@@ -13,6 +16,10 @@ export type Config = {
   mailFrom: string;
   sessionTtlMs: number;
   pendingMfaTtlMs: number;
+  // Signed agent releases (DEV-07): <dir>/<version>/release.json + binaries. A CDN origin in prod.
+  agentReleasesDir: string;
+  // Base64 Ed25519 release public keys, comma-separated. Dev reads <agent/dist>/release.pub when unset.
+  agentReleaseKeys: string;
 };
 
 export function loadConfig(env = process.env): Config {
@@ -43,5 +50,16 @@ export function loadConfig(env = process.env): Config {
     mailFrom: env.NEXUS_MAIL_FROM ?? "Votal Nexus <no-reply@nexus.local>",
     sessionTtlMs: 12 * 60 * 60 * 1000,
     pendingMfaTtlMs: 5 * 60 * 1000,
+    agentReleasesDir: env.NEXUS_AGENT_RELEASES_DIR ?? fileURLToPath(new URL("../../../agent/dist/releases", import.meta.url)),
+    agentReleaseKeys: env.NEXUS_AGENT_RELEASE_KEYS ?? (mode === "prod" ? "" : devReleaseKey()),
   };
+}
+
+/** The dev release key made by `pnpm agent:release` (agent/dist/release.pub), if any. */
+function devReleaseKey() {
+  try {
+    return readFileSync(fileURLToPath(new URL("../../../agent/dist/release.pub", import.meta.url)), "utf8").trim();
+  } catch {
+    return "";
+  }
 }

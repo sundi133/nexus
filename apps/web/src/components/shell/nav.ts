@@ -7,6 +7,7 @@ import {
   KeyRound,
   LayoutGrid,
   MonitorSmartphone,
+  PackageCheck,
   Laptop,
   ScrollText,
   Server,
@@ -42,6 +43,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "All devices", href: "/devices", icon: Laptop, shortcut: "G D" },
       { label: "Device policies", href: "/device-policies", icon: Wrench },
+      { label: "Agent updates", href: "/agent-updates", icon: PackageCheck },
     ],
   },
   {

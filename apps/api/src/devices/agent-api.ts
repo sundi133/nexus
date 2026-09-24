@@ -4,6 +4,7 @@ import { bodyLimit } from "hono/body-limit";
 import { calculateJwkThumbprint, EmbeddedJWK, importJWK, jwtVerify, type JWK } from "jose";
 import { sql } from "kysely";
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 import type { App, Env } from "../context.js";
 import { audit } from "../audit/record.js";
 import { hashToken } from "../auth/tokens.js";
@@ -11,6 +12,8 @@ import { ApiError, badRequest, conflict } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { CHECKIN_INTERVAL_S, evaluateDevice, getPolicies, INVENTORY_INTERVAL_S } from "./service.js";
 import { PostureFacts } from "./posture.js";
+import { releaseStore } from "./releases.js";
+import { offerFor, recordResult } from "./updates.js";
 
 /**
  * Agent API (ARCHITECTURE §8, ADR-015). Every request carries
@@ -73,6 +76,10 @@ const CheckinBody = z.object({
   device: DeviceUpdate,
   posture: PostureFacts,
   inventory: Inventory.optional(),
+  // How the last offered update went (DEV-07).
+  update_result: z
+    .object({ version: z.string().max(40), state: z.enum(["installed", "failed", "rolled_back"]), error: z.string().max(500).optional() })
+    .optional(),
 });
 
 const bsh = (body: string) => createHash("sha256").update(body).digest("base64url");
@@ -197,8 +204,9 @@ export function registerAgentRoutes(app: App) {
     path: "/v1/agent/checkin",
     tags: ["Agent"],
     summary: "Report posture and inventory (called by the Nexus agent every minute)",
-    description: "Body `{device, posture, inventory?}`, signed with the device key (`kid` = device ID). Returns the next check-in intervals.",
-    responses: { 200: { description: "`{checkin_interval_seconds, inventory_interval_seconds, compliance, web_origin}`" } },
+    description:
+      "Body `{device, posture, inventory?, update_result?}`, signed with the device key (`kid` = device ID). Returns the next check-in intervals and, when this device's rollout ring is due, a signed `update` offer.",
+    responses: { 200: { description: "`{checkin_interval_seconds, inventory_interval_seconds, compliance, web_origin, update: {version, url, sha256, size, key_id, signature} | null}`" } },
   });
   app.post("/v1/agent/checkin", async (c) => {
     const deps = c.get("deps");
@@ -235,11 +243,39 @@ export function registerAgentRoutes(app: App) {
           updated_at: new Date(),
         })
         .where("id", "=", kid)
-        .returning(["id", "org_id", "hostname", "platform", "os_version", "posture", "compliance", "primary_user_id"])
+        .returning(["id", "org_id", "hostname", "platform", "arch", "os_version", "agent_version", "last_seen_at", "posture", "compliance", "primary_user_id"])
         .executeTakeFirstOrThrow();
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
-      return { checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl };
+      if (input.update_result) await recordResult(tx, dev.org_id, d, input.update_result, meta);
+      const update = await offerFor(tx, dev.org_id, d, releaseStore(deps.cfg), meta);
+      return { checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update };
     });
     return c.json(out, 200);
+  });
+}
+
+/** Release binaries. Public: their integrity comes from the release signature, not from who may download. */
+export function registerReleaseDownloads(app: App) {
+  app.openAPIRegistry.registerPath({
+    method: "get",
+    path: "/v1/agent/releases/{version}/{file}",
+    tags: ["Agent"],
+    summary: "Download a signed agent binary",
+    responses: { 200: { description: "The binary" }, 404: { description: "No such release artifact" } },
+  });
+  app.get("/v1/agent/releases/:version/:file", async (c) => {
+    const store = releaseStore(c.get("deps").cfg);
+    const rel = await store.get(c.req.param("version"));
+    const a = rel?.artifacts.find((x) => x.file === c.req.param("file"));
+    if (!rel || !a) throw new ApiError(404, "not_found", "No such release artifact");
+    return new Response(Readable.toWeb(store.open(rel.version, a.file)) as ReadableStream, {
+      headers: {
+        "content-type": "application/octet-stream",
+        "content-length": String(a.size),
+        "content-disposition": `attachment; filename="${a.file}"`,
+        "cache-control": "public, max-age=31536000, immutable",
+        "x-content-sha256": a.sha256,
+      },
+    });
   });
 }

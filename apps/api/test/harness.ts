@@ -1,7 +1,7 @@
 import * as OTPAuth from "otpauth";
 import { randomBytes } from "node:crypto";
 import { createApp } from "../src/app.js";
-import { loadConfig } from "../src/config.js";
+import { loadConfig, type Config } from "../src/config.js";
 import { Db } from "../src/platform/db.js";
 import { migrate } from "../src/platform/migrate.js";
 import { Realtime } from "../src/platform/realtime.js";
@@ -10,8 +10,8 @@ import { MemoryMailer } from "../src/platform/mailer.js";
 import { RecordingPushSender } from "../src/platform/push.js";
 
 /** Boots the real app against the nexus_test database. Tests talk HTTP to it via app.request(). */
-export async function bootApp() {
-  const cfg = loadConfig();
+export async function bootApp(overrides: Partial<Config> = {}) {
+  const cfg = { ...loadConfig(), ...overrides };
   await migrate(cfg.databaseOwnerUrl);
   const db = new Db(cfg.databaseUrl);
   const realtime = new Realtime(cfg.databaseUrl);

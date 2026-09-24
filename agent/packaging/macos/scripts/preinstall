@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stop a running agent before its binary is replaced.
+launchctl bootout system/ai.votal.nexus-agent 2>/dev/null || true
+exit 0

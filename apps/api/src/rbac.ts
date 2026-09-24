@@ -21,6 +21,7 @@ export const PERMISSIONS = [
   "devices:read",
   "devices:write", // enroll/remove devices, assign users, device policies
   "policies:write", // conditional access policies
+  "devices:updates", // agent software rollouts (fleet-wide changes, so not helpdesk)
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 

@@ -341,7 +341,8 @@
           "apps:assign",
           "devices:read",
           "devices:write",
-          "policies:write"
+          "policies:write",
+          "devices:updates"
         ]
       },
       "Factor": {
@@ -2484,6 +2485,268 @@
           "expires_at",
           "fingerprint",
           "certificate"
+        ]
+      },
+      "AgentUpdateStatus": {
+        "type": "object",
+        "properties": {
+          "release_keys_configured": {
+            "type": "boolean"
+          },
+          "latest": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "published_at": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "platforms": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "darwin/arm64"
+                ]
+              }
+            },
+            "required": [
+              "version",
+              "published_at",
+              "notes",
+              "platforms"
+            ]
+          },
+          "releases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRelease"
+            }
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "auto_rollout": {
+                "type": "boolean"
+              },
+              "advance_after_hours": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "auto_rollout",
+              "advance_after_hours"
+            ]
+          },
+          "rollout": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+              },
+              "version": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "canary",
+                  "early",
+                  "all"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "paused",
+                  "halted",
+                  "completed",
+                  "cancelled"
+                ]
+              },
+              "halted_reason": {
+                "type": "string"
+              },
+              "stage_started_at": {
+                "type": "string"
+              },
+              "next_advance_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When the current stage advances by itself, if at least one of its devices updated healthily"
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "started_by": {
+                "type": "string"
+              },
+              "stages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stage": {
+                      "type": "string",
+                      "enum": [
+                        "canary",
+                        "early",
+                        "all"
+                      ]
+                    },
+                    "devices": {
+                      "type": "integer"
+                    },
+                    "updated": {
+                      "type": "integer"
+                    },
+                    "failed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "stage",
+                    "devices",
+                    "updated",
+                    "failed"
+                  ]
+                }
+              },
+              "devices": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                    },
+                    "hostname": {
+                      "type": "string"
+                    },
+                    "ring": {
+                      "type": "string",
+                      "enum": [
+                        "canary",
+                        "early",
+                        "all"
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "updated",
+                        "offered",
+                        "waiting",
+                        "failed",
+                        "rolled_back",
+                        "unsupported"
+                      ]
+                    },
+                    "agent_version": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "hostname",
+                    "ring",
+                    "state",
+                    "agent_version",
+                    "error"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "version",
+              "stage",
+              "status",
+              "halted_reason",
+              "stage_started_at",
+              "next_advance_at",
+              "created_at",
+              "started_by",
+              "stages",
+              "devices"
+            ]
+          },
+          "fleet": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string"
+                },
+                "devices": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "version",
+                "devices"
+              ]
+            }
+          }
+        },
+        "required": [
+          "release_keys_configured",
+          "latest",
+          "releases",
+          "settings",
+          "rollout",
+          "fleet"
+        ]
+      },
+      "AgentRelease": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "darwin/arm64"
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "published_at",
+          "notes",
+          "platforms"
         ]
       },
       "DevicePage": {
@@ -10811,10 +11074,416 @@
           "Agent"
         ],
         "summary": "Report posture and inventory (called by the Nexus agent every minute)",
-        "description": "Body `{device, posture, inventory?}`, signed with the device key (`kid` = device ID). Returns the next check-in intervals.",
+        "description": "Body `{device, posture, inventory?, update_result?}`, signed with the device key (`kid` = device ID). Returns the next check-in intervals and, when this device's rollout ring is due, a signed `update` offer.",
         "responses": {
           "200": {
-            "description": "`{checkin_interval_seconds, inventory_interval_seconds, compliance, web_origin}`"
+            "description": "`{checkin_interval_seconds, inventory_interval_seconds, compliance, web_origin, update: {version, url, sha256, size, key_id, signature} | null}`"
+          }
+        }
+      }
+    },
+    "/v1/agent/releases/{version}/{file}": {
+      "get": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Download a signed agent binary",
+        "responses": {
+          "200": {
+            "description": "The binary"
+          },
+          "404": {
+            "description": "No such release artifact"
+          }
+        }
+      }
+    },
+    "/v1/agent-updates": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Agent releases, rollout progress and fleet versions",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentUpdateStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent-updates/settings": {
+      "put": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Agent update settings (requires recent MFA)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "auto_rollout": {
+                    "type": "boolean"
+                  },
+                  "advance_after_hours": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 720
+                  }
+                },
+                "required": [
+                  "auto_rollout",
+                  "advance_after_hours"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentUpdateStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent-updates/rollouts": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Start rolling out a release (requires recent MFA)",
+        "description": "Replaces any unfinished rollout. Canaries default to ~1% of the fleet (at least one device), preferring devices seen in the last hour.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "canary_device_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                    },
+                    "maxItems": 50
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentUpdateStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent-updates/rollouts/{id}/actions": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Pause, resume, advance or cancel a rollout",
+        "description": "Pausing and cancelling only stop the spread, so they don't need recent MFA; resuming and advancing do.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "pause",
+                      "resume",
+                      "advance",
+                      "cancel"
+                    ]
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentUpdateStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }
