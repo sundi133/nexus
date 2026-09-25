@@ -30,6 +30,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - name: Dependency audit (fails on high or critical)
+        run: pnpm audit --prod --audit-level high
       - name: Create the runtime role and test database (like deploy/compose/initdb)
         env: { PGPASSWORD: nexus_owner }
         run: |
@@ -45,6 +47,11 @@ jobs:
           pnpm --filter @nexus/mobile exec tsc --noEmit
       - name: API tests (incl. security guards)
         run: pnpm --filter @nexus/api test
+      - name: Backup and restore test (on the data the tests left behind)
+        env: { DATABASE_URL: "postgres://nexus_owner:nexus_owner@localhost:55432/nexus_test" }
+        run: |
+          deploy/ops/backup.sh /tmp/backups
+          deploy/ops/restore-test.sh "$(ls /tmp/backups/*.dump)"
       - name: OpenAPI spec and client are up to date
         run: |
           pnpm api:spec
