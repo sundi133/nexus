@@ -706,6 +706,21 @@ export interface Database {
     created_by: string | null;
     created_at: Generated<Date>;
   };
+  audit_blocks: {
+    org_id: string;
+    seq: ColumnType<string, number | string, never>; // bigint
+    from_txid: string; // xid8, as text
+    from_id: string;
+    to_txid: string;
+    to_id: string;
+    count: number;
+    first_ts: Date;
+    last_ts: Date;
+    prev_digest: string;
+    digest: string;
+    sealed_at: Generated<Date>;
+    pruned_at: NullableTimestamp;
+  };
   directory_links: {
     org_id: string;
     connection_id: string;

@@ -1,7 +1,7 @@
 "use client";
 
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { ScrollText, X } from "lucide-react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ScrollText, ShieldAlert, ShieldCheck, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ActivityList } from "@/components/features/activity";
@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { Card, EmptyState, PageHeader, Skeleton } from "@/components/ui/misc";
 import { api, unwrap } from "@/lib/api";
+import { pluralize, timeAgo } from "@/lib/utils";
+import { useCan } from "@/lib/queries";
 
 const TYPES = [
   ["", "All events"],
@@ -46,6 +48,7 @@ function AuditView() {
   return (
     <>
       <PageHeader title="Audit log" description="Every change and sign-in, immutable. Click a row to see the full event." />
+      <IntegrityCard />
       <div className="mb-3 flex flex-wrap gap-2">
         <Select value={filters.type ?? ""} onChange={(e) => setParam("type", e.target.value)} aria-label="Event type">
           {TYPES.map(([v, l]) => (
@@ -95,5 +98,42 @@ export default function AuditPage() {
     <Suspense>
       <AuditView />
     </Suspense>
+  );
+}
+
+/** The hash chain's state: sealed blocks, the latest digest, and the result of recomputing it (AUD-05). */
+function IntegrityCard() {
+  const qc = useQueryClient();
+  const can = useCan();
+  const v = useQuery({ queryKey: ["audit-integrity"], queryFn: () => unwrap(api.GET("/v1/audit/integrity")), staleTime: 60_000 });
+  const seal = useMutation({ mutationFn: () => unwrap(api.POST("/v1/audit/seal")), onSuccess: () => qc.invalidateQueries({ queryKey: ["audit-integrity"] }) });
+  if (!v.data) return null;
+  const d = v.data;
+  return (
+    <Card className={`mb-4 flex flex-wrap items-center gap-3 p-4 text-[13px] ${d.ok ? "" : "border-danger/40 bg-danger-soft"}`}>
+      {d.ok ? <ShieldCheck className="size-5 text-success" /> : <ShieldAlert className="size-5 text-danger" />}
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">
+          {!d.ok ? "The audit log failed its integrity check" : d.head ? "Audit log verified: nothing has been changed or removed" : "The audit log hasn't been sealed yet"}
+        </p>
+        <p className="text-xs text-fg-muted">
+          {!d.ok && d.problem
+            ? d.problem.detail
+            : d.head
+              ? `${pluralize(d.events_checked, "event")} in ${pluralize(d.blocks_checked, "sealed block")}${d.pruned_blocks ? ` (${d.pruned_blocks} past retention)` : ""} · last sealed ${timeAgo(d.head.sealed_at)} · ${d.unsealed_events} newer, sealed hourly · kept ${d.retention_days} days`
+              : "Events are sealed into a hash chain every hour."}
+        </p>
+        {d.head ? (
+          <p className="mt-0.5 truncate font-mono text-[11px] text-fg-subtle" title="Compare with the audit.sealed events in your SIEM or archive">
+            Latest digest {d.head.digest}
+          </p>
+        ) : null}
+      </div>
+      {can("org:manage") && d.unsealed_events ? (
+        <Button size="sm" loading={seal.isPending} onClick={() => seal.mutate()}>
+          Seal now
+        </Button>
+      ) : null}
+    </Card>
   );
 }

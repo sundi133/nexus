@@ -82,6 +82,8 @@ const VERBS: Record<string, string> = {
   "mcp.permission_removed": "removed a tool permission on",
   "mcp.tool_called": "called",
   "mcp.tool_denied": "was denied",
+  "audit.sealed": "sealed a block of the audit log",
+  "audit.integrity_failed": "detected tampering in the audit log",
 };
 
 export function describe(e: AuditEvent) {

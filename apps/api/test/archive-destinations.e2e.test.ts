@@ -30,7 +30,15 @@ const dest = async (id: string) => ((await h.call("GET", "/v1/event-destinations
 const newUser = (tag: string) => h.call("POST", "/v1/users", { token: admin, body: { email: uniqueEmail(tag), given_name: tag } });
 const puts = () => received.filter((r) => r.method === "PUT");
 /** Backdate this org's audit events, as if they'd been waiting a while. */
-const age = (minutes: number) => owner.query(`UPDATE audit_events SET ts = ts - make_interval(mins => $2) WHERE org_id = $1`, [orgId, minutes]);
+// Simulates time passing. Audit events are append-only, so the test lifts the guard just for this.
+const age = async (minutes: number) => {
+  await owner.query("SET session_replication_role = replica"); // this session only: triggers off
+  try {
+    await owner.query(`UPDATE audit_events SET ts = ts - make_interval(mins => $2) WHERE org_id = $1`, [orgId, minutes]);
+  } finally {
+    await owner.query("SET session_replication_role = origin");
+  }
+};
 /** Delivery waits for older transactions anywhere in the cluster (other test files) to finish: poll. */
 async function deliverUntil(id: string, done: () => boolean, tries = 40) {
   for (let i = 0; i < tries; i++) {

@@ -10,13 +10,19 @@ export const OrgSettings = z
     session_ttl_hours: z.number().int().min(1).max(168).openapi({ description: "How long a sign-in lasts before re-authentication" }),
     restrict_to_verified_domains: z.boolean().openapi({ description: "Only people with emails in your verified domains can be added" }),
     owners_require_passkey: z.boolean().openapi({ description: "Owners confirm admin actions with a passkey (phishing-resistant); other methods aren't accepted for them" }),
+    audit_retention_days: z
+      .number()
+      .int()
+      .min(30)
+      .max(3650)
+      .openapi({ description: "How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept." }),
   })
   .openapi("OrgSettings");
 
 export type OrgSettings = z.infer<typeof OrgSettings>;
 
 // Secure by default: admins must use MFA from day one.
-export const DEFAULT_SETTINGS: OrgSettings = { mfa_policy: "admins", session_ttl_hours: 12, restrict_to_verified_domains: false, owners_require_passkey: false };
+export const DEFAULT_SETTINGS: OrgSettings = { mfa_policy: "admins", session_ttl_hours: 12, restrict_to_verified_domains: false, owners_require_passkey: false, audit_retention_days: 365 };
 
 export async function getSettings(tx: Tx, orgId: string): Promise<OrgSettings> {
   const row = await tx.selectFrom("organizations").select("settings").where("id", "=", orgId).executeTakeFirstOrThrow();

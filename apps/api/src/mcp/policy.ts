@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { canonical } from "../platform/canonical.js";
+
+export { canonical };
 
 /**
  * MCP tool policy (SPEC MCP-04, MCP-10): risk classes and per-tool
@@ -30,19 +33,6 @@ export function classify(name: string, description: string, a: ToolAnnotations):
   if (/^(get|list|search|find|read|query|describe|show|lookup|count|view|fetch_?info|whoami)/i.test(words) || /(^|_)(get|list|search|read)(_|$)/i.test(words)) return { risk: "read", source: "heuristic" };
   if (DESTRUCTIVE.test(description)) return { risk: "destructive", source: "heuristic" };
   return { risk: "write", source: "heuristic" };
-}
-
-/** Canonical JSON (sorted keys), so the hash only changes when the content does. */
-export function canonical(v: unknown): string {
-  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
-  if (v && typeof v === "object") {
-    return `{${Object.keys(v as object)
-      .sort()
-      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
-      .map((k) => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(v ?? null);
 }
 
 /** What an approval covers: a changed description is a changed tool (tool poisoning hides in descriptions). */

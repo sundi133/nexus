@@ -3080,6 +3080,125 @@
           "next_cursor"
         ]
       },
+      "AuditIntegrity": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "blocks_checked": {
+            "type": "integer"
+          },
+          "events_checked": {
+            "type": "integer"
+          },
+          "pruned_blocks": {
+            "type": "integer",
+            "description": "Blocks whose events were removed by retention; their digests remain in the chain"
+          },
+          "head": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "block": {
+                "type": "integer"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "sealed_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "block",
+              "digest",
+              "sealed_at"
+            ],
+            "description": "The latest seal. Compare its digest with the audit.sealed events in your SIEM or archive."
+          },
+          "problem": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "block": {
+                "type": "integer"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "block",
+              "kind",
+              "detail"
+            ]
+          },
+          "unsealed_events": {
+            "type": "integer",
+            "description": "Events newer than the latest seal (sealed within the hour)"
+          },
+          "retention_days": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "blocks_checked",
+          "events_checked",
+          "pruned_blocks",
+          "head",
+          "problem",
+          "unsealed_events",
+          "retention_days"
+        ]
+      },
+      "AuditBlock": {
+        "type": "object",
+        "properties": {
+          "block": {
+            "type": "integer"
+          },
+          "events": {
+            "type": "integer"
+          },
+          "first_ts": {
+            "type": "string"
+          },
+          "last_ts": {
+            "type": "string"
+          },
+          "prev_digest": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "sealed_at": {
+            "type": "string"
+          },
+          "pruned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "block",
+          "events",
+          "first_ts",
+          "last_ts",
+          "prev_digest",
+          "digest",
+          "sealed_at",
+          "pruned"
+        ]
+      },
       "AuditEventPage": {
         "type": "object",
         "properties": {
@@ -3469,13 +3588,20 @@
           "owners_require_passkey": {
             "type": "boolean",
             "description": "Owners confirm admin actions with a passkey (phishing-resistant); other methods aren't accepted for them"
+          },
+          "audit_retention_days": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 3650,
+            "description": "How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept."
           }
         },
         "required": [
           "mfa_policy",
           "session_ttl_hours",
           "restrict_to_verified_domains",
-          "owners_require_passkey"
+          "owners_require_passkey",
+          "audit_retention_days"
         ]
       },
       "PolicyImpact": {
@@ -18339,6 +18465,285 @@
         }
       }
     },
+    "/v1/audit/integrity": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Verify the audit log",
+        "description": "Recomputes the hash chain over every retained event and checks that the sealed blocks link up. Any changed, removed or inserted event is reported with its block.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditIntegrity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audit/blocks": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "List sealed blocks (newest first)",
+        "description": "The chain of digests, for anchoring elsewhere or independent verification.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuditBlock"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audit/seal": {
+      "post": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Seal the audit log now",
+        "description": "Seals committed events into a new block (this also happens hourly).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sealed": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "block": {
+                          "type": "integer"
+                        },
+                        "events": {
+                          "type": "integer"
+                        },
+                        "digest": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "block",
+                        "events",
+                        "digest"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sealed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/audit/events": {
       "get": {
         "tags": [
@@ -19064,6 +19469,12 @@
                   "owners_require_passkey": {
                     "type": "boolean",
                     "description": "Owners confirm admin actions with a passkey (phishing-resistant); other methods aren't accepted for them"
+                  },
+                  "audit_retention_days": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 3650,
+                    "description": "How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept."
                   }
                 }
               }

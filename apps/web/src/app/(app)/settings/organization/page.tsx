@@ -174,6 +174,24 @@ export default function OrganizationSettingsPage() {
                   ))}
                 </Select>
               </div>
+              <div className="flex items-center gap-3">
+                <label htmlFor="retention" className="text-[13px] font-medium">
+                  Keep audit events for
+                </label>
+                <Select
+                  id="retention"
+                  disabled={!editable}
+                  value={draft.audit_retention_days}
+                  onChange={(e) => setDraft({ ...draft, audit_retention_days: Number(e.target.value) })}
+                >
+                  {[...new Set([30, 90, 180, 365, 730, 1095, 2555, 3650, draft.audit_retention_days])].sort((x, y) => x - y).map((d) => (
+                    <option key={d} value={d}>
+                      {d < 365 ? `${d} days` : `${Math.round((d / 365) * 10) / 10} year${d >= 730 ? "s" : ""}`}
+                    </option>
+                  ))}
+                </Select>
+                <span className="text-xs text-fg-muted">Older events are removed only after your SIEM and archive have them.</span>
+              </div>
               <label className="flex items-start gap-2 text-[13px]">
                 <input
                   type="checkbox"

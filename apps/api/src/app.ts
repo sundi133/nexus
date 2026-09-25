@@ -24,6 +24,7 @@ import { registerAiAgentRoutes } from "./ai-agents/routes.js";
 import { registerMcpGateway } from "./mcp/gateway.js";
 import { registerMcpRoutes } from "./mcp/routes.js";
 import { scheduleMcpSyncs } from "./mcp/service.js";
+import { scheduleAuditIntegrity } from "./audit/integrity.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
@@ -218,4 +219,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleAccessReviews(jobs, deps);
   scheduleDynamicGroups(jobs, deps);
   scheduleMcpSyncs(jobs, deps);
+  scheduleAuditIntegrity(jobs, deps);
 }

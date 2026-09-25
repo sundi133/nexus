@@ -82,6 +82,13 @@ Nexus calls customer-configured URLs: webhooks, SIEM endpoints, SCIM apps and Sl
 - For long-term retention, events can also be archived to the customer's own S3 or Google Cloud Storage bucket. Turn on Object Lock or a retention policy there for tamper-proof (WORM) storage. The credentials Nexus needs only allow writing objects.
 - Webhooks are signed with `nexus-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`. Receivers should check the signature and reject timestamps older than 5 minutes.
 
+## Audit integrity and retention
+
+- **Hash chain:** each organization's audit events are hashed into a chain in commit order and sealed into blocks every hour. Every seal is recorded as an `audit.sealed` event carrying the digest, so the digests reach your SIEM and archive and can be compared outside Nexus.
+- **Verification:** `GET /v1/audit/integrity` recomputes every retained block, and a daily job does the same. A changed, removed or inserted event is reported with its block and raises a critical alert.
+- **Append-only:** the application's database role can only insert and read audit events, and a trigger refuses UPDATE and DELETE even for the table owner. The one exception is the retention function.
+- **Retention** (30 days to 10 years, default 365) removes whole sealed blocks, and only after every enabled event destination has received their events. The digests stay, so the chain still verifies.
+
 ## Web and API hardening
 
 - **Headers:** HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` (API) / `strict-origin-when-cross-origin` (console), and `frame-ancestors 'none'` / `X-Frame-Options: DENY`. In production, the console also sends a Content Security Policy.
