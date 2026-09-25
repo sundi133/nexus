@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto";
 import type { Deps, Env } from "./context.js";
 import { registerAuditRoutes } from "./audit/routes.js";
 import { loadPrincipal } from "./auth/guard.js";
+import { unauthorized } from "./platform/errors.js";
+import { isPublicRoute } from "./auth/public-routes.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
@@ -80,6 +82,11 @@ export function createApp(deps: Deps) {
 
   app.use("/v1/*", cors({ origin: deps.cfg.publicUrl, credentials: false, maxAge: 600 }));
   app.use("/v1/*", loadPrincipal);
+  // Deny by default, before any request validation runs.
+  app.use("/v1/*", async (c, next) => {
+    if (!c.get("principal") && !isPublicRoute(c.req.method, c.req.path)) throw unauthorized();
+    await next();
+  });
 
   app.onError((err, c) => {
     if (err instanceof ApiError) return problem(c, err);
