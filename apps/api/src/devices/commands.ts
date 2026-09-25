@@ -4,7 +4,7 @@ import { CompactSign } from "jose";
 import type { App, Deps } from "../context.js";
 import { audit } from "../audit/record.js";
 import { verifiedFactorTypes } from "../auth/routes.js";
-import { requirePermission, requireRecentMfa } from "../auth/guard.js";
+import { assertDeviceInScope, requirePermission, requireRecentMfa } from "../auth/guard.js";
 import { ProviderError } from "../directory/sync/providers.js";
 import { notifyRoles } from "../notify/send.js";
 import type { Tx } from "../platform/db.js";
@@ -155,13 +155,15 @@ export function registerCommandRoutes(app: App) {
     async (c) => {
       const { id } = c.req.valid("param");
       const input = c.req.valid("json");
-      const p = requirePermission(c, input.action === "wipe" ? "devices:wipe" : "devices:actions");
+      const perm = input.action === "wipe" ? "devices:wipe" : "devices:actions";
+      const p = requirePermission(c, perm, { scoped: true }); // wipe is never scopable, so it stays org-wide
       const deps = c.get("deps");
       const meta = c.get("meta");
       if (input.action !== "refresh" && input.reason.length < 3) throw badRequest("reason_required", "Say why (it goes in the audit log and to the device's user)");
 
       // Decide the channel and gather what the MDM needs, before any network call.
       const plan = await deps.db.tenant(p.orgId, async (tx) => {
+        await assertDeviceInScope(tx, p, perm, id);
         if (input.action !== "refresh") requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0);
         const d = await tx.selectFrom("devices").select(["id", "org_id", "hostname", "serial", "last_seen_at", "primary_user_id"]).where("id", "=", id).where("status", "=", "active").executeTakeFirst();
         if (!d) throw notFound("Device");
@@ -235,8 +237,9 @@ export function registerCommandRoutes(app: App) {
   app.openapi(
     createRoute({ method: "get", path: "/v1/devices/{id}/commands", tags: ["Devices"], summary: "Actions taken on a device", security: bearer, request: idParam, responses: { 200: json(z.object({ data: z.array(CommandOut) })), ...problemResponses } }),
     async (c) => {
-      const p = requirePermission(c, "devices:read");
-      return c.json({ data: await c.get("deps").db.tenant(p.orgId, (tx) => history(tx, c.req.valid("param").id)) }, 200);
+      const p = requirePermission(c, "devices:read", { scoped: true });
+      const id = c.req.valid("param").id;
+      return c.json({ data: await c.get("deps").db.tenant(p.orgId, async (tx) => (await assertDeviceInScope(tx, p, "devices:read", id), history(tx, id))) }, 200);
     },
   );
 

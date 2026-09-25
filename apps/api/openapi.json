@@ -173,6 +173,16 @@
               "$ref": "#/components/schemas/Permission"
             }
           },
+          "scoped_permissions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Permissions held only for people in these groups (scoped roles)"
+          },
           "session": {
             "type": "object",
             "properties": {
@@ -207,6 +217,7 @@
           "organization",
           "roles",
           "permissions",
+          "scoped_permissions",
           "session"
         ]
       },
@@ -3520,6 +3531,261 @@
           "section",
           "action",
           "key"
+        ]
+      },
+      "RoleCatalog": {
+        "type": "object",
+        "properties": {
+          "builtin": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "owner",
+                    "admin",
+                    "helpdesk",
+                    "security_analyst",
+                    "readonly"
+                  ]
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "org:manage",
+                      "admins:manage",
+                      "users:read",
+                      "users:write",
+                      "users:lifecycle",
+                      "groups:read",
+                      "groups:write",
+                      "audit:read",
+                      "apps:read",
+                      "apps:write",
+                      "apps:assign",
+                      "devices:read",
+                      "devices:write",
+                      "policies:write",
+                      "devices:updates",
+                      "devices:actions",
+                      "devices:wipe",
+                      "directory:sync",
+                      "api_keys:manage",
+                      "integrations:manage",
+                      "access:manage",
+                      "agents:read",
+                      "agents:manage",
+                      "agents:suspend",
+                      "mcp:manage",
+                      "alerts:read",
+                      "alerts:triage",
+                      "alerts:manage"
+                    ]
+                  }
+                },
+                "scopable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key",
+                "permissions",
+                "scopable"
+              ]
+            }
+          },
+          "custom": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomRole"
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "org:manage",
+                    "admins:manage",
+                    "users:read",
+                    "users:write",
+                    "users:lifecycle",
+                    "groups:read",
+                    "groups:write",
+                    "audit:read",
+                    "apps:read",
+                    "apps:write",
+                    "apps:assign",
+                    "devices:read",
+                    "devices:write",
+                    "policies:write",
+                    "devices:updates",
+                    "devices:actions",
+                    "devices:wipe",
+                    "directory:sync",
+                    "api_keys:manage",
+                    "integrations:manage",
+                    "access:manage",
+                    "agents:read",
+                    "agents:manage",
+                    "agents:suspend",
+                    "mcp:manage",
+                    "alerts:read",
+                    "alerts:triage",
+                    "alerts:manage"
+                  ]
+                },
+                "scopable": {
+                  "type": "boolean",
+                  "description": "Can be limited to groups in a scoped grant"
+                },
+                "in_custom_roles": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key",
+                "scopable",
+                "in_custom_roles"
+              ]
+            }
+          }
+        },
+        "required": [
+          "builtin",
+          "custom",
+          "permissions"
+        ]
+      },
+      "CustomRole": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "org:manage",
+                "admins:manage",
+                "users:read",
+                "users:write",
+                "users:lifecycle",
+                "groups:read",
+                "groups:write",
+                "audit:read",
+                "apps:read",
+                "apps:write",
+                "apps:assign",
+                "devices:read",
+                "devices:write",
+                "policies:write",
+                "devices:updates",
+                "devices:actions",
+                "devices:wipe",
+                "directory:sync",
+                "api_keys:manage",
+                "integrations:manage",
+                "access:manage",
+                "agents:read",
+                "agents:manage",
+                "agents:suspend",
+                "mcp:manage",
+                "alerts:read",
+                "alerts:triage",
+                "alerts:manage"
+              ]
+            }
+          },
+          "holders": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-05T12:00:00.000Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-05T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "permissions",
+          "holders",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "RoleGrant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "role": {
+            "type": "string",
+            "description": "A built-in role (helpdesk, security_analyst, readonly) or custom:<id>"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            },
+            "description": "Empty: the whole organization"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-05T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "name",
+          "scope",
+          "created_at"
         ]
       },
       "WebAuthnCeremony": {
@@ -17841,6 +18107,686 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConfigPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/roles": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Built-in roles, custom roles and the permission catalog",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCatalog"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Create a custom role",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "default": ""
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "org:manage",
+                        "admins:manage",
+                        "users:read",
+                        "users:write",
+                        "users:lifecycle",
+                        "groups:read",
+                        "groups:write",
+                        "audit:read",
+                        "apps:read",
+                        "apps:write",
+                        "apps:assign",
+                        "devices:read",
+                        "devices:write",
+                        "policies:write",
+                        "devices:updates",
+                        "devices:actions",
+                        "devices:wipe",
+                        "directory:sync",
+                        "api_keys:manage",
+                        "integrations:manage",
+                        "access:manage",
+                        "agents:read",
+                        "agents:manage",
+                        "agents:suspend",
+                        "mcp:manage",
+                        "alerts:read",
+                        "alerts:triage",
+                        "alerts:manage"
+                      ]
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "name",
+                  "permissions"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCatalog"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/roles/{id}": {
+      "patch": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Change a custom role",
+        "description": "Takes effect for everyone who has it at their next request.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "default": ""
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "org:manage",
+                        "admins:manage",
+                        "users:read",
+                        "users:write",
+                        "users:lifecycle",
+                        "groups:read",
+                        "groups:write",
+                        "audit:read",
+                        "apps:read",
+                        "apps:write",
+                        "apps:assign",
+                        "devices:read",
+                        "devices:write",
+                        "policies:write",
+                        "devices:updates",
+                        "devices:actions",
+                        "devices:wipe",
+                        "directory:sync",
+                        "api_keys:manage",
+                        "integrations:manage",
+                        "access:manage",
+                        "agents:read",
+                        "agents:manage",
+                        "agents:suspend",
+                        "mcp:manage",
+                        "alerts:read",
+                        "alerts:triage",
+                        "alerts:manage"
+                      ]
+                    },
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCatalog"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Delete a custom role",
+        "description": "Everyone who had it loses it.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCatalog"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{id}/role-grants": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "A person's custom and scoped roles",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RoleGrant"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Set a person's custom and scoped roles",
+        "description": "Replaces them. A built-in role (Help Desk, Security Analyst, Read-only) needs groups here (for the whole organization, use the user's roles instead); a custom role applies to the whole organization unless groups are given. Within groups, only permissions about people and their devices are limited; other permissions in the role don't apply, except reading groups and apps.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "grants": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "pattern": "^(helpdesk|security_analyst|readonly|custom:[0-9a-f-]{36})$"
+                        },
+                        "scope_group_ids": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          },
+                          "maxItems": 50,
+                          "default": []
+                        }
+                      },
+                      "required": [
+                        "role"
+                      ]
+                    },
+                    "maxItems": 20
+                  }
+                },
+                "required": [
+                  "grants"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RoleGrant"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
                 }
               }
             }

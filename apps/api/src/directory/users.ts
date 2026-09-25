@@ -7,7 +7,7 @@ import { sql } from "kysely";
 import type { App, Principal, RequestMeta } from "../context.js";
 import { audit } from "../audit/record.js";
 import { loadUser, sessionOut } from "../auth/routes.js";
-import { requirePermission } from "../auth/guard.js";
+import { assertUserInScope, principalCan, requirePermission, scopeGroups } from "../auth/guard.js";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "../auth/passwords.js";
 import { assertNotBreached } from "../auth/recovery.js";
 import { notifyRoles } from "../notify/send.js";
@@ -17,7 +17,7 @@ import { isUniqueViolation } from "../platform/db.js";
 import { badRequest, conflict, forbidden, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { decodeCursor, pageOf } from "../platform/pagination.js";
-import { can, ROLES } from "../rbac.js";
+import { ROLES } from "../rbac.js";
 import { bearer, body, Cursor, displayName, Group, Id, iso, json, page, patchOf, problemResponses, Role, Session, toUser, User, UserStatus } from "../schemas.js";
 
 const UserDetail = User.extend({
@@ -133,11 +133,13 @@ export function registerUserRoutes(app: App) {
       responses: { 200: json(page(User, "UserPage")), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "users:read");
+      const p = requirePermission(c, "users:read", { scoped: true });
       const q = c.req.valid("query");
       const after = decodeCursor(q.cursor);
       const rows = await c.get("deps").db.tenant(p.orgId, (tx) => {
         let query = userQuery(tx).orderBy("users.id", "desc").limit(q.limit + 1);
+        const scope = scopeGroups(p, "users:read");
+        if (scope) query = query.where((eb) => eb.exists(eb.selectFrom("group_members").whereRef("group_members.user_id", "=", "users.id").where("group_members.group_id", "in", scope)));
         if (after) query = query.where("users.id", "<", after);
         if (q.status) query = query.where("users.status", "=", q.status);
         else query = query.where("users.status", "<>", "deprovisioned");
@@ -183,7 +185,7 @@ export function registerUserRoutes(app: App) {
     async (c) => {
       const p = requirePermission(c, "users:write");
       const input = c.req.valid("json");
-      if (input.roles.length > 0 && !can(p.roles, "admins:manage")) {
+      if (input.roles.length > 0 && !principalCan(p, "admins:manage")) {
         throw forbidden("Only owners can grant admin roles");
       }
       if (input.invite && input.password) throw badRequest("invalid_request", "Choose either an initial password or an invitation, not both");
@@ -244,9 +246,10 @@ export function registerUserRoutes(app: App) {
       responses: { 200: json(UserDetail), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "users:read");
+      const p = requirePermission(c, "users:read", { scoped: true });
       const { id } = c.req.valid("param");
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+        await assertUserInScope(tx, p, "users:read", id);
         const user = await getUserOr404(tx, id);
         const groups = await tx
           .selectFrom("group_members")
@@ -280,10 +283,11 @@ export function registerUserRoutes(app: App) {
       responses: { 200: json(User), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "users:write");
+      const p = requirePermission(c, "users:write", { scoped: true });
       const { id } = c.req.valid("param");
       const patch = c.req.valid("json");
       const user = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+        await assertUserInScope(tx, p, "users:write", id);
         const before = await getUserOr404(tx, id);
         if (patch.manager_id) await checkManager(tx, id, patch.manager_id);
         const changes = Object.fromEntries(
@@ -325,11 +329,12 @@ export function registerUserRoutes(app: App) {
         responses: { 200: json(z.object({ user: User, effects: z.record(z.string(), z.unknown()) })), ...problemResponses },
       }),
       async (c) => {
-        const p = requirePermission(c, "users:lifecycle");
+        const p = requirePermission(c, "users:lifecycle", { scoped: true });
         const { id } = c.req.valid("param");
         const { reason } = c.req.valid("json");
         const who = { principal: p, meta: c.get("meta") };
         const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+          await assertUserInScope(tx, p, "users:lifecycle", id);
           const user = await getUserOr404(tx, id);
           const effects = await run(tx, who, user);
           await touchUsers(tx, p.orgId, [id]); // status changes reach provisioned apps
@@ -346,7 +351,7 @@ export function registerUserRoutes(app: App) {
 
   const assertNotSelfOrLastOwner = async (tx: Tx, who: Who, user: { id: string; roles: string[] | null }) => {
     if (user.id === who.principal.userId) throw badRequest("cannot_target_self", "You can't do this to your own account");
-    if (user.roles?.includes("owner") && !can(who.principal.roles, "admins:manage")) {
+    if (user.roles?.includes("owner") && !principalCan(who.principal, "admins:manage")) {
       throw forbidden("Only owners can suspend another owner");
     }
     if (user.roles?.includes("owner") && (await ownerCount(tx)) <= 1) {

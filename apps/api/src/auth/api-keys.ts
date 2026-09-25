@@ -5,7 +5,7 @@ import { audit } from "../audit/record.js";
 import { isUniqueViolation, type Tx } from "../platform/db.js";
 import { badRequest, conflict, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
-import { GRANTABLE_TO_KEYS, permissionsFor, type Permission } from "../rbac.js";
+import { describeGrants, GRANTABLE_TO_KEYS, type Permission, resolveGrants } from "../rbac.js";
 import { bearer, body, Id, iso, json, Permission as PermissionSchema, problemResponses } from "../schemas.js";
 import { requirePermission, requireRecentMfa } from "./guard.js";
 import { verifiedFactorTypes } from "./routes.js";
@@ -62,7 +62,7 @@ export function registerApiKeyRoutes(app: App) {
     }),
     async (c) => {
       const p = requirePermission(c, "api_keys:manage");
-      const mine = new Set(permissionsFor(p.roles));
+      const mine = new Set(describeGrants(p.grants ?? resolveGrants(p.roles, [])).all);
       return c.json({ data: await c.get("deps").db.tenant(p.orgId, list), grantable_scopes: GRANTABLE_TO_KEYS.filter((s) => mine.has(s)) }, 200);
     },
   );
@@ -88,7 +88,7 @@ export function registerApiKeyRoutes(app: App) {
       const p = requirePermission(c, "api_keys:manage");
       if (p.apiKey) throw badRequest("keys_cannot_create_keys", "API keys can't create API keys");
       const input = c.req.valid("json");
-      const mine = new Set(permissionsFor(p.roles));
+      const mine = new Set(describeGrants(p.grants ?? resolveGrants(p.roles, [])).all);
       const bad = input.scopes.filter((s) => !GRANTABLE_TO_KEYS.includes(s) || !mine.has(s));
       if (bad.length) throw badRequest("scope_not_allowed", `These scopes can't be granted: ${bad.join(", ")}`);
       const key = `nxk_${randomBytes(32).toString("base64url")}`;

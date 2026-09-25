@@ -3,11 +3,11 @@ import type { Context } from "hono";
 import type { App, Env, Principal } from "../context.js";
 import { audit } from "../audit/record.js";
 import { verifiedFactorTypes } from "../auth/routes.js";
-import { requirePermission, requireRecentMfa, requireSession } from "../auth/guard.js";
+import { principalCan, requirePermission, requireRecentMfa, requireSession } from "../auth/guard.js";
 import { isUniqueViolation, type Tx } from "../platform/db.js";
 import { badRequest, conflict, forbidden, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
-import { can, ROLES } from "../rbac.js";
+import { ROLES } from "../rbac.js";
 import { bearer, body, Id, iso, isoOrNull, json, patchOf, problemResponses } from "../schemas.js";
 import { alreadyHas, approversFor, decide, endGrant, grant, isEligible, notifyApprovers, resourceName, type CatalogRow, type Stage } from "./requests.js";
 
@@ -179,7 +179,7 @@ export function registerAccessRequestRoutes(app: App) {
     }),
     async (c) => {
       const p = requireSession(c);
-      const all = c.req.valid("query").all === "true" && can(p.roles, "access:manage");
+      const all = c.req.valid("query").all === "true" && principalCan(p, "access:manage");
       return c.json({ data: await c.get("deps").db.tenant(p.orgId, (tx) => catalogOut(tx, p, all)) }, 200);
     },
   );
@@ -321,7 +321,7 @@ export function registerAccessRequestRoutes(app: App) {
     async (c) => {
       const p = requireSession(c);
       const q = c.req.valid("query");
-      if (q.view === "all" && !can(p.roles, "access:manage")) throw forbidden();
+      if (q.view === "all" && !principalCan(p, "access:manage")) throw forbidden();
       const data = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         let s = tx.selectFrom("access_requests").select("id").orderBy("created_at", "desc").limit(q.view === "approvals" ? 500 : q.limit);
         if (q.view === "mine") s = s.where("requester_id", "=", p.userId);
@@ -400,7 +400,7 @@ export function registerAccessRequestRoutes(app: App) {
         const req = await tx.selectFrom("access_requests").selectAll().where("id", "=", id).forUpdate().executeTakeFirst();
         if (!req) throw notFound("Access request");
         const own = req.requester_id === p.userId;
-        if (!own && !can(p.roles, "access:manage")) throw forbidden();
+        if (!own && !principalCan(p, "access:manage")) throw forbidden();
         if (req.status !== "active") throw conflict("not_active", "Only active grants can be ended");
         if (!own) await stepUp(c, tx, p);
         const cat = await tx.selectFrom("access_catalog").selectAll().where("id", "=", req.catalog_id).executeTakeFirstOrThrow();

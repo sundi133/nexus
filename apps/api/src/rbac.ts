@@ -62,3 +62,54 @@ export function can(roles: readonly Role[], perm: Permission): boolean {
 }
 
 export const isAdmin = (roles: readonly Role[]) => roles.length > 0;
+
+// ---- RBAC v2: custom roles and scoped grants (SPEC RBAC-02, RBAC-03) ----------------------
+
+/** Permissions a grant can limit to groups: they act on people (and their devices). */
+export const SCOPABLE: readonly Permission[] = ["users:read", "users:write", "users:lifecycle", "devices:read", "devices:write", "devices:actions"];
+/** Kept organization-wide in a scoped grant, so a scoped admin can find their way around. */
+export const SCOPED_EXTRAS: readonly Permission[] = ["groups:read", "apps:read"];
+/** Built-in roles that can be limited to groups. Owner and Admin manage the organization itself. */
+export const SCOPABLE_ROLES = ["helpdesk", "security_analyst", "readonly"] as const;
+/** Never in a custom role: managing admins stays with owners. */
+export const NOT_IN_CUSTOM_ROLES: readonly Permission[] = ["admins:manage"];
+
+export const rolePermissions = (role: Role) => [...(GRANTS[role] ?? [])];
+
+/** Where a permission applies: everywhere, or within these groups. */
+export type Grants = ReadonlyMap<Permission, "all" | ReadonlySet<string>>;
+
+export function resolveGrants(roles: readonly Role[], extra: { permissions: readonly string[]; scope: readonly string[] }[]): Grants {
+  const out = new Map<Permission, "all" | Set<string>>();
+  const all = (p: Permission) => out.set(p, "all");
+  for (const r of roles) for (const p of GRANTS[r] ?? []) all(p);
+  for (const g of extra) {
+    for (const raw of g.permissions) {
+      const p = raw as Permission;
+      if (!PERMISSIONS.includes(p)) continue;
+      if (!g.scope.length || SCOPED_EXTRAS.includes(p)) {
+        all(p);
+        continue;
+      }
+      if (!SCOPABLE.includes(p)) continue; // e.g. audit:read in a scoped grant: dropped, it would see everyone
+      const cur = out.get(p);
+      if (cur === "all") continue;
+      const set = cur ?? new Set<string>();
+      for (const id of g.scope) set.add(id);
+      out.set(p, set);
+    }
+  }
+  return out;
+}
+
+/** Org-wide permissions, and the ones held only within some groups. */
+export function describeGrants(g: Grants) {
+  const all: Permission[] = [];
+  const scoped: Partial<Record<Permission, string[]>> = {};
+  for (const perm of PERMISSIONS) {
+    const v = g.get(perm);
+    if (v === "all") all.push(perm);
+    else if (v) scoped[perm] = [...v];
+  }
+  return { all, scoped };
+}

@@ -2,7 +2,8 @@ import type { Context, MiddlewareHandler } from "hono";
 import { sql } from "kysely";
 import type { Env, Principal } from "../context.js";
 import { ApiError, forbidden, unauthorized } from "../platform/errors.js";
-import { can, type Permission, type Role } from "../rbac.js";
+import { can, type Permission, resolveGrants, type Role, rolePermissions } from "../rbac.js";
+import type { Tx } from "../platform/db.js";
 import { hashToken } from "./tokens.js";
 import { RateLimiter } from "./ratelimit.js";
 
@@ -61,8 +62,14 @@ export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
       return r.rows[0];
     });
     if (found && found.user_status === "active") {
-      const { roles, email, ownerPasskeyRequired } = await db.tenant(found.org_id, async (tx) => {
+      const { roles, grants, email, ownerPasskeyRequired } = await db.tenant(found.org_id, async (tx) => {
         const rows = await tx.selectFrom("user_roles").select("role").where("user_id", "=", found.user_id).execute();
+        const extra = await tx
+          .selectFrom("role_grants")
+          .leftJoin("custom_roles", "custom_roles.id", "role_grants.custom_role_id")
+          .select(["role_grants.builtin_role", "role_grants.scope_group_ids", "custom_roles.permissions"])
+          .where("role_grants.user_id", "=", found.user_id)
+          .execute();
         const user = await tx.selectFrom("users").select("email").where("id", "=", found.user_id).executeTakeFirstOrThrow();
         const org = await tx.selectFrom("organizations").select("settings").where("id", "=", found.org_id).executeTakeFirstOrThrow();
         // Touch last_seen at most once a minute to keep writes cheap.
@@ -72,7 +79,12 @@ export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
           .where("id", "=", found.session_id)
           .where("last_seen_at", "<", new Date(Date.now() - 60_000))
           .execute();
-        return { roles: rows.map((r) => r.role as Role), email: user.email, ownerPasskeyRequired: (org.settings as { owners_require_passkey?: boolean }).owners_require_passkey === true };
+        const roles = rows.map((r) => r.role as Role);
+        const grants = resolveGrants(
+          roles,
+          extra.map((g) => ({ permissions: g.builtin_role ? rolePermissions(g.builtin_role) : (g.permissions ?? []), scope: g.scope_group_ids })),
+        );
+        return { roles, grants, email: user.email, ownerPasskeyRequired: (org.settings as { owners_require_passkey?: boolean }).owners_require_passkey === true };
       });
       c.set("principal", {
         orgId: found.org_id,
@@ -85,6 +97,7 @@ export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
         mfaMethod: found.mfa_method,
         ownerPasskeyRequired,
         roles,
+        grants,
       });
     }
   }
@@ -109,10 +122,51 @@ export function requireSession(c: Context<Env>, opts: { allowPendingMfa?: boolea
   return p;
 }
 
-export function requirePermission(c: Context<Env>, perm: Permission): Principal {
+/** Where the principal holds a permission: everywhere ("all"), within some groups, or not at all. */
+export function scopeOf(p: Principal, perm: Permission): "all" | ReadonlySet<string> | null {
+  if (p.apiKey) return p.apiKey.scopes.has(perm) ? "all" : null;
+  if (p.grants) return p.grants.get(perm) ?? null;
+  return principalCan(p, perm) ? "all" : null;
+}
+
+/** The principal holds the permission across the whole organization. */
+export const principalCan = (p: Principal, perm: Permission) => scopeOf(p, perm) === "all";
+
+/**
+ * Requires a permission. Deny by default for scoped grants (RBAC-03): a
+ * permission held only within some groups counts only where the route opts in
+ * with `{ scoped: true }` — and then must limit what it touches with
+ * `scopeOf` / `assertUserInScope` / `assertDeviceInScope`.
+ */
+export function requirePermission(c: Context<Env>, perm: Permission, opts: { scoped?: boolean } = {}): Principal {
   const p = requireSession(c, { allowApiKey: true });
-  if (p.apiKey ? !p.apiKey.scopes.has(perm) : !can(p.roles, perm)) throw forbidden(p.apiKey ? `This API key doesn't have the ${perm} scope` : undefined);
+  const scope = scopeOf(p, perm);
+  if (!scope || (scope !== "all" && !opts.scoped)) throw forbidden(p.apiKey ? `This API key doesn't have the ${perm} scope` : undefined);
   return p;
+}
+
+/** Group IDs the principal is limited to for this permission, or null when it isn't limited. */
+export function scopeGroups(p: Principal, perm: Permission): string[] | null {
+  const s = scopeOf(p, perm);
+  return s === "all" || !s ? null : [...s];
+}
+
+export async function isUserInScope(tx: Tx, p: Principal, perm: Permission, userId: string) {
+  const groups = scopeGroups(p, perm);
+  if (!groups) return scopeOf(p, perm) === "all";
+  return !!(await tx.selectFrom("group_members").select("user_id").where("user_id", "=", userId).where("group_id", "in", groups).executeTakeFirst());
+}
+
+/** Scoped admins can only act on people in their groups; others don't exist for them. */
+export async function assertUserInScope(tx: Tx, p: Principal, perm: Permission, userId: string) {
+  if (!(await isUserInScope(tx, p, perm, userId))) throw new ApiError(404, "not_found", "User not found");
+}
+
+/** A device is in scope when its primary user is. */
+export async function assertDeviceInScope(tx: Tx, p: Principal, perm: Permission, deviceId: string) {
+  if (!scopeGroups(p, perm)) return;
+  const d = await tx.selectFrom("devices").select("primary_user_id").where("id", "=", deviceId).executeTakeFirst();
+  if (!d?.primary_user_id || !(await isUserInScope(tx, p, perm, d.primary_user_id))) throw new ApiError(404, "not_found", "Device not found");
 }
 
 const STEP_UP_WINDOW_MS = 10 * 60 * 1000;

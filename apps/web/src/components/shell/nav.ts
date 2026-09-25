@@ -84,6 +84,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "My security", href: "/settings/security", icon: KeyRound },
       { label: "Organization", href: "/settings/organization", icon: Settings },
+      { label: "Roles", href: "/settings/roles", icon: ShieldCheck },
       { label: "Single sign-on", href: "/settings/identity-providers", icon: LogIn },
       { label: "Integrations", href: "/settings/integrations", icon: Radio },
       { label: "API keys", href: "/settings/api-keys", icon: Key },

@@ -11,6 +11,8 @@ import { ConfirmAction } from "@/components/features/confirm-action";
 import { OffboardDialog, offboardingKey, useOffboarding } from "@/components/features/offboard-dialog";
 import { useBreakGlass } from "@/components/features/break-glass";
 import { MfaBadge, RoleBadges, UserStatusPill } from "@/components/features/user-bits";
+import { type GrantDraft, GrantsBadges, GrantsEditor, grantsReady, useRoleGrants } from "@/components/features/role-grants";
+import { useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Avatar, Card, CardHeader, EmptyState, ErrorBanner, KeyValue, Skeleton, StatusPill } from "@/components/ui/misc";
@@ -31,6 +33,8 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [editing, setEditing] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
   const [offboarding, setOffboarding] = useState(false);
+  // Needs org-wide users:read (scoped admins don't see who else is an admin).
+  const roleGrants = useRoleGrants(id, !!me?.permissions.includes("users:read"));
   const breakGlass = useBreakGlass(id, () => {
     qc.invalidateQueries({ queryKey: qk.user(id) });
     qc.invalidateQueries({ queryKey: ["audit"] });
@@ -181,7 +185,10 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           <MfaBadge enrolled={u.mfa_enrolled} />
         </Signal>
         <Signal label="Admin roles">
-          <RoleBadges roles={u.roles} />
+          <span className="flex flex-wrap items-center gap-1">
+            {u.roles.length || !roleGrants.data?.data.length ? <RoleBadges roles={u.roles} /> : null}
+            <GrantsBadges grants={roleGrants.data?.data ?? []} />
+          </span>
         </Signal>
         <Signal label="Active sessions">{sessions}</Signal>
         <Signal label="Last sign-in">{timeAgo(u.last_login_at)}</Signal>
@@ -356,10 +363,19 @@ function EditUserDialog({ user, open, onOpenChange, onSaved }: { user: UserDetai
 
 function RolesDialog({ user, open, onOpenChange, onSaved }: { user: UserDetail; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void }) {
   const [roles, setRoles] = useState<Role[]>(user.roles);
+  const withStepUp = useStepUp();
+  const qc = useQueryClient();
+  const current = useRoleGrants(user.id, open);
+  const [grants, setGrants] = useState<GrantDraft[] | null>(null);
+  const draft = grants ?? (current.data?.data ?? []).map((g) => ({ role: g.role, scope_group_ids: g.scope.map((s) => s.id) }));
   const save = useMutation({
-    mutationFn: () => unwrap(api.PUT("/v1/users/{id}/roles", { params: { path: { id: user.id } }, body: { roles } })),
+    mutationFn: async () => {
+      await unwrap(api.PUT("/v1/users/{id}/roles", { params: { path: { id: user.id } }, body: { roles } }));
+      if (grants) await withStepUp(() => unwrap(api.PUT("/v1/users/{id}/role-grants", { params: { path: { id: user.id } }, body: { grants } })));
+    },
     onSuccess: () => {
       onSaved();
+      qc.invalidateQueries({ queryKey: ["role-grants", user.id] });
       toast.success("Admin roles updated");
       onOpenChange(false);
     },
@@ -387,9 +403,13 @@ function RolesDialog({ user, open, onOpenChange, onSaved }: { user: UserDetail; 
               </span>
             </label>
           ))}
+          <div className="border-t border-border pt-3">
+            <p className="mb-2 text-[13px] font-medium">Custom and group-limited roles</p>
+            <GrantsEditor value={draft} onChange={setGrants} />
+          </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending}>
+            <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending} disabled={!grantsReady(draft)}>
               Save roles
             </Button>
           </div>

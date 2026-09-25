@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { sql } from "kysely";
 import type { App, Deps } from "../context.js";
 import { audit } from "../audit/record.js";
-import { requirePermission, requireSession } from "../auth/guard.js";
+import { assertDeviceInScope, requirePermission, requireSession, scopeGroups } from "../auth/guard.js";
 import { hashToken } from "../auth/tokens.js";
 import type { Tx } from "../platform/db.js";
 import type { DevicePlatform } from "../platform/db-types.js";
@@ -220,11 +220,13 @@ export function registerDeviceRoutes(app: App) {
       responses: { 200: json(page(DeviceSummary, "DevicePage")), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "devices:read");
+      const p = requirePermission(c, "devices:read", { scoped: true });
       const q = c.req.valid("query");
       const after = decodeCursor(q.cursor);
+      const scope = scopeGroups(p, "devices:read");
       const rows = await c.get("deps").db.tenant(p.orgId, (tx) => {
         let query = deviceQuery(tx).orderBy("devices.id", "desc").limit(q.limit + 1);
+        if (scope) query = query.where((eb) => eb.exists(eb.selectFrom("group_members").whereRef("group_members.user_id", "=", "devices.primary_user_id").where("group_members.group_id", "in", scope)));
         if (after) query = query.where("devices.id", "<", after);
         if (q.platform) query = query.where("devices.platform", "=", q.platform);
         if (q.compliance) query = query.where("devices.compliance", "=", q.compliance);
@@ -327,8 +329,9 @@ export function registerDeviceRoutes(app: App) {
       responses: { 200: json(DeviceDetail), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "devices:read");
-      return c.json(await c.get("deps").db.tenant(p.orgId, (tx) => detail(tx, c.req.valid("param").id)), 200);
+      const p = requirePermission(c, "devices:read", { scoped: true });
+      const id = c.req.valid("param").id;
+      return c.json(await c.get("deps").db.tenant(p.orgId, async (tx) => (await assertDeviceInScope(tx, p, "devices:read", id), detail(tx, id))), 200);
     },
   );
 

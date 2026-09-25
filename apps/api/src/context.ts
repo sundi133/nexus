@@ -5,7 +5,7 @@ import type { Sealer } from "./platform/seal.js";
 import type { Realtime } from "./platform/realtime.js";
 import type { Mailer } from "./platform/mailer.js";
 import type { PushSender } from "./platform/push.js";
-import type { Permission, Role } from "./rbac.js";
+import type { Grants, Permission, Role } from "./rbac.js";
 import type { SessionState } from "./platform/db-types.js";
 
 /** The authenticated caller. Every client (web BFF, mobile, CLI) resolves to one of these. */
@@ -22,6 +22,8 @@ export type Principal = {
   /** The org requires owners to step up with a passkey (RBAC-04). */
   ownerPasskeyRequired?: boolean;
   roles: Role[];
+  /** Effective permissions from roles, custom roles and scoped grants (RBAC v2). */
+  grants?: Grants;
   /** Set when the caller is an API key: its scopes replace roles, and it can't use personal (/v1/me) endpoints. */
   apiKey?: { id: string; name: string; scopes: ReadonlySet<Permission> };
 };

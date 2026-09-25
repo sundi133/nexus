@@ -22,9 +22,10 @@ export function useMe() {
   return useQuery({ queryKey: qk.me, queryFn: () => unwrap(api.GET("/v1/me")), staleTime: 60_000 });
 }
 
+/** Can the signed-in person do this anywhere? Scoped roles count: the server limits them to their groups. */
 export function useCan() {
   const { data } = useMe();
-  const perms = new Set<Permission>(data?.permissions ?? []);
+  const perms = new Set<Permission>([...(data?.permissions ?? []), ...(Object.keys(data?.scoped_permissions ?? {}) as Permission[])]);
   return (p: Permission) => perms.has(p);
 }
 

@@ -797,6 +797,26 @@ export interface Database {
     created_by: string | null;
     created_at: Generated<Date>;
   };
+  custom_roles: {
+    id: string;
+    org_id: string;
+    name: string;
+    description: Generated<string>;
+    permissions: string[];
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  role_grants: {
+    id: string;
+    org_id: string;
+    user_id: string;
+    builtin_role: "helpdesk" | "security_analyst" | "readonly" | null;
+    custom_role_id: string | null;
+    scope_group_ids: Generated<string[]>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
   directory_links: {
     org_id: string;
     connection_id: string;

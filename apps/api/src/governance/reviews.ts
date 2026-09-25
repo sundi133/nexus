@@ -4,7 +4,7 @@ import { sql } from "kysely";
 import type { App, Deps, Env, Principal, RequestMeta } from "../context.js";
 import { audit } from "../audit/record.js";
 import { verifiedFactorTypes } from "../auth/routes.js";
-import { requirePermission, requireRecentMfa, requireSession } from "../auth/guard.js";
+import { principalCan, requirePermission, requireRecentMfa, requireSession } from "../auth/guard.js";
 import { notifyUsers } from "../notify/send.js";
 import type { Tx } from "../platform/db.js";
 import { badRequest, conflict, forbidden, notFound } from "../platform/errors.js";
@@ -12,7 +12,7 @@ import { newId } from "../platform/ids.js";
 import { csvCell } from "../platform/csv.js";
 import { enqueue, registerJobHandler, type JobRunner } from "../platform/jobs.js";
 import { touchGroups, touchUsers } from "../provisioning/service.js";
-import { can } from "../rbac.js";
+
 import { bearer, body, Id, iso, isoOrNull, json, problemResponses } from "../schemas.js";
 import { endGrant, type CatalogRow } from "./requests.js";
 
@@ -62,15 +62,32 @@ async function snapshot(tx: Tx, r: Pick<Review, "scope_type" | "scope_id">): Pro
     return members.filter((m) => ok.has(m.user_id)).map((m) => ({ user_id: m.user_id, grant_kind: "group_member" as const, grant_ref: r.scope_id!, via: "" }));
   }
   const roles = await tx.selectFrom("user_roles").select(["user_id", "role"]).execute();
-  const ok = await people(roles.map((x) => x.user_id));
-  return roles.filter((x) => ok.has(x.user_id)).map((x) => ({ user_id: x.user_id, grant_kind: "role" as const, grant_ref: x.role, via: "" }));
+  // Custom roles and group-scoped roles (RBAC v2) are admin access too.
+  const grants = await tx
+    .selectFrom("role_grants")
+    .leftJoin("custom_roles", "custom_roles.id", "role_grants.custom_role_id")
+    .select(["role_grants.id", "role_grants.user_id", "role_grants.builtin_role", "role_grants.scope_group_ids", "custom_roles.name"])
+    .execute();
+  const groupNames = new Map((await tx.selectFrom("groups").select(["id", "name"]).execute()).map((g) => [g.id, g.name]));
+  const ok = await people([...roles.map((x) => x.user_id), ...grants.map((g) => g.user_id)]);
+  return [
+    ...roles.filter((x) => ok.has(x.user_id)).map((x) => ({ user_id: x.user_id, grant_kind: "role" as const, grant_ref: x.role, via: "" })),
+    ...grants
+      .filter((g) => ok.has(g.user_id))
+      .map((g) => ({
+        user_id: g.user_id,
+        grant_kind: "role" as const,
+        grant_ref: `grant:${g.id}`,
+        via: `${g.name ?? g.builtin_role!.replace("_", " ")} role${g.scope_group_ids.length ? ` for ${g.scope_group_ids.map((id) => groupNames.get(id) ?? "a deleted group").join(", ")}` : ""}`,
+      })),
+  ];
 }
 
 /** Can this person decide this item? Reviewers (or access admins), never for their own access. */
 function canDecide(p: Principal, r: Review, i: Item) {
   if (r.status !== "open" || i.user_id === p.userId) return false;
-  if (i.reviewer_id) return i.reviewer_id === p.userId || can(p.roles, "access:manage");
-  return r.reviewer_ids.includes(p.userId) || can(p.roles, "access:manage");
+  if (i.reviewer_id) return i.reviewer_id === p.userId || principalCan(p, "access:manage");
+  return r.reviewer_ids.includes(p.userId) || principalCan(p, "access:manage");
 }
 
 async function revokeOne(tx: Tx, orgId: string, i: Item, meta: RequestMeta, reviewId: string): Promise<Outcome> {
@@ -108,7 +125,9 @@ async function revokeOne(tx: Tx, orgId: string, i: Item, meta: RequestMeta, revi
       const owners = await tx.selectFrom("user_roles").innerJoin("users", "users.id", "user_roles.user_id").select("user_roles.user_id").where("role", "=", "owner").where("users.status", "=", "active").execute();
       if (owners.length <= 1) return "skipped"; // the organization keeps at least one owner
     }
-    const r = await tx.deleteFrom("user_roles").where("user_id", "=", i.user_id).where("role", "=", i.grant_ref).executeTakeFirst();
+    const r = i.grant_ref.startsWith("grant:")
+      ? await tx.deleteFrom("role_grants").where("id", "=", i.grant_ref.slice(6)).where("user_id", "=", i.user_id).executeTakeFirst()
+      : await tx.deleteFrom("user_roles").where("user_id", "=", i.user_id).where("role", "=", i.grant_ref).executeTakeFirst();
     if (!Number(r.numDeletedRows)) return "already_gone";
   }
   const email = (await tx.selectFrom("users").select("email").where("id", "=", i.user_id).executeTakeFirst())?.email ?? "";
@@ -267,7 +286,7 @@ async function itemsOut(tx: Tx, p: Principal, r: Review, mine: boolean): Promise
     out.push({
       id: i.id,
       user: { id: i.user_id, email: i.email, name: `${i.given_name} ${i.family_name}`.trim() || i.email, title: i.title, department: i.department, last_login_at: isoOrNull(i.last_login_at) },
-      access: i.grant_kind === "role" ? `${i.grant_ref.replace("_", " ")} role` : i.via || (r.scope_type === "group" ? "member" : "assigned directly"),
+      access: i.grant_kind === "role" ? (i.grant_ref.startsWith("grant:") ? i.via : `${i.grant_ref.replace("_", " ")} role`) : i.via || (r.scope_type === "group" ? "member" : "assigned directly"),
       reviewer: i.reviewer_email ?? null,
       decision: i.decision,
       note: i.note,
@@ -377,7 +396,7 @@ export function registerAccessReviewRoutes(app: App) {
         const out = [];
         for (const r of rows) {
           const o = await reviewOut(tx, p, r);
-          if (can(p.roles, "access:manage") || r.reviewer_ids.includes(p.userId) || o.progress.yours_to_decide > 0) out.push(o);
+          if (principalCan(p, "access:manage") || r.reviewer_ids.includes(p.userId) || o.progress.yours_to_decide > 0) out.push(o);
         }
         return out;
       });
@@ -400,7 +419,7 @@ export function registerAccessReviewRoutes(app: App) {
       const p = requireSession(c);
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         const r = await load(tx, c.req.valid("param").id);
-        const admin = can(p.roles, "access:manage");
+        const admin = principalCan(p, "access:manage");
         const items = await itemsOut(tx, p, r, !admin);
         if (!admin && !items.length && !r.reviewer_ids.includes(p.userId)) throw notFound("Access review");
         return { review: await reviewOut(tx, p, r), items };
@@ -437,7 +456,7 @@ export function registerAccessReviewRoutes(app: App) {
           target: { type: "access_review", id: r.id, display: r.name },
           details: { keep: input.items.filter((d) => d.decision === "keep").length, revoke: input.items.filter((d) => d.decision === "revoke").length, items: input.items.map((d) => d.id) },
         });
-        return { review: await reviewOut(tx, p, r), items: await itemsOut(tx, p, r, !can(p.roles, "access:manage")) };
+        return { review: await reviewOut(tx, p, r), items: await itemsOut(tx, p, r, !principalCan(p, "access:manage")) };
       });
       return c.json(out, 200);
     },

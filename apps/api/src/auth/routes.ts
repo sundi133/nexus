@@ -7,7 +7,7 @@ import { notifyUsers } from "../notify/send.js";
 import type { Tx } from "../platform/db.js";
 import { ApiError, badRequest, conflict, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
-import { permissionsFor } from "../rbac.js";
+import { describeGrants, resolveGrants } from "../rbac.js";
 import { getSettings, mfaRequired } from "../org/settings.js";
 import type { SessionState } from "../platform/db-types.js";
 import {
@@ -61,6 +61,7 @@ const Me = z
     organization: Organization,
     roles: z.array(RoleSchema),
     permissions: z.array(Permission),
+    scoped_permissions: z.record(z.string(), z.array(z.string())).openapi({ description: "Permissions held only for people in these groups (scoped roles)" }),
     session: z.object({ id: Id, state: SessionStateSchema, client: z.string(), mfa_at: z.string().nullable() }),
   })
   .openapi("Me");
@@ -491,7 +492,10 @@ export function registerAuthRoutes(app: App) {
           user: toUser(user),
           organization: { id: org.id, name: org.name, slug: org.slug, created_at: iso(org.created_at) },
           roles: p.roles,
-          permissions: permissionsFor(p.roles),
+          ...(() => {
+            const d = describeGrants(p.grants ?? resolveGrants(p.roles, []));
+            return { permissions: d.all, scoped_permissions: d.scoped };
+          })(),
           session: { id: p.sessionId, state: p.sessionState, client: p.client, mfa_at: isoOrNull(p.mfaAt) },
         },
         200,

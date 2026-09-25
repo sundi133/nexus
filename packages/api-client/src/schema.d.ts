@@ -7738,6 +7738,493 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Built-in roles, custom roles and the permission catalog */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoleCatalog"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a custom role */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** @default  */
+                        description?: string;
+                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoleCatalog"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a custom role
+         * @description Everyone who had it loses it.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoleCatalog"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /**
+         * Change a custom role
+         * @description Takes effect for everyone who has it at their next request.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        /** @default  */
+                        description?: string;
+                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoleCatalog"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/users/{id}/role-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A person's custom and scoped roles */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["RoleGrant"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        /**
+         * Set a person's custom and scoped roles
+         * @description Replaces them. A built-in role (Help Desk, Security Analyst, Read-only) needs groups here (for the whole organization, use the user's roles instead); a custom role applies to the whole organization unless groups are given. Within groups, only permissions about people and their devices are limited; other permissions in the role don't apply, except reading groups and apps.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        grants: {
+                            role: string;
+                            /** @default [] */
+                            scope_group_ids?: string[];
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["RoleGrant"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/factors/webauthn/options": {
         parameters: {
             query?: never;
@@ -19899,6 +20386,10 @@ export interface components {
             organization: components["schemas"]["Organization"];
             roles: components["schemas"]["Role"][];
             permissions: components["schemas"]["Permission"][];
+            /** @description Permissions held only for people in these groups (scoped roles) */
+            scoped_permissions: {
+                [key: string]: string[];
+            };
             session: {
                 /**
                  * Format: uuid
@@ -20964,6 +21455,67 @@ export interface components {
                     to?: unknown;
                 };
             };
+        };
+        RoleCatalog: {
+            builtin: {
+                /** @enum {string} */
+                key: "owner" | "admin" | "helpdesk" | "security_analyst" | "readonly";
+                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                scopable: boolean;
+            }[];
+            custom: components["schemas"]["CustomRole"][];
+            permissions: {
+                /** @enum {string} */
+                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+                /** @description Can be limited to groups in a scoped grant */
+                scopable: boolean;
+                in_custom_roles: boolean;
+            }[];
+        };
+        CustomRole: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            name: string;
+            description: string;
+            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+            holders: number;
+            /**
+             * Format: date-time
+             * @example 2026-10-05T12:00:00.000Z
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @example 2026-10-05T12:00:00.000Z
+             */
+            updated_at: string;
+        };
+        RoleGrant: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            /** @description A built-in role (helpdesk, security_analyst, readonly) or custom:<id> */
+            role: string;
+            name: string;
+            /** @description Empty: the whole organization */
+            scope: {
+                /**
+                 * Format: uuid
+                 * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                 */
+                id: string;
+                name: string;
+            }[];
+            /**
+             * Format: date-time
+             * @example 2026-10-05T12:00:00.000Z
+             */
+            created_at: string;
         };
         WebAuthnCeremony: {
             /**

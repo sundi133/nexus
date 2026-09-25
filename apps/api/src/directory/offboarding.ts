@@ -3,12 +3,12 @@ import type { Context } from "hono";
 import type { App, Env, Principal, RequestMeta } from "../context.js";
 import { audit } from "../audit/record.js";
 import { verifiedFactorTypes } from "../auth/routes.js";
-import { requirePermission, requireRecentMfa } from "../auth/guard.js";
+import { assertUserInScope, principalCan, requirePermission, requireRecentMfa } from "../auth/guard.js";
 import { notifyRoles } from "../notify/send.js";
 import type { Tx } from "../platform/db.js";
 import { badRequest, conflict, forbidden, notFound } from "../platform/errors.js";
 import { enqueue, registerJobHandler } from "../platform/jobs.js";
-import { can } from "../rbac.js";
+
 import { bearer, body, Id, iso, json, problemResponses } from "../schemas.js";
 import { touchGroups, touchUsers } from "../provisioning/service.js";
 import { suspendOwnedAgents } from "../ai-agents/lifecycle.js";
@@ -87,6 +87,7 @@ export async function offboard(tx: Tx, orgId: string, userId: string, who: { pri
   await tx.updateTable("users").set({ status: "deprovisioned", updated_at: new Date() }).where("id", "=", userId).execute();
   const sessions = await revokeUserSessions(tx, userId);
   await tx.deleteFrom("user_roles").where("user_id", "=", userId).execute();
+  await tx.deleteFrom("role_grants").where("user_id", "=", userId).execute();
   await tx.deleteFrom("group_members").where("user_id", "=", userId).execute();
   await tx.deleteFrom("app_assignments").where("principal_type", "=", "user").where("principal_id", "=", userId).execute();
   const factors = await tx.deleteFrom("auth_factors").where("user_id", "=", userId).executeTakeFirst();
@@ -139,7 +140,7 @@ async function guard(c: Context<Env>, tx: Tx, p: Principal, userId: string) {
   if (bg?.break_glass) throw badRequest("break_glass", "This is a break-glass account. Remove the designation first (owners only).");
   const roles = (await tx.selectFrom("user_roles").select("role").where("user_id", "=", userId).execute()).map((r) => r.role);
   if (roles.includes("owner")) {
-    if (!can(p.roles, "admins:manage")) throw forbidden("Only owners can offboard another owner");
+    if (!principalCan(p, "admins:manage")) throw forbidden("Only owners can offboard another owner");
     const owners = await tx
       .selectFrom("user_roles")
       .innerJoin("users", "users.id", "user_roles.user_id")
@@ -166,8 +167,9 @@ export function registerOffboardingRoutes(app: App) {
       responses: { 200: json(Preview), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "users:lifecycle");
-      return c.json(await c.get("deps").db.tenant(p.orgId, (tx) => preview(tx, c.req.valid("param").id)), 200);
+      const p = requirePermission(c, "users:lifecycle", { scoped: true });
+      const id = c.req.valid("param").id;
+      return c.json(await c.get("deps").db.tenant(p.orgId, async (tx) => (await assertUserInScope(tx, p, "users:lifecycle", id), preview(tx, id))), 200);
     },
   );
 
@@ -184,11 +186,12 @@ export function registerOffboardingRoutes(app: App) {
       responses: { 200: json(Preview), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "users:lifecycle");
+      const p = requirePermission(c, "users:lifecycle", { scoped: true });
       const { id } = c.req.valid("param");
       const { reason, at } = c.req.valid("json");
       const meta = c.get("meta");
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+        await assertUserInScope(tx, p, "users:lifecycle", id);
         await guard(c, tx, p, id);
         const when = at ? new Date(at) : null;
         if (when && when.getTime() > Date.now() + 60_000) {
@@ -210,9 +213,10 @@ export function registerOffboardingRoutes(app: App) {
   app.openapi(
     createRoute({ method: "delete", path: "/v1/users/{id}/offboarding", tags: ["Users"], summary: "Cancel a scheduled offboarding", security: bearer, request: idParam, responses: { 200: json(Preview), ...problemResponses } }),
     async (c) => {
-      const p = requirePermission(c, "users:lifecycle");
+      const p = requirePermission(c, "users:lifecycle", { scoped: true });
       const { id } = c.req.valid("param");
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+        await assertUserInScope(tx, p, "users:lifecycle", id);
         const r = await tx.deleteFrom("jobs").where("kind", "=", "user.offboard").where("dedupe_key", "=", dedupe(id)).where("status", "=", "queued").returning("id").executeTakeFirst();
         if (!r) throw notFound("Scheduled offboarding");
         const u = await preview(tx, id);

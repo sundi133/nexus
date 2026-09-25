@@ -82,6 +82,13 @@ Nexus calls customer-configured URLs: webhooks, SIEM endpoints, SCIM apps and Sl
 - For long-term retention, events can also be archived to the customer's own S3 or Google Cloud Storage bucket. Turn on Object Lock or a retention policy there for tamper-proof (WORM) storage. The credentials Nexus needs only allow writing objects.
 - Webhooks are signed with `nexus-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`. Receivers should check the signature and reject timestamps older than 5 minutes.
 
+## Roles and scopes
+
+- **Custom roles** are sets of catalog permissions. They can never include `admins:manage`, so only owners grant admin access.
+- **Scoped roles** limit Help Desk, Security Analyst, Read-only or a custom role to groups. Within a scope, only permissions about people and their devices apply, plus reading groups and apps; anything that would reveal the rest of the organization (such as the audit log) is dropped.
+- **Deny by default:** a route accepts a scoped grant only if it explicitly opts in and checks each person or device it touches. People outside the scope get "not found".
+- Every grant change is audited as `user.roles_changed` and alerts owners and admins.
+
 ## Audit integrity and retention
 
 - **Hash chain:** each organization's audit events are hashed into a chain in commit order and sealed into blocks every hour. Every seal is recorded as an `audit.sealed` event carrying the digest, so the digests reach your SIEM and archive and can be compared outside Nexus.
