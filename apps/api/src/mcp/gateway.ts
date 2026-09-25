@@ -173,6 +173,7 @@ async function callTool(deps: Deps, orgId: string, meta: Env["Variables"]["meta"
     deps.db.tenant(orgId, (tx) =>
       audit(tx, orgId, { meta }, {
         type: decision.allow ? "mcp.tool_called" : "mcp.tool_denied",
+        outcome: !decision.allow ? "denied" : extra.upstream && extra.upstream !== "ok" ? "failure" : "success",
         actor: { type: "agent", id: who.agentId, display: who.name },
         target: { type: "mcp_tool", id: tool?.id ?? null, display: `${server.slug}/${name}` },
         details: {

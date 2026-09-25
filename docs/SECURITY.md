@@ -97,6 +97,20 @@ Nexus calls customer-configured URLs: webhooks, SIEM endpoints, SCIM apps and Sl
 - Directory syncs are held when they would suspend more than max(5, 10%) of users, until an admin approves the exact count.
 - Organizations can restrict sign-up and invitations to domains verified by DNS TXT records. Each domain can be claimed by only one organization.
 
+## AI agents and the MCP gateway
+
+- Agents are principals with an accountable owner. They get short-lived tokens (15 minutes by default, 60 at most) through `client_credentials`. Tokens are bound to the organization's MCP gateway, or to a single server behind it (RFC 8707).
+- Agents can authenticate three ways:
+  - **Workload identity federation** (recommended). The issuer, subject and audience must match exactly; the issuer's keys are fetched through the SSRF guard.
+  - **private_key_jwt.** Assertions are single-use and last at most 10 minutes; Nexus stores only the public key.
+  - **Client secrets.** Stored hashed, shown once, and they expire.
+- **Kill switch:** suspending an agent sets a revocation timestamp. The gateway checks the agent's status and that timestamp on every call, so existing tokens stop working at once. Offboarding or containing an owner suspends their agents until they are reassigned.
+- The gateway terminates MCP itself (initialize, ping, tools/list, tools/call). Only authorized `tools/call` requests reach an upstream, using credentials that are sealed at rest and never returned by the API or shown to agents. Upstream URLs pass the SSRF guard on every connection.
+- **Tool approval:** each approval covers a hash of the tool's description, input schema and annotations. Any change, including a change to the description (tool poisoning), takes the tool out of service until an admin re-approves it, and the admin sees what changed.
+- **Authorization** is deny by default, and deny rules win. Rules can use the agent, its tags, the tool, the tool's risk class and argument conditions; conditions check every element of an array.
+- **Audit trail:** every call and every refusal is audited with the agent, tool, decision, rule and latency. Arguments are recorded as a hash and a list of keys, never their values.
+- Per-agent rate limits apply to each server. The gateway caps request and response bodies (1 MB in, 5 MB out) and does not batch requests.
+
 ## Dependencies and supply chain
 
 - The lockfile is frozen in CI (`pnpm install --frozen-lockfile`).
@@ -108,6 +122,7 @@ Nexus calls customer-configured URLs: webhooks, SIEM endpoints, SCIM apps and Sl
 
 **In scope:**
 - The API (`/v1/*`, including the SSO protocol endpoints) and the console.
+- The agent token endpoint (`client_credentials`) and the MCP gateway (`/mcp/*`): token audience and revocation, tool approval bypass, argument-condition bypass, and reaching an upstream's credentials.
 - The agent's enrollment, check-in and update flows.
 - Tenant isolation, with at least two test organizations.
 - Authentication and MFA flows, account recovery, and API keys.
@@ -120,6 +135,7 @@ Provide testers with two organizations, an owner and a member in each, an enroll
 ## Known limitations
 
 These are tracked on the [roadmap](ROADMAP.md):
-- AI-agent identities and MCP authorization are not built yet.
+- The MCP gateway covers tools only (not resources, prompts, sampling or elicitation). Guardrails that inspect content (redaction, prompt-injection detection) and on-behalf-of delegation for users are planned for Release B.
+- Gateway rate limits are per process; with several API replicas the effective limit is multiplied until they move to a shared store.
 - Self-hosted deployments rely on the operator for database encryption at rest and network isolation.
 - Two moderate advisories remain in mobile app build tooling. They don't ship to the server or the console.

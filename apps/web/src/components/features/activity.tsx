@@ -61,6 +61,27 @@ const VERBS: Record<string, string> = {
   "federation.idp_updated": "changed identity provider",
   "federation.idp_deleted": "disconnected identity provider",
   "federation.tested": "ran a test sign-in with",
+  "group.dynamic_updated": "updated the members of",
+  "agent.registered": "registered the agent",
+  "agent.updated": "updated the agent",
+  "agent.deleted": "deleted the agent",
+  "agent.credential_added": "added a credential to",
+  "agent.credential_revoked": "revoked a credential of",
+  "agent.suspended": "suspended the agent",
+  "agent.activated": "reactivated the agent",
+  "agent.token_issued": "got an access token",
+  "mcp.server_registered": "registered the MCP server",
+  "mcp.server_updated": "changed the MCP server",
+  "mcp.server_removed": "removed the MCP server",
+  "mcp.tools_discovered": "found tool changes on",
+  "mcp.tools_approved": "approved tools on",
+  "mcp.tools_blocked": "blocked tools on",
+  "mcp.tool_risk_set": "set the risk class of",
+  "mcp.permission_added": "added a tool permission on",
+  "mcp.permission_changed": "changed a tool permission on",
+  "mcp.permission_removed": "removed a tool permission on",
+  "mcp.tool_called": "called",
+  "mcp.tool_denied": "was denied",
 };
 
 export function describe(e: AuditEvent) {
@@ -83,6 +104,9 @@ function targetHref(e: AuditEvent) {
   if (e.target.type === "group") return `/groups/${e.target.id}`;
   if (e.target.type === "application") return `/apps/${e.target.id}`;
   if (e.target.type === "device") return `/devices/${e.target.id}`;
+  if (e.target.type === "agent") return `/agents/${e.target.id}`;
+  if (e.target.type === "mcp_server") return `/mcp/${e.target.id}`;
+  if (e.target.type === "mcp_tool" && e.details.server_id) return `/mcp/${String(e.details.server_id)}`;
   return null;
 }
 
@@ -95,7 +119,7 @@ export function ActivityList({ events, compact }: { events: AuditEvent[]; compac
     <ul className="divide-y divide-border">
       {events.map((e) => {
         const href = targetHref(e);
-        const showTarget = e.target.display && !["auth.login", "auth.logout", "auth.mfa", "auth.step_up"].includes(e.type);
+        const showTarget = e.target.display && !["auth.login", "auth.logout", "auth.mfa", "auth.step_up", "agent.token_issued"].includes(e.type);
         return (
           <li key={e.id}>
             <button

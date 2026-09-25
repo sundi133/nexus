@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, EmptyState, ErrorBanner, Skeleton, StatusPill } from "@/components/ui/misc";
 import { api, unwrap } from "@/lib/api";
 import { useCan } from "@/lib/queries";
-import { cn, timeAgo } from "@/lib/utils";
+import { cn, timeAgo, toggled } from "@/lib/utils";
 
 type Item = Schemas["AccessReviewItem"];
 
@@ -40,7 +40,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   if (!data.data) return <ErrorBanner error={data.error} />;
   const { review: r, items } = data.data;
   const decidable = items.filter((i) => i.you_can_decide);
-  const toggle = (iid: string) => setSelected((s) => (s.has(iid) ? (s.delete(iid), new Set(s)) : new Set(s.add(iid))));
+  const toggle = (iid: string) => setSelected((s) => toggled(s, iid));
   const bulk = (decision: "keep" | "revoke") => decide.mutate([...selected].map((iid) => ({ id: iid, decision })));
   const open = r.status === "open";
 

@@ -65,8 +65,8 @@ export const NAV: NavSection[] = [
   {
     title: "AI security",
     items: [
-      { label: "Agents", href: "/agents", icon: Bot, soon: "A3" },
-      { label: "MCP servers", href: "/mcp", icon: Server, soon: "A3" },
+      { label: "Agents", href: "/agents", icon: Bot },
+      { label: "MCP servers", href: "/mcp", icon: Server },
     ],
   },
   {

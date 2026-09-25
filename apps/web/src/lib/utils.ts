@@ -44,3 +44,11 @@ export const ROLE_LABELS: Record<string, string> = {
   security_analyst: "Security analyst",
   readonly: "Read-only",
 };
+
+/** A new Set with `v` added or removed. Pure, so it's safe in state updaters (which React may run twice). */
+export const toggled = <T,>(s: Set<T>, v: T) => {
+  const next = new Set(s);
+  if (next.has(v)) next.delete(v);
+  else next.add(v);
+  return next;
+};
