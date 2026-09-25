@@ -1,5 +1,6 @@
 import { ApiProblem, createClient, unwrap } from "@nexus/api-client";
 import { parse as parseYaml, stringify as toYaml } from "yaml";
+import { type ConnectorConfig, PushError, pushDirectory, renderPush } from "./directory-push.js";
 
 /**
  * `nexus`, the Votal Nexus CLI. Config as code first (export, plan, apply a
@@ -34,6 +35,7 @@ Usage:
   nexus agents suspend <name> [--reason <text>]
   nexus alerts list [--status active|resolved|all]
   nexus audit verify
+  nexus directory push -c connector.yaml [--dry-run]   on-prem AD/LDAP -> Nexus (SCIM)
 
 Environment: NEXUS_URL and NEXUS_TOKEN (an API key) override saved credentials.
 MCP server secrets in the config come from the environment variables named by
@@ -46,7 +48,7 @@ function parseArgs(argv: string[]): { args: string[]; flags: Flags } {
   const flags: Flags = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    const short: Record<string, string> = { "-f": "file", "-o": "output", "-y": "yes", "-h": "help" };
+    const short: Record<string, string> = { "-f": "file", "-o": "output", "-y": "yes", "-h": "help", "-c": "connector" };
     const key = a.startsWith("--") ? a.slice(2) : short[a];
     if (!key) {
       args.push(a);
@@ -54,7 +56,7 @@ function parseArgs(argv: string[]): { args: string[]; flags: Flags } {
     }
     const [k, inline] = key.split("=", 2) as [string, string | undefined];
     if (inline !== undefined) flags[k] = inline;
-    else if (["prune", "yes", "help", "json"].includes(k)) flags[k] = true;
+    else if (["prune", "yes", "help", "json", "dry-run"].includes(k)) flags[k] = true;
     else flags[k] = argv[++i] ?? "";
   }
   return { args, flags };
@@ -115,7 +117,23 @@ async function main(argv: string[], io: IO): Promise<number> {
   const [cmd, sub, ...rest] = args;
   if (!cmd || flags.help) {
     io.out(HELP);
-    return cmd ? 0 : 1;
+    return flags.help ? 0 : 1;
+  }
+
+  // The on-prem connector talks to SCIM with its own token: no API key needed.
+  if (cmd === "directory" && sub === "push") {
+    const file = String(flags.connector ?? rest[0] ?? "");
+    if (!file) throw new UsageError("Usage: nexus directory push -c connector.yaml [--dry-run]");
+    const cfg = parseYaml(await io.readFile(file)) as ConnectorConfig;
+    if (!cfg?.scim?.url || !cfg?.ldap?.url) throw new UsageError(`${file} needs scim.url and ldap settings (see the README)`);
+    const dryRun = !!flags["dry-run"];
+    try {
+      io.out(renderPush(await pushDirectory(io, cfg, { dryRun }), dryRun));
+    } catch (e) {
+      if (e instanceof PushError || (e as { permanent?: boolean }).permanent !== undefined) throw new UsageError((e as Error).message);
+      throw e;
+    }
+    return 0;
   }
 
   if (cmd === "login") {

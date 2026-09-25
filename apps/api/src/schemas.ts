@@ -200,7 +200,7 @@ export const toUser = (u: UserRow): z.infer<typeof User> => ({
   status: u.status,
   roles: (u.roles ?? []) as z.infer<typeof Role>[],
   mfa_enrolled: Boolean(u.mfa_enrolled),
-  managed_by: u.managed_by === "google" ? "Google Workspace" : u.managed_by === "entra" ? "Microsoft Entra ID" : u.managed_by === "scim" ? "SCIM" : null,
+  managed_by: ({ google: "Google Workspace", entra: "Microsoft Entra ID", scim: "SCIM", ldap: "Active Directory / LDAP" } as Record<string, string>)[u.managed_by ?? ""] ?? null,
   break_glass: u.break_glass ?? false,
   manager_id: u.manager_id ?? null,
   last_login_at: isoOrNull(u.last_login_at),

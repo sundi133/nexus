@@ -48,6 +48,40 @@ mcp_servers:
       - { effect: allow, subject: "tag:support", tools: ["*"], risks: [read] }
 ```
 
+## On-prem Active Directory / LDAP connector
+
+When Nexus can't reach your domain controllers (hosted Nexus, no inbound firewall rules), run the connector inside your network. It reads AD or LDAP read-only and reconciles Nexus through a SCIM connection, the same way Okta or Entra ID provision:
+- it creates and updates people;
+- it deactivates people who are disabled or removed in the directory (a burst of deactivations pauses for an admin's approval);
+- it syncs groups, with nested membership expanded.
+
+1. In Nexus, go to **Directory sync → Set up SCIM** and copy the SCIM URL and token.
+2. Write `connector.yaml`:
+
+```yaml
+scim:
+  url: https://api.nexus.example.com/scim/v2
+  token_env: NEXUS_SCIM_TOKEN
+ldap:
+  preset: active_directory            # or openldap, custom
+  url: ldaps://dc1.corp.example.com:636
+  ca_cert_file: /etc/nexus/corp-ca.pem   # if your DCs use an internal CA
+  bind_dn: CN=svc-nexus,OU=Service Accounts,DC=corp,DC=example,DC=com
+  bind_password_env: LDAP_BIND_PASSWORD
+  base_dn: DC=corp,DC=example,DC=com
+  # user_base_dn, group_base_dn, user_search_filter, group_search_filter, disabled_filter: optional
+groups: true
+```
+
+3. Run it on a schedule, for example every 15 minutes from a systemd timer, cron or a container:
+
+```bash
+NEXUS_SCIM_TOKEN=… LDAP_BIND_PASSWORD=… nexus directory push -c connector.yaml --dry-run   # see first
+NEXUS_SCIM_TOKEN=… LDAP_BIND_PASSWORD=… nexus directory push -c connector.yaml
+```
+
+The service account's password never leaves your network, and no inbound ports are needed. If Nexus *can* reach the directory (self-hosted, or LDAPS published), connect it directly under **Directory sync → Connect a directory → Active Directory / LDAP** instead. That also lets people sign in with their directory password.
+
 ## Incident basics
 
 ```bash

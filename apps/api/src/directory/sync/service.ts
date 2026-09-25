@@ -12,13 +12,14 @@ import { touchGroups, touchUsers } from "../../provisioning/service.js";
 import { emailAdmission } from "../../org/domains.js";
 import { plan, PROVIDER_NAME, summarize, type Local, type Plan, type Remote } from "./plan.js";
 import { fetchDirectory, ProviderError } from "./providers.js";
+import { fetchLdap } from "./ldap.js";
 
 export const secretAad = (connectionId: string) => `directory_connection:${connectionId}`;
 
 type Conn = {
   id: string;
   org_id: string;
-  provider: "google" | "entra" | "scim";
+  provider: "google" | "entra" | "scim" | "ldap";
   name: string;
   config: unknown;
   secret: Buffer | null;
@@ -37,6 +38,7 @@ export async function loadConnection(tx: Tx, id: string) {
 export function remoteFor(deps: Deps, conn: Pick<Conn, "id" | "provider" | "config" | "secret" | "sync_groups">): Promise<Remote> {
   if (conn.provider === "scim" || !conn.secret) throw badRequest("scim_push", "A SCIM connection is updated by your identity provider; there's nothing for Nexus to fetch");
   const secret = deps.sealer.open(conn.secret, secretAad(conn.id)).toString();
+  if (conn.provider === "ldap") return fetchLdap(deps, conn.config, secret, { groups: conn.sync_groups });
   return fetchDirectory(deps.cfg, conn.provider, conn.config, secret, { groups: conn.sync_groups });
 }
 
@@ -94,7 +96,9 @@ export async function applyPlan(tx: Tx, conn: Conn, p: Plan, meta: RequestMeta) 
       .execute();
     await link("user", r.external_id, id);
     created++;
-    if (conn.invite_new_users) invites.push(await issueInvitation(tx, { orgId: conn.org_id, userId: null }, id));
+    // With directory passwords, people just sign in with the password they already have (and are activated then).
+    const directoryPasswords = conn.provider === "ldap" && (conn.config as { password_auth?: boolean }).password_auth === true;
+    if (conn.invite_new_users && !directoryPasswords) invites.push(await issueInvitation(tx, { orgId: conn.org_id, userId: null }, id));
   }
   for (const l of p.link_users) await link("user", l.external_id, l.local_id);
 

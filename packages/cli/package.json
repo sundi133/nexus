@@ -8,11 +8,12 @@
   "main": "./src/cli.ts",
   "exports": { ".": "./src/cli.ts" },
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/nexus.mjs --banner:js='#!/usr/bin/env node'",
+    "build": "node build.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@nexus/api-client": "workspace:*",
+    "@nexus/ldap-directory": "workspace:*",
     "yaml": "^2.9.1"
   },
   "devDependencies": {

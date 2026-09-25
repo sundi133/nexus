@@ -6192,7 +6192,8 @@
             "enum": [
               "google",
               "entra",
-              "scim"
+              "scim",
+              "ldap"
             ]
           },
           "provider_name": {
@@ -6385,6 +6386,85 @@
           "users",
           "active_users",
           "groups"
+        ]
+      },
+      "LdapConfig": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "type": "string",
+            "enum": [
+              "active_directory",
+              "openldap",
+              "custom"
+            ],
+            "default": "active_directory"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 300,
+            "pattern": "^ldaps?:\\/\\/[^/\\s]+\\/?$/i",
+            "example": "ldaps://dc1.corp.example.com:636"
+          },
+          "start_tls": {
+            "type": "boolean",
+            "default": false
+          },
+          "ca_cert": {
+            "type": "string",
+            "maxLength": 20000,
+            "description": "PEM of your internal CA, if the directory's certificate isn't publicly trusted"
+          },
+          "bind_dn": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "example": "CN=svc-nexus,OU=Service Accounts,DC=corp,DC=example,DC=com"
+          },
+          "base_dn": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "example": "DC=corp,DC=example,DC=com"
+          },
+          "user_base_dn": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "group_base_dn": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "user_search_filter": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "group_search_filter": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "disabled_filter": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Matches disabled people (Active Directory's disabled flag is always honoured)"
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "password_auth": {
+            "type": "boolean",
+            "default": false,
+            "description": "People sign in to Nexus with their directory password"
+          }
+        },
+        "required": [
+          "url",
+          "bind_dn",
+          "base_dn"
         ]
       },
       "DirectoryPlan": {
@@ -26631,6 +26711,34 @@
                       "client_id",
                       "client_secret"
                     ]
+                  },
+                  {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LdapConfig"
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "ldap"
+                            ]
+                          },
+                          "bind_password": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "description": "The service account's password (read-only account)"
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "bind_password"
+                        ]
+                      }
+                    ]
                   }
                 ]
               }
@@ -26862,6 +26970,34 @@
                           "tenant_id",
                           "client_id",
                           "client_secret"
+                        ]
+                      },
+                      {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/LdapConfig"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "ldap"
+                                ]
+                              },
+                              "bind_password": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000,
+                                "description": "The service account's password (read-only account)"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "bind_password"
+                            ]
+                          }
                         ]
                       }
                     ]
@@ -27121,8 +27257,46 @@
                           "client_id",
                           "client_secret"
                         ]
+                      },
+                      {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/LdapConfig"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "ldap"
+                                ]
+                              },
+                              "bind_password": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000,
+                                "description": "The service account's password (read-only account)"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "bind_password"
+                            ]
+                          }
+                        ]
                       }
                     ]
+                  },
+                  "ldap_bind_password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "LDAP: rotate the service account's password (other settings unchanged)"
+                  },
+                  "ldap_password_auth": {
+                    "type": "boolean",
+                    "description": "LDAP: people sign in with their directory password"
                   }
                 }
               }

@@ -44,7 +44,7 @@ export default function DirectorySyncPage() {
     <>
       <PageHeader
         title="Directory sync"
-        description="Keep people and groups in step with your directory: Nexus reads Google Workspace or Microsoft Entra ID, or your IdP (Okta, Entra ID, JumpCloud…) pushes changes over SCIM. Joiners get accounts, leavers are suspended."
+        description="Keep people and groups in step with your directory: Nexus reads Google Workspace, Microsoft Entra ID or Active Directory / LDAP, or your IdP (Okta, Entra ID, JumpCloud…) or the on-prem AD connector pushes changes over SCIM. Joiners get accounts, leavers are suspended."
         actions={
           editable ? (
             <>
@@ -71,7 +71,7 @@ export default function DirectorySyncPage() {
           <EmptyState
             icon={<FolderSync />}
             title="No directory connected"
-            description="Connect Google Workspace or Microsoft Entra ID and Nexus creates accounts for new hires, keeps names, titles and groups current, and suspends people the moment they leave."
+            description="Connect Google Workspace, Microsoft Entra ID or Active Directory and Nexus creates accounts for new hires, keeps names, titles and groups current, and suspends people the moment they leave."
             action={
               editable ? (
                 <Button variant="primary" onClick={() => setConnecting(true)}>
@@ -253,10 +253,10 @@ function Stat({ n, label, tone }: { n: number | undefined; label: string; tone?:
 function ProviderMark({ provider }: { provider: Conn["provider"] }) {
   return (
     <div
-      className={cn("flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white", provider === "google" ? "bg-[#1a73e8]" : provider === "entra" ? "bg-[#0078d4]" : "bg-fg-muted")}
+      className={cn("flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white", provider === "google" ? "bg-[#1a73e8]" : provider === "entra" ? "bg-[#0078d4]" : provider === "ldap" ? "bg-[#243a5e]" : "bg-fg-muted")}
       aria-hidden
     >
-      {provider === "google" ? "G" : provider === "entra" ? "E" : "S"}
+      {provider === "google" ? "G" : provider === "entra" ? "E" : provider === "ldap" ? "AD" : "S"}
     </div>
   );
 }
@@ -482,12 +482,21 @@ const SETUP = {
     "Under API permissions, add Microsoft Graph application permissions User.Read.All, Group.Read.All and GroupMember.Read.All, then grant admin consent.",
     "Under Certificates & secrets, create a client secret.",
   ],
+  ldap: [
+    "Create a read-only service account in Active Directory (a regular domain user is enough).",
+    "Make the directory reachable from Nexus over LDAPS (port 636) or LDAP with StartTLS. If it isn't reachable from the internet, run the on-prem connector instead (below).",
+    "If your domain controllers use an internal CA, paste its certificate so Nexus can verify them.",
+  ],
 };
+
+const PROVIDER_LABEL = { google: "Google Workspace", entra: "Microsoft Entra ID", ldap: "Active Directory / LDAP" } as const;
 
 function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c: Conn) => void }) {
   const qc = useQueryClient();
   const withStepUp = useStepUp();
-  const [provider, setProvider] = useState<"google" | "entra">("google");
+  const [provider, setProvider] = useState<"google" | "entra" | "ldap">("google");
+  const [ldap, setLdap] = useState({ preset: "active_directory" as "active_directory" | "openldap" | "custom", url: "", start_tls: false, ca_cert: "", bind_dn: "", bind_password: "", base_dn: "", user_base_dn: "", group_base_dn: "", user_search_filter: "", group_search_filter: "", disabled_filter: "", password_auth: false });
+  const setL = (v: Partial<typeof ldap>) => (setLdap({ ...ldap, ...v }), setProbe(null));
   const [name, setName] = useState("Google Workspace");
   const [adminEmail, setAdminEmail] = useState("");
   const [key, setKey] = useState("");
@@ -501,10 +510,28 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
   const [deprovision, setDeprovision] = useState<"suspend" | "none">("suspend");
   const [invite, setInvite] = useState(true);
 
+  const opt = (v: string) => (v.trim() ? v.trim() : undefined);
   const creds =
     provider === "google"
       ? ({ provider, admin_email: adminEmail.trim(), service_account_key: key } as const)
-      : ({ provider, tenant_id: tenant.trim(), client_id: clientId.trim(), client_secret: secret } as const);
+      : provider === "entra"
+        ? ({ provider, tenant_id: tenant.trim(), client_id: clientId.trim(), client_secret: secret } as const)
+        : ({
+            provider,
+            preset: ldap.preset,
+            url: ldap.url.trim(),
+            start_tls: ldap.start_tls,
+            ca_cert: opt(ldap.ca_cert),
+            bind_dn: ldap.bind_dn.trim(),
+            bind_password: ldap.bind_password,
+            base_dn: ldap.base_dn.trim(),
+            user_base_dn: opt(ldap.user_base_dn),
+            group_base_dn: opt(ldap.group_base_dn),
+            user_search_filter: opt(ldap.user_search_filter),
+            group_search_filter: opt(ldap.group_search_filter),
+            disabled_filter: opt(ldap.disabled_filter),
+            password_auth: ldap.password_auth,
+          } as const);
   const test = useMutation({
     mutationFn: () => unwrap(api.POST("/v1/directory/test", { body: creds })),
     onSuccess: setProbe,
@@ -527,9 +554,9 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
       else onClose();
     },
   });
-  const pick = (p: "google" | "entra") => {
+  const pick = (p: "google" | "entra" | "ldap") => {
     setProvider(p);
-    setName(p === "google" ? "Google Workspace" : "Microsoft Entra ID");
+    setName(PROVIDER_LABEL[p]);
     setProbe(null);
     test.reset();
   };
@@ -538,15 +565,15 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent title="Connect a directory" description="Nexus only reads your directory. You'll see a preview before anything changes." className="max-w-xl">
         <div className="max-h-[70vh] space-y-5 overflow-y-auto pr-1">
-          <div className="grid grid-cols-2 gap-2">
-            {(["google", "entra"] as const).map((p) => (
+          <div className="grid grid-cols-3 gap-2">
+            {(["google", "entra", "ldap"] as const).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => pick(p)}
                 className={cn("flex items-center gap-2 rounded-md border p-3 text-left text-[13px] font-medium", provider === p ? "border-primary bg-primary-soft" : "border-border hover:bg-bg-subtle")}
               >
-                <ProviderMark provider={p} /> {p === "google" ? "Google Workspace" : "Microsoft Entra ID"}
+                <ProviderMark provider={p} /> {PROVIDER_LABEL[p]}
               </button>
             ))}
           </div>
@@ -574,6 +601,8 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
                 />
               </Field>
             </>
+          ) : provider === "ldap" ? (
+            <LdapFields v={ldap} set={setL} />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Tenant ID" htmlFor="ds-tenant">
@@ -637,12 +666,14 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
                     Suspend people who leave <span className="block text-xs text-fg-muted">When someone is suspended or removed upstream, their Nexus account is suspended and signed out everywhere.</span>
                   </span>
                 </label>
-                <label className="flex items-start gap-2">
-                  <input type="checkbox" className="mt-0.5" checked={invite} onChange={(e) => setInvite(e.target.checked)} />
-                  <span>
-                    Email new people an invitation <span className="block text-xs text-fg-muted">Otherwise they stay staged until you invite them.</span>
-                  </span>
-                </label>
+                {provider === "ldap" && ldap.password_auth ? null : (
+                  <label className="flex items-start gap-2">
+                    <input type="checkbox" className="mt-0.5" checked={invite} onChange={(e) => setInvite(e.target.checked)} />
+                    <span>
+                      Email new people an invitation <span className="block text-xs text-fg-muted">Otherwise they stay staged until you invite them.</span>
+                    </span>
+                  </label>
+                )}
               </div>
               <Field label="Name" htmlFor="ds-name">
                 <Input id="ds-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
@@ -772,7 +803,10 @@ function SettingsDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) 
   const [tenant, setTenant] = useState(conn.provider === "entra" ? conn.account : "");
   const [clientId, setClientId] = useState("");
   const [secret, setSecret] = useState("");
-  const replacing = conn.provider === "google" ? key.trim() !== "" : secret !== "";
+  const [ldapPassword, setLdapPassword] = useState("");
+  const [passwordAuth, setPasswordAuth] = useState(conn.account.includes("directory passwords"));
+  const isLdap = conn.provider === "ldap";
+  const replacing = !isLdap && (conn.provider === "google" ? key.trim() !== "" : secret !== "");
   const credentials = !replacing
     ? undefined
     : conn.provider === "google"
@@ -801,7 +835,20 @@ function SettingsDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) 
             </Select>
           </Field>
           {conn.group_filter.length ? <p className="text-xs text-fg-muted">Scoped to {pluralize(conn.group_filter.length, "directory group")}.</p> : null}
-          <details className="rounded-md border border-border px-3 py-2">
+          {isLdap ? (
+            <>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-0.5" checked={passwordAuth} onChange={(e) => setPasswordAuth(e.target.checked)} />
+                <span>
+                  People sign in with their directory password <span className="block text-xs text-fg-muted">Checked against the directory at each sign-in; Nexus stores no password for them.</span>
+                </span>
+              </label>
+              <Field label="New service account password" htmlFor="st-ldap-pw" hint="Leave empty to keep the current one">
+                <Input id="st-ldap-pw" type="password" autoComplete="off" value={ldapPassword} onChange={(e) => setLdapPassword(e.target.value)} />
+              </Field>
+            </>
+          ) : null}
+          <details className={cn("rounded-md border border-border px-3 py-2", isLdap && "hidden")}>
             <summary className="cursor-pointer text-[13px] font-medium">Replace credentials</summary>
             <div className="mt-3 space-y-3">
               {conn.provider === "google" ? (
@@ -845,7 +892,17 @@ function SettingsDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) 
               variant="primary"
               loading={patch.isPending}
               onClick={() =>
-                patch.mutate({ deprovision, invite_new_users: invite, sync_groups: syncGroups, interval_minutes: every, ...(credentials ? { credentials } : {}) }, { onSuccess: () => (toast.success("Settings saved"), onClose()) })
+                patch.mutate(
+                  {
+                    deprovision,
+                    invite_new_users: invite,
+                    sync_groups: syncGroups,
+                    interval_minutes: every,
+                    ...(credentials ? { credentials } : {}),
+                    ...(isLdap ? { ldap_password_auth: passwordAuth, ...(ldapPassword ? { ldap_bind_password: ldapPassword } : {}) } : {}),
+                  },
+                  { onSuccess: () => (toast.success("Settings saved"), onClose()) },
+                )
               }
             >
               Save
@@ -854,5 +911,76 @@ function SettingsDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) 
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type LdapForm = { preset: "active_directory" | "openldap" | "custom"; url: string; start_tls: boolean; ca_cert: string; bind_dn: string; bind_password: string; base_dn: string; user_base_dn: string; group_base_dn: string; user_search_filter: string; group_search_filter: string; disabled_filter: string; password_auth: boolean };
+
+function LdapFields({ v, set }: { v: LdapForm; set: (x: Partial<LdapForm>) => void }) {
+  const ad = v.preset === "active_directory";
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Directory" htmlFor="ld-preset">
+          <Select id="ld-preset" className="w-full" value={v.preset} onChange={(e) => set({ preset: e.target.value as LdapForm["preset"] })}>
+            <option value="active_directory">Active Directory</option>
+            <option value="openldap">OpenLDAP</option>
+            <option value="custom">Other LDAP</option>
+          </Select>
+        </Field>
+        <Field label="Server" htmlFor="ld-url" hint="ldaps://host:636, or ldap://host:389 with StartTLS">
+          <Input id="ld-url" value={v.url} onChange={(e) => set({ url: e.target.value })} placeholder={ad ? "ldaps://dc1.corp.example.com:636" : "ldaps://ldap.example.com:636"} />
+        </Field>
+      </div>
+      <label className="flex items-center gap-2 text-[13px]">
+        <input type="checkbox" checked={v.start_tls} onChange={(e) => set({ start_tls: e.target.checked })} /> Use StartTLS (for ldap:// on port 389)
+      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Service account (bind DN)" htmlFor="ld-bind">
+          <Input id="ld-bind" value={v.bind_dn} onChange={(e) => set({ bind_dn: e.target.value })} placeholder={ad ? "CN=svc-nexus,OU=Service Accounts,DC=corp,DC=example,DC=com" : "cn=svc-nexus,ou=service,dc=example,dc=com"} />
+        </Field>
+        <Field label="Password" htmlFor="ld-pw">
+          <Input id="ld-pw" type="password" autoComplete="off" value={v.bind_password} onChange={(e) => set({ bind_password: e.target.value })} />
+        </Field>
+      </div>
+      <Field label="Base DN" htmlFor="ld-base">
+        <Input id="ld-base" value={v.base_dn} onChange={(e) => set({ base_dn: e.target.value })} placeholder={ad ? "DC=corp,DC=example,DC=com" : "dc=example,dc=com"} />
+      </Field>
+      <details className="rounded-md border border-border px-3 py-2 text-[13px]">
+        <summary className="cursor-pointer font-medium">Certificate, search bases and filters (optional)</summary>
+        <div className="mt-3 space-y-3">
+          <Field label="Internal CA certificate (PEM)" htmlFor="ld-ca" hint="Only if the directory's certificate isn't from a public CA">
+            <textarea id="ld-ca" rows={3} spellCheck={false} value={v.ca_cert} onChange={(e) => set({ ca_cert: e.target.value })} placeholder="-----BEGIN CERTIFICATE-----" className="w-full rounded-md border border-border bg-bg px-3 py-2 font-mono text-xs" />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="People under" htmlFor="ld-ub">
+              <Input id="ld-ub" value={v.user_base_dn} onChange={(e) => set({ user_base_dn: e.target.value })} placeholder="The base DN" />
+            </Field>
+            <Field label="Groups under" htmlFor="ld-gb">
+              <Input id="ld-gb" value={v.group_base_dn} onChange={(e) => set({ group_base_dn: e.target.value })} placeholder="The base DN" />
+            </Field>
+            <Field label="People filter" htmlFor="ld-uf">
+              <Input id="ld-uf" className="font-mono" value={v.user_search_filter} onChange={(e) => set({ user_search_filter: e.target.value })} placeholder={ad ? "(&(objectCategory=person)(objectClass=user))" : "(objectClass=inetOrgPerson)"} />
+            </Field>
+            <Field label="Group filter" htmlFor="ld-gf">
+              <Input id="ld-gf" className="font-mono" value={v.group_search_filter} onChange={(e) => set({ group_search_filter: e.target.value })} placeholder={ad ? "(objectClass=group)" : "(objectClass=groupOfNames)"} />
+            </Field>
+          </div>
+          <Field label="Disabled accounts match" htmlFor="ld-df" hint={ad ? "Active Directory's disabled flag is always honoured" : "e.g. (employeeType=disabled)"}>
+            <Input id="ld-df" className="font-mono" value={v.disabled_filter} onChange={(e) => set({ disabled_filter: e.target.value })} />
+          </Field>
+        </div>
+      </details>
+      <label className="flex items-start gap-2 text-[13px]">
+        <input type="checkbox" className="mt-0.5" checked={v.password_auth} onChange={(e) => set({ password_auth: e.target.checked })} />
+        <span>
+          People sign in with their directory password
+          <span className="block text-xs text-fg-muted">Nexus checks it against the directory at each sign-in (MFA still applies) and stores no password. No invitation emails are needed.</span>
+        </span>
+      </label>
+      <p className="rounded-md bg-bg-subtle px-3 py-2 text-xs text-fg-muted">
+        Directory not reachable from the internet? Set up SCIM here, then run the on-prem connector inside your network: <code className="font-mono">nexus directory push -c connector.yaml</code>. It reads AD the same way and pushes over SCIM; no inbound ports.
+      </p>
+    </div>
   );
 }

@@ -7,7 +7,7 @@ import { revokeUserSessions } from "../directory/users.js";
 import { notifyRoles, notifyUsers } from "../notify/send.js";
 import { breachCount } from "../platform/breach.js";
 import type { Tx } from "../platform/db.js";
-import { ApiError, badRequest } from "../platform/errors.js";
+import { ApiError, badRequest, conflict } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { layout } from "../platform/mailer.js";
 import { bearer, body, iso, json, problemResponses } from "../schemas.js";
@@ -16,6 +16,7 @@ import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "./passwords.j
 import { RateLimiter } from "./ratelimit.js";
 import { getSettings } from "../org/settings.js";
 import { verifiedFactorTypes } from "./routes.js";
+import { directoryPasswordCheck } from "../directory/sync/ldap.js";
 import { federationRequiredFor } from "../federation/enforce.js";
 import { hashToken } from "./tokens.js";
 
@@ -218,6 +219,7 @@ export function registerRecoveryRoutes(app: App) {
       const found = await deps.db.unscoped(async (tx) => (await sql<{ user_id: string; org_id: string; status: string }>`SELECT * FROM nexus_auth_find_user(${email})`.execute(tx)).rows[0]);
       if (!found || found.status !== "active") return c.body(null, 202);
       if (await federationRequiredFor(deps, email, found)) return c.body(null, 202); // they sign in with their IdP; there's no Nexus password to reset
+      if (await directoryPasswordCheck(deps, found.org_id, found.user_id)) return c.body(null, 202); // their password lives in the company directory
       const token = `nxr_${randomBytes(32).toString("base64url")}`;
       await deps.db.tenant(found.org_id, async (tx) => {
         await tx.updateTable("password_resets").set({ used_at: new Date() }).where("user_id", "=", found.user_id).where("used_at", "is", null).execute();
@@ -287,6 +289,8 @@ export function registerRecoveryRoutes(app: App) {
       const p = requireSession(c);
       const deps = c.get("deps");
       const { current_password, new_password } = c.req.valid("json");
+      const directory = await directoryPasswordCheck(deps, p.orgId, p.userId);
+      if (directory) throw conflict("directory_password", `Your password is managed in ${directory.connection}. Change it there (for example, Ctrl+Alt+Del on a Windows PC).`);
       const user = await deps.db.tenant(p.orgId, async (tx) => {
         requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0, { personal: true });
         return tx.selectFrom("users").select(["password_hash", "email"]).where("id", "=", p.userId).executeTakeFirstOrThrow();

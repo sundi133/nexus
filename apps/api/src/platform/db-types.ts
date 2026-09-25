@@ -581,7 +581,7 @@ export interface Database {
   directory_connections: {
     id: string;
     org_id: string;
-    provider: "google" | "entra" | "scim";
+    provider: "google" | "entra" | "scim" | "ldap";
     name: string;
     config: Json;
     secret: Buffer | null;

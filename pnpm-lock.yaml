@@ -23,6 +23,9 @@ importers:
       '@hono/zod-openapi':
         specifier: ^1.6.3
         version: 1.6.3(hono@4.13.9)(zod@4.6.5)
+      '@nexus/ldap-directory':
+        specifier: workspace:^
+        version: link:../../packages/ldap-directory
       '@node-rs/argon2':
         specifier: ^2.2.1
         version: 2.2.1
@@ -87,6 +90,9 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      ldapts:
+        specifier: ^9.2.0
+        version: 9.2.0
       openid-client:
         specifier: ^6.8.8
         version: 6.8.8
@@ -249,6 +255,9 @@ importers:
       '@nexus/api-client':
         specifier: workspace:*
         version: link:../api-client
+      '@nexus/ldap-directory':
+        specifier: workspace:*
+        version: link:../ldap-directory
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -259,6 +268,19 @@ importers:
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+
+  packages/ldap-directory:
+    dependencies:
+      ldapts:
+        specifier: ^9.2.0
+        version: 9.2.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.2
+        version: 26.6.2
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
@@ -6925,6 +6947,12 @@ packages:
     hasBin: true
     dev: false
 
+  /ldapts@9.2.0:
+    resolution: {integrity: sha512-5mDg3OT5fDP9DUXga9dCLW8cMW24OTOKT4pv/Qj+f2zCV3qxb+gkZLCzMAqzVTOANoycidKkYpPvkclUQU2aXw==}
+    engines: {node: '>=22'}
+    dependencies:
+      strict-event-emitter-types: 2.0.0
+
   /leven@3.1.0:
     resolution: {integrity: sha512-qsda+H8jTaUaN/x5vzW2rzc+8Rw4TAQ/4KjB46IwK5VH+IlVeeeje/EoZRpiXvIqjFgK84QffqPztGI3VBLG1A==}
     engines: {node: '>=6'}
@@ -9325,6 +9353,9 @@ packages:
     resolution: {integrity: sha512-uyQK/mx5QjHun80FLJTfaWE7JtwfRMKBLkMne6udYOmvH0CawotVa7TfgYHzAnpphn4+TweIx1QKMnRIbipmUg==}
     engines: {node: '>= 0.10.0'}
     dev: false
+
+  /strict-event-emitter-types@2.0.0:
+    resolution: {integrity: sha512-Nk/brWYpD85WlOgzw5h173aci0Teyv8YdIAEtV+N88nDB0dLlazZyJMIsN6eo1/AR61l+p6CJTG1JIyFaoNEEA==}
 
   /strict-uri-encode@2.0.0:
     resolution: {integrity: sha512-QwiXZgpRcKkhTj2Scnn++4PKtWsH0kpzZ62L2R6c/LUVYv7hVnZqcg2+sMuT6R7Jusu1vviK/MFsu6kNJfWlEQ==}

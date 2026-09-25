@@ -45,10 +45,23 @@ jobs:
           pnpm --filter @nexus/api typecheck
           pnpm --filter @nexus/web exec tsc --noEmit
           pnpm --filter @nexus/mobile exec tsc --noEmit
+          pnpm --filter @nexus/cli typecheck
+          pnpm --filter @nexus/ldap-directory typecheck
+      - name: Build the nexus CLI
+        run: pnpm --filter @nexus/cli build && node packages/cli/dist/nexus.mjs --help
       - name: Start MinIO (real S3 for the archive tests)
         run: docker run -d -p 9010:9000 quay.io/minio/minio server /data
+      - name: Start OpenLDAP (real LDAPS/StartTLS on a private CA for the directory tests)
+        run: |
+          apps/api/test/fixtures/ldap/make-certs.sh /tmp/ldap-certs
+          docker run -d --name openldap -p 1389:1389 -p 1636:1636 \
+            -e LDAP_ROOT=dc=acme,dc=test -e LDAP_ADMIN_USERNAME=admin -e LDAP_ADMIN_PASSWORD=admin-password \
+            -e LDAP_CUSTOM_LDIF_DIR=/ldifs -e LDAP_ENABLE_TLS=yes \
+            -e LDAP_TLS_CERT_FILE=/certs/server.crt -e LDAP_TLS_KEY_FILE=/certs/server.key -e LDAP_TLS_CA_FILE=/certs/ca.crt \
+            -v "$PWD/apps/api/test/fixtures/ldap:/ldifs:ro" -v /tmp/ldap-certs:/certs:ro bitnamilegacy/openldap:2.6
+          for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/1636) 2>/dev/null && break; sleep 1; done
       - name: API tests (incl. security guards)
-        env: { NEXUS_TEST_S3_ENDPOINT: "http://127.0.0.1:9010" }
+        env: { NEXUS_TEST_S3_ENDPOINT: "http://127.0.0.1:9010", NEXUS_TEST_LDAP_HOST: localhost, NEXUS_TEST_LDAP_CA: /tmp/ldap-certs/ca.crt }
         run: pnpm --filter @nexus/api test
       - name: Backup and restore test (on the data the tests left behind)
         env: { DATABASE_URL: "postgres://nexus_owner:nexus_owner@localhost:55432/nexus_test" }

@@ -41,7 +41,7 @@ export type Plan = {
   guard: { tripped: boolean; suspensions: number; threshold: number };
 };
 
-export const PROVIDER_NAME = { google: "Google Workspace", entra: "Microsoft Entra ID", scim: "SCIM" } as const;
+export const PROVIDER_NAME = { google: "Google Workspace", entra: "Microsoft Entra ID", scim: "SCIM", ldap: "Active Directory / LDAP" } as const;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const norm = (e: string) => e.trim().toLowerCase();

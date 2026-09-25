@@ -32,6 +32,8 @@ export type Config = {
   opsgenieBase: { us: string; eu: string };
   // Allow outbound calls (SCIM, webhooks) to private/loopback addresses. Dev and test only.
   allowPrivateOutbound: boolean;
+  // Directory (LDAP/AD) hosts on private networks: self-hosted deployments next to their AD set this.
+  allowPrivateDirectory: boolean;
   // Have I Been Pwned range API for breached-password checks ("" = off).
   hibpBase: string;
   // Push delivery. Unset = pushes are recorded/logged only (development).
@@ -106,6 +108,7 @@ export function loadConfig(env = process.env): Config {
     pagerdutyEventsUrl: env.NEXUS_PAGERDUTY_EVENTS_URL ?? "https://events.pagerduty.com/v2/enqueue",
     opsgenieBase: { us: env.NEXUS_OPSGENIE_BASE ?? "https://api.opsgenie.com", eu: env.NEXUS_OPSGENIE_EU_BASE ?? "https://api.eu.opsgenie.com" },
     allowPrivateOutbound: mode !== "prod" && env.NEXUS_ALLOW_PRIVATE_OUTBOUND !== "false",
+    allowPrivateDirectory: env.NEXUS_ALLOW_PRIVATE_DIRECTORY ? env.NEXUS_ALLOW_PRIVATE_DIRECTORY === "true" : mode !== "prod",
     hibpBase: env.NEXUS_HIBP_BASE ?? (mode === "test" ? "" : "https://api.pwnedpasswords.com"),
     apns:
       env.NEXUS_APNS_KEY && env.NEXUS_APNS_KEY_ID && env.NEXUS_APNS_TEAM_ID

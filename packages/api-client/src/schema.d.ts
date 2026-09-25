@@ -15037,7 +15037,12 @@ export interface paths {
                         /** Format: uuid */
                         client_id: string;
                         client_secret: string;
-                    };
+                    } | (components["schemas"]["LdapConfig"] & {
+                        /** @enum {string} */
+                        provider: "ldap";
+                        /** @description The service account's password (read-only account) */
+                        bind_password: string;
+                    });
                 };
             };
             responses: {
@@ -15205,7 +15210,12 @@ export interface paths {
                         /** Format: uuid */
                         client_id: string;
                         client_secret: string;
-                    }) & {
+                    } | (components["schemas"]["LdapConfig"] & {
+                        /** @enum {string} */
+                        provider: "ldap";
+                        /** @description The service account's password (read-only account) */
+                        bind_password: string;
+                    })) & {
                         /**
                          * @description Scheduled syncs. New connections start off so you can preview first.
                          * @default false
@@ -15415,7 +15425,16 @@ export interface paths {
                             /** Format: uuid */
                             client_id: string;
                             client_secret: string;
-                        };
+                        } | (components["schemas"]["LdapConfig"] & {
+                            /** @enum {string} */
+                            provider: "ldap";
+                            /** @description The service account's password (read-only account) */
+                            bind_password: string;
+                        });
+                        /** @description LDAP: rotate the service account's password (other settings unchanged) */
+                        ldap_bind_password?: string;
+                        /** @description LDAP: people sign in with their directory password */
+                        ldap_password_auth?: boolean;
                     };
                 };
             };
@@ -22186,7 +22205,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            provider: "google" | "entra" | "scim";
+            provider: "google" | "entra" | "scim" | "ldap";
             provider_name: string;
             name: string;
             /** @description Admin email (Google) or tenant (Entra) the connection reads */
@@ -22241,6 +22260,37 @@ export interface components {
                 name: string;
                 members: number;
             }[];
+        };
+        LdapConfig: {
+            /**
+             * @default active_directory
+             * @enum {string}
+             */
+            preset: "active_directory" | "openldap" | "custom";
+            /** @example ldaps://dc1.corp.example.com:636 */
+            url: string;
+            /** @default false */
+            start_tls: boolean;
+            /** @description PEM of your internal CA, if the directory's certificate isn't publicly trusted */
+            ca_cert?: string;
+            /** @example CN=svc-nexus,OU=Service Accounts,DC=corp,DC=example,DC=com */
+            bind_dn: string;
+            /** @example DC=corp,DC=example,DC=com */
+            base_dn: string;
+            user_base_dn?: string;
+            group_base_dn?: string;
+            user_search_filter?: string;
+            group_search_filter?: string;
+            /** @description Matches disabled people (Active Directory's disabled flag is always honoured) */
+            disabled_filter?: string;
+            attributes?: {
+                [key: string]: string;
+            };
+            /**
+             * @description People sign in to Nexus with their directory password
+             * @default false
+             */
+            password_auth: boolean;
         };
         DirectoryPlan: {
             summary: {

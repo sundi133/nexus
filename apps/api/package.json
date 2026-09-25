@@ -16,6 +16,7 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@hono/zod-openapi": "^1.6.3",
+    "@nexus/ldap-directory": "workspace:^",
     "@node-rs/argon2": "^2.2.1",
     "@peculiar/x509": "^2.1.0",
     "@simplewebauthn/server": "^14.0.2",
@@ -39,6 +40,7 @@
     "@types/node": "^26.6.2",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
+    "ldapts": "^9.2.0",
     "openid-client": "^6.8.8",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",

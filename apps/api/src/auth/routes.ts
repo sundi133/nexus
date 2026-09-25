@@ -34,6 +34,7 @@ import { alertIfBreakGlass } from "../directory/break-glass.js";
 import { RateLimiter } from "./ratelimit.js";
 import { hashToken, newSessionToken } from "./tokens.js";
 import { refuseIfFederationRequired } from "../federation/enforce.js";
+import { directoryPasswordCheck } from "../directory/sync/ldap.js";
 
 const loginLimiter = new RateLimiter(10, 5 * 60_000); // per email+IP
 const mfaLimiter = new RateLimiter(5, 5 * 60_000); // per session
@@ -96,6 +97,14 @@ export async function loadUser(tx: Tx, userId: string) {
             .where("auth_factors.verified_at", "is not", null),
         )
         .as("mfa_enrolled"),
+      eb
+        .selectFrom("directory_links")
+        .innerJoin("directory_connections", "directory_connections.id", "directory_links.connection_id")
+        .whereRef("directory_links.local_id", "=", "users.id")
+        .where("directory_links.kind", "=", "user")
+        .select("directory_connections.provider")
+        .limit(1)
+        .as("managed_by"),
     ])
     .where("users.id", "=", userId)
     .executeTakeFirst();
@@ -303,16 +312,36 @@ export function registerAuthRoutes(app: App) {
         return r.rows[0];
       });
       await refuseIfFederationRequired(deps, email, found);
-      const ok = await verifyPassword(found?.password_hash ?? null, input.password);
       const invalid = new ApiError(401, "invalid_credentials", "Incorrect email or password");
+      // People from an LDAP / Active Directory connection with password sign-in use their directory password.
+      const directory = found ? await directoryPasswordCheck(deps, found.org_id, found.user_id) : null;
+      let ok: boolean;
+      if (directory) {
+        try {
+          ok = await directory.verify(input.password);
+        } catch (e) {
+          await deps.db.tenant(found!.org_id, (tx) =>
+            audit(tx, found!.org_id, { meta, display: email }, { type: "auth.login", outcome: "failure", actor: { type: "user", id: found!.user_id, display: email }, details: { reason: "directory_unavailable", directory: directory.connection, error: (e as Error).message.slice(0, 200) } }),
+          );
+          throw new ApiError(503, "directory_unavailable", `Your organization's directory (${directory.connection}) can't be reached to check your password. Try again shortly.`);
+        }
+      } else ok = await verifyPassword(found?.password_hash ?? null, input.password);
 
       if (!found) throw invalid;
       const who = { meta, display: email };
       const actor = { type: "user" as const, id: found.user_id, display: email };
+      if (ok && directory && found.status === "staged") {
+        // The directory vouched for them: no invitation needed.
+        await deps.db.tenant(found.org_id, async (tx) => {
+          await tx.updateTable("users").set({ status: "active", updated_at: new Date() }).where("id", "=", found.user_id).where("status", "=", "staged").execute();
+          await audit(tx, found.org_id, who, { type: "user.activated", actor, target: { type: "user", id: found.user_id, display: email }, details: { via: "directory_password", directory: directory.connection } });
+        });
+        found.status = "active";
+      }
 
       if (!ok) {
         await deps.db.tenant(found.org_id, (tx) =>
-          audit(tx, found.org_id, who, { type: "auth.login", outcome: "failure", actor, details: { reason: "bad_password", client: input.client } }),
+          audit(tx, found.org_id, who, { type: "auth.login", outcome: "failure", actor, details: { reason: "bad_password", client: input.client, ...(directory ? { directory: directory.connection } : {}) } }),
         );
         throw invalid;
       }

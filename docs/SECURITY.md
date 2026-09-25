@@ -82,6 +82,13 @@ Nexus calls customer-configured URLs: webhooks, SIEM endpoints, SCIM apps and Sl
 - For long-term retention, events can also be archived to the customer's own S3 or Google Cloud Storage bucket. Turn on Object Lock or a retention policy there for tamper-proof (WORM) storage. The credentials Nexus needs only allow writing objects.
 - Webhooks are signed with `nexus-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`. Receivers should check the signature and reject timestamps older than 5 minutes.
 
+## On-prem directories (AD / LDAP)
+
+- **Transport:** connections use LDAPS or StartTLS with TLS 1.2+ and certificate verification (optionally against a pasted private CA). Plain `ldap://` without StartTLS is refused, because it would send the password in clear.
+- **Network policy:** directory hosts on private networks are refused unless the deployment sets `NEXUS_ALLOW_PRIVATE_DIRECTORY=true` (self-hosted next to AD). Hosted tenants use the on-prem connector, which needs no inbound ports; the service account's password stays in the customer network.
+- **Service account:** it is read-only and its password is sealed at rest.
+- **Directory-password sign-in:** Nexus looks the person up by their directory ID and binds as them. It never binds with an empty password (which LDAP treats as an anonymous "success"). Sign-in rate limits and MFA still apply. When the directory can't be reached, sign-in reports it as unavailable, not as a wrong password.
+
 ## Roles and scopes
 
 - **Custom roles** are sets of catalog permissions. They can never include `admins:manage`, so only owners grant admin access.

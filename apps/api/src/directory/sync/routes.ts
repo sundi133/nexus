@@ -15,8 +15,9 @@ import { bearer, body, Id, iso, json, patchOf, problemResponses } from "../../sc
 import { PROVIDER_NAME, summarize, type Plan, type Remote } from "./plan.js";
 import { EntraConfig, fetchDirectory, GoogleConfig, GoogleKey, ProviderError } from "./providers.js";
 import { loadConnection, loadLocal, planFor, remoteFor, secretAad, syncDedupeKey } from "./service.js";
+import { fetchLdap, LdapConfigSchema } from "./ldap.js";
 
-const Provider = z.enum(["google", "entra", "scim"]);
+const Provider = z.enum(["google", "entra", "scim", "ldap"]);
 const GoogleCreds = z.object({
   provider: z.literal("google"),
   admin_email: z.email(),
@@ -29,7 +30,11 @@ const EntraCreds = z.object({
   client_id: z.uuid(),
   client_secret: z.string().min(1).max(1000),
 });
-const Creds = z.discriminatedUnion("provider", [GoogleCreds, EntraCreds]);
+const LdapCreds = LdapConfigSchema.extend({
+  provider: z.literal("ldap"),
+  bind_password: z.string().min(1).max(1000).openapi({ description: "The service account's password (read-only account)" }),
+});
+const Creds = z.discriminatedUnion("provider", [GoogleCreds, EntraCreds, LdapCreds]);
 const SettingsIn = z.object({
   enabled: z.boolean().default(false).openapi({ description: "Scheduled syncs. New connections start off so you can preview first." }),
   sync_groups: z.boolean().default(true),
@@ -82,7 +87,11 @@ const PlanOut = z
   })
   .openapi("DirectoryPlan");
 
-function credentials(c: z.infer<typeof Creds>): { config: Record<string, string>; secret: string } {
+function credentials(c: z.infer<typeof Creds>): { config: Record<string, unknown>; secret: string } {
+  if (c.provider === "ldap") {
+    const { provider: _p, bind_password, ...config } = c;
+    return { config: LdapConfigSchema.parse(config), secret: bind_password };
+  }
   if (c.provider === "google") {
     let key: z.infer<typeof GoogleKey>;
     try {
@@ -149,7 +158,7 @@ async function listOut(tx: Tx, apiPublicUrl = ""): Promise<z.infer<typeof Connec
       provider: r.provider,
       provider_name: PROVIDER_NAME[r.provider],
       name: r.name,
-      account: r.provider === "google" ? cfg.admin_email ?? "" : r.provider === "entra" ? cfg.tenant_id ?? "" : "",
+      account: r.provider === "google" ? cfg.admin_email ?? "" : r.provider === "entra" ? cfg.tenant_id ?? "" : r.provider === "ldap" ? `${cfg.url ?? ""} (${cfg.base_dn ?? ""})${(cfg as { password_auth?: boolean }).password_auth ? ", directory passwords" : ""}` : "",
       enabled: r.enabled,
       sync_groups: r.sync_groups,
       group_filter: r.group_filter,
@@ -277,7 +286,7 @@ export function registerDirectorySyncRoutes(app: App) {
       requirePermission(c, "directory:sync");
       const { config, secret } = credentials(c.req.valid("json"));
       const provider = c.req.valid("json").provider;
-      return c.json(await probe(() => fetchDirectory(c.get("deps").cfg, provider, config, secret, { groups: true })), 200);
+      return c.json(await probe(() => (provider === "ldap" ? fetchLdap(c.get("deps"), config, secret, { groups: true }) : fetchDirectory(c.get("deps").cfg, provider, config, secret, { groups: true }))), 200);
     },
   );
 
@@ -348,19 +357,32 @@ export function registerDirectorySyncRoutes(app: App) {
       tags: ["Directory sync"],
       summary: "Change a connection's settings or credentials (requires recent MFA)",
       security: bearer,
-      request: { ...idParam, ...body(patchOf(SettingsIn).extend({ name: z.string().trim().min(1).max(100).optional(), credentials: Creds.optional() })) },
+      request: {
+        ...idParam,
+        ...body(
+          patchOf(SettingsIn).extend({
+            name: z.string().trim().min(1).max(100).optional(),
+            credentials: Creds.optional(),
+            ldap_bind_password: z.string().min(1).max(1000).optional().openapi({ description: "LDAP: rotate the service account's password (other settings unchanged)" }),
+            ldap_password_auth: z.boolean().optional().openapi({ description: "LDAP: people sign in with their directory password" }),
+          }),
+        ),
+      },
       responses: list,
     }),
     async (c) => {
       const p = requirePermission(c, "directory:sync");
       const { id } = c.req.valid("param");
-      const { credentials: creds, ...set } = c.req.valid("json");
+      const { credentials: creds, ldap_bind_password, ldap_password_auth, ...set } = c.req.valid("json");
       const deps = c.get("deps");
       const data = await deps.db.tenant(p.orgId, async (tx) => {
         await stepUp(c, tx, p);
         const before = await loadConnection(tx, id);
         if (!before) throw notFound("Connection");
         let secretSet = {};
+        if ((ldap_bind_password || ldap_password_auth !== undefined) && before.provider !== "ldap") throw badRequest("provider_mismatch", "Those settings are for LDAP connections");
+        if (ldap_bind_password) secretSet = { secret: deps.sealer.seal(Buffer.from(ldap_bind_password), secretAad(id)) };
+        if (ldap_password_auth !== undefined) secretSet = { ...secretSet, config: JSON.stringify({ ...(before.config as object), password_auth: ldap_password_auth }) };
         if (creds) {
           if (creds.provider !== before.provider) throw badRequest("provider_mismatch", "Credentials are for a different provider");
           const { config, secret } = credentials(creds);
@@ -370,7 +392,7 @@ export function registerDirectorySyncRoutes(app: App) {
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
           type: "directory.connection_updated",
           target: { type: "directory_connection", id, display: set.name ?? before.name },
-          details: { changes: set, credentials_rotated: !!creds },
+          details: { changes: { ...set, ...(ldap_password_auth !== undefined ? { password_auth: ldap_password_auth } : {}) }, credentials_rotated: !!creds || !!ldap_bind_password },
         });
         return listOut(tx, c.get("deps").cfg.apiPublicUrl);
       });
