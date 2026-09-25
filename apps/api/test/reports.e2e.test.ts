@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { bootApp, PASSWORD, uniqueEmail } from "./harness.js";
@@ -80,7 +81,7 @@ describe("reports", () => {
   it("agent tool access shows what each agent can call", async () => {
     expect((await report("agent_tool_access")).summary).toMatchObject({ agents: 0, grants: 0 });
     const agent = (await h.call("POST", "/v1/agents", { token, body: { name: "Bot", owner_user_id: P.root!.id, tags: ["ops"] } })).body.id;
-    const srv = "00000000-0000-7000-8000-00000000aa01";
+    const srv = randomUUID();
     await owner.query("INSERT INTO mcp_servers (id, org_id, name, slug, url) VALUES ($1, $2, 'GitHub', 'github', 'https://gh.example.com/mcp')", [srv, orgId]);
     const tool = (name: string, risk: string, status = "approved") =>
       owner.query("INSERT INTO mcp_tools (id, org_id, server_id, name, hash, approved_hash, status, change, risk) VALUES (gen_random_uuid(), $1, $2, $3, 'h', 'h', $4, '', $5)", [orgId, srv, name, status, risk]);
