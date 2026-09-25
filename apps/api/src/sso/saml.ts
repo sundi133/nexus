@@ -1,5 +1,4 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { DOMParser } from "@xmldom/xmldom";
 import { sql } from "kysely";
 import { randomBytes } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
@@ -8,6 +7,11 @@ import type { App, Deps, Env, Principal } from "../context.js";
 import { audit } from "../audit/record.js";
 import type { Tx } from "../platform/db.js";
 import { bearer, json, problemResponses } from "../schemas.js";
+import { parseXml as parseXmlSafe } from "../platform/xml.js";
+import { DEFAULT_ATTRIBUTES, idpUrls, NAMEID, type AttributeMapping, type SamlConfig } from "./saml-config.js";
+
+// Kept importable from here too.
+export { ATTRIBUTE_SOURCES, AttributeMapping, DEFAULT_ATTRIBUTES, idpUrls, parseSpMetadata, type SamlConfig } from "./saml-config.js";
 import { assignedAppIds } from "./apps.js";
 import { activeSamlCert, certBody, publishedSamlCerts } from "./saml-cert.js";
 import { decideAccess, matchedSummary } from "../access/service.js";
@@ -31,10 +35,6 @@ const NS = {
   md: "urn:oasis:names:tc:SAML:2.0:metadata",
   ds: "http://www.w3.org/2000/09/xmldsig#",
 };
-const NAMEID = {
-  email: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress",
-  persistent: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
-} as const;
 const BINDING = {
   redirect: "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
   post: "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
@@ -44,55 +44,13 @@ const SKEW_MS = 60_000;
 const FORCE_AUTHN_FRESH_MS = 2 * 60_000;
 const MAX_XML_BYTES = 64 * 1024;
 
-export const ATTRIBUTE_SOURCES = ["email", "given_name", "family_name", "display_name", "user_id", "department", "title", "groups", "static"] as const;
-
-export const AttributeMapping = z
-  .object({
-    name: z.string().trim().min(1).max(256),
-    source: z.enum(ATTRIBUTE_SOURCES),
-    value: z.string().max(2048).optional().openapi({ description: "Required when source is `static`" }),
-  })
-  .refine((a) => a.source !== "static" || !!a.value, { message: "A static attribute needs a value", path: ["value"] })
-  .openapi("SamlAttribute");
-export type AttributeMapping = z.infer<typeof AttributeMapping>;
-
-/** What apps get when no mapping is configured. */
-export const DEFAULT_ATTRIBUTES: AttributeMapping[] = [
-  { name: "email", source: "email" },
-  { name: "firstName", source: "given_name" },
-  { name: "lastName", source: "family_name" },
-  { name: "displayName", source: "display_name" },
-  { name: "groups", source: "groups" },
-];
-
-export type SamlConfig = {
-  entity_id: string;
-  acs_url: string;
-  name_id_format: keyof typeof NAMEID;
-  default_relay_state?: string;
-  sign: "assertion" | "response_and_assertion";
-  attributes?: AttributeMapping[];
-};
-
-export const idpUrls = (deps: Deps, slug: string) => {
-  const base = `${deps.cfg.publicUrl}/saml/${slug}`;
-  return { entityId: base, ssoUrl: `${base}/sso`, metadataUrl: `${base}/metadata` };
-};
-
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]!);
 const instant = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, "Z");
 const newSamlId = () => `_${randomBytes(20).toString("hex")}`;
 
 // ---- Parsing ------------------------------------------------------------------------
 
-function parseXml(xml: string) {
-  if (Buffer.byteLength(xml) > MAX_XML_BYTES) throw new Error("XML too large");
-  if (/<!DOCTYPE/i.test(xml)) throw new Error("DOCTYPE is not allowed");
-  const errors: string[] = [];
-  const doc = new DOMParser({ onError: (level, msg) => void (level !== "warning" && errors.push(msg)) }).parseFromString(xml, "text/xml");
-  if (errors.length || !doc.documentElement) throw new Error("Malformed XML");
-  return doc;
-}
+const parseXml = (xml: string) => parseXmlSafe(xml, MAX_XML_BYTES);
 
 export type AuthnRequest = { id: string; issuer: string; acsUrl: string | null; forceAuthn: boolean; isPassive: boolean };
 
@@ -112,18 +70,6 @@ export function decodeAuthnRequest(samlRequest: string, binding: "redirect" | "p
     forceAuthn: root.getAttribute("ForceAuthn") === "true",
     isPassive: root.getAttribute("IsPassive") === "true",
   };
-}
-
-/** Pulls entity ID and the HTTP-POST ACS URL out of SP metadata (SPEC SSO-04). */
-export function parseSpMetadata(xml: string): { entity_id: string; acs_url: string } {
-  const root = parseXml(xml).documentElement!;
-  if (root.localName !== "EntityDescriptor") throw new Error("Not SAML metadata (expected an EntityDescriptor)");
-  const entity_id = root.getAttribute("entityID");
-  const acs = Array.from(root.getElementsByTagNameNS(NS.md, "AssertionConsumerService")).filter((e) => e.getAttribute("Binding") === BINDING.post);
-  const pick = acs.find((e) => e.getAttribute("isDefault") === "true") ?? acs.sort((a, b) => Number(a.getAttribute("index") ?? 0) - Number(b.getAttribute("index") ?? 0))[0];
-  const acs_url = pick?.getAttribute("Location");
-  if (!entity_id || !acs_url) throw new Error("Metadata needs an entityID and an HTTP-POST AssertionConsumerService");
-  return { entity_id, acs_url };
 }
 
 // ---- Building + signing ------------------------------------------------------------
@@ -409,4 +355,4 @@ export function registerSamlRoutes(app: App) {
   );
 }
 
-export { NAMEID };
+export { NAMEID } from "./saml-config.js";

@@ -10,6 +10,8 @@ export const PUBLIC_ROUTES: { method: string; path: RegExp; why: string }[] = [
   { method: "POST", path: /^\/v1\/auth\/login$/, why: "sign in" },
   { method: "POST", path: /^\/v1\/auth\/passkey(\/options)?$/, why: "passwordless sign-in" },
   { method: "POST", path: /^\/v1\/auth\/password-reset(\/complete)?$/, why: "forgot password" },
+  { method: "POST", path: /^\/v1\/auth\/federation\/(discover|start|complete)$/, why: "sign in through the organization's IdP" },
+  { method: "GET", path: /^\/v1\/federation\/saml\/[^/]+\/metadata$/, why: "SAML metadata for the IdP admin" },
   { method: "GET", path: /^\/v1\/invitations\/[^/]+$/, why: "open an invitation link" },
   { method: "POST", path: /^\/v1\/invitations\/accept$/, why: "accept an invitation" },
   { method: "POST", path: /^\/v1\/devices\/pair$/, why: "a phone redeems a pairing code" },

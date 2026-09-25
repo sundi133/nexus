@@ -18,7 +18,7 @@ export type Principal = {
   client: string;
   mfaAt: Date | null;
   /** How the session last proved MFA. */
-  mfaMethod?: "totp" | "push" | "webauthn" | "recovery_code" | null;
+  mfaMethod?: "totp" | "push" | "webauthn" | "recovery_code" | "idp" | null;
   /** The org requires owners to step up with a passkey (RBAC-04). */
   ownerPasskeyRequired?: boolean;
   roles: Role[];

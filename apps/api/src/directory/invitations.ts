@@ -8,6 +8,7 @@ import { requirePermission } from "../auth/guard.js";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "../auth/passwords.js";
 import { assertNotBreached } from "../auth/recovery.js";
 import { createSession, verifiedFactorTypes } from "../auth/routes.js";
+import { refuseIfFederationRequired } from "../federation/enforce.js";
 import { hashToken } from "../auth/tokens.js";
 import { notifyUsers } from "../notify/send.js";
 import { getSettings, mfaRequired } from "../org/settings.js";
@@ -149,6 +150,7 @@ export function registerInvitationRoutes(app: App) {
       const deps = c.get("deps");
       const meta = c.get("meta");
       const inv = await lookup(deps, input.token);
+      await refuseIfFederationRequired(deps, inv.email, { user_id: inv.user_id, org_id: inv.org_id });
       await assertNotBreached(deps, input.password);
       const passwordHash = await hashPassword(input.password);
 

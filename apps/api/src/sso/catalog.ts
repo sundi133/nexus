@@ -4,7 +4,7 @@ import { requirePermission } from "../auth/guard.js";
 import { badRequest, notFound } from "../platform/errors.js";
 import { bearer, body, json, problemResponses } from "../schemas.js";
 import { ApplicationCreated, createApplication, type AppInput } from "./apps.js";
-import type { AttributeMapping } from "./saml.js";
+import type { AttributeMapping } from "./saml-config.js";
 
 /**
  * App catalog (SPEC SSO-03): pre-built SSO settings for common apps.

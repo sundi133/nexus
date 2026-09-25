@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig, validateProd } from "../src/config.js";
-import { LATEST_MIGRATION } from "../src/platform/migrate.js";
+import { LATEST_MIGRATION, migrate } from "../src/platform/migrate.js";
 import { bootApp, PASSWORD, uniqueEmail } from "./harness.js";
 
 /** Operability: health, readiness, metrics, security headers, production config checks, job retention. */
@@ -89,6 +89,22 @@ describe("production configuration", () => {
       NEXUS_METRICS_TOKEN: "a-long-random-scrape-token-1234",
     };
     expect(validateProd(loadConfig(env), env)).toEqual([]);
+  });
+});
+
+describe("migrations", () => {
+  it("records a checksum per migration, and refuses to run when an applied one was edited", async () => {
+    const ownerUrl = process.env.NEXUS_DATABASE_OWNER_URL!;
+    const row = async () => (await owner.query("SELECT checksum FROM schema_migrations WHERE version = '0001_core.sql'")).rows[0].checksum as string;
+    expect(await row()).toMatch(/^[0-9a-f]{64}$/);
+    const real = await row();
+    await owner.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0001_core.sql'", ["0".repeat(64)]);
+    try {
+      await expect(migrate(ownerUrl)).rejects.toThrow("migration 0001_core.sql was changed after it was applied");
+    } finally {
+      await owner.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0001_core.sql'", [real]);
+    }
+    await expect(migrate(ownerUrl)).resolves.toBeUndefined();
   });
 });
 

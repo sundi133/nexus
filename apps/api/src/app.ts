@@ -12,6 +12,7 @@ import { LATEST_MIGRATION } from "./platform/migrate.js";
 import { unauthorized } from "./platform/errors.js";
 import { isPublicRoute } from "./auth/public-routes.js";
 import { registerAuthRoutes } from "./auth/routes.js";
+import { registerFederationRoutes } from "./federation/routes.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
@@ -143,6 +144,7 @@ export function createApp(deps: Deps) {
   });
 
   registerAuthRoutes(app);
+  registerFederationRoutes(app);
   registerPasskeyRoutes(app);
   registerPushRoutes(app);
   registerImportRoutes(app);

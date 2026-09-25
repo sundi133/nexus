@@ -33,6 +33,7 @@ import { domainOf } from "../org/domains.js";
 import { alertIfBreakGlass } from "../directory/break-glass.js";
 import { RateLimiter } from "./ratelimit.js";
 import { hashToken, newSessionToken } from "./tokens.js";
+import { refuseIfFederationRequired } from "../federation/enforce.js";
 
 const loginLimiter = new RateLimiter(10, 5 * 60_000); // per email+IP
 const mfaLimiter = new RateLimiter(5, 5 * 60_000); // per session
@@ -42,7 +43,7 @@ const SessionStateSchema = z.enum(["pending_mfa", "enroll_mfa", "active"]).opena
 const ENROLL_TTL_MS = 30 * 60 * 1000;
 const Password = z.string().min(MIN_PASSWORD_LENGTH).max(256);
 
-const AuthResult = z
+export const AuthResult = z
   .object({
     token: z.string().openapi({ description: "Bearer token. Store securely; it is shown only once." }),
     session: z.object({ id: Id, state: SessionStateSchema, expires_at: z.string() }),
@@ -166,7 +167,7 @@ async function verifyUserTotp(tx: Tx, deps: Deps, userId: string, code: string) 
  * Proving possession of a factor counts as fresh MFA for this session. If the
  * session was waiting on mandatory enrollment, it becomes fully active.
  */
-export type MfaMethod = "totp" | "push" | "webauthn" | "recovery_code";
+export type MfaMethod = "totp" | "push" | "webauthn" | "recovery_code" | "idp";
 
 export async function markFreshMfa(tx: Tx, p: { orgId: string; sessionId: string; sessionState: SessionState }, method: MfaMethod) {
   const now = new Date();
@@ -300,6 +301,7 @@ export function registerAuthRoutes(app: App) {
           SELECT * FROM nexus_auth_find_user(${email})`.execute(tx);
         return r.rows[0];
       });
+      await refuseIfFederationRequired(deps, email, found);
       const ok = await verifyPassword(found?.password_hash ?? null, input.password);
       const invalid = new ApiError(401, "invalid_credentials", "Incorrect email or password");
 

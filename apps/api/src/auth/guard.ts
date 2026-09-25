@@ -17,7 +17,7 @@ type SessionLookup = {
   state: SessionState;
   client: string;
   mfa_at: Date | null;
-  mfa_method: "totp" | "push" | "webauthn" | "recovery_code" | null;
+  mfa_method: "totp" | "push" | "webauthn" | "recovery_code" | "idp" | null;
   expires_at: Date;
   user_status: string;
 };

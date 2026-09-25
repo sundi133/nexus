@@ -497,6 +497,229 @@
           "expires_at"
         ]
       },
+      "FederationDiscovery": {
+        "type": "object",
+        "properties": {
+          "federated": {
+            "type": "boolean"
+          },
+          "provider": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "federated",
+          "provider",
+          "required"
+        ]
+      },
+      "FederationStart": {
+        "type": "object",
+        "properties": {
+          "redirect_url": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "redirect_url",
+          "state"
+        ]
+      },
+      "IdentityProvider": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "oidc",
+              "saml"
+            ]
+          },
+          "issuer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopes": {
+            "type": "string"
+          },
+          "idp_entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idp_sso_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "certificates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "subject": {
+                  "type": "string"
+                },
+                "not_after": {
+                  "type": "string"
+                },
+                "fingerprint_sha256": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "subject",
+                "not_after",
+                "fingerprint_sha256"
+              ]
+            }
+          },
+          "email_attribute": {
+            "type": "string"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "jit_provisioning": {
+            "type": "boolean"
+          },
+          "mfa": {
+            "type": "string",
+            "enum": [
+              "when_signalled",
+              "always",
+              "never"
+            ],
+            "description": "when_signalled: the IdP's MFA counts when it says MFA was used (amr / AuthnContext); always: every sign-in through it counts as MFA; never: Nexus MFA always applies"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "last_test_ok_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_login_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "linked_users": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "protocol",
+          "issuer",
+          "client_id",
+          "scopes",
+          "idp_entity_id",
+          "idp_sso_url",
+          "certificates",
+          "email_attribute",
+          "domains",
+          "jit_provisioning",
+          "mfa",
+          "required",
+          "enabled",
+          "last_test_ok_at",
+          "last_login_at",
+          "linked_users",
+          "created_at"
+        ]
+      },
+      "FederationServiceProvider": {
+        "type": "object",
+        "properties": {
+          "oidc_redirect_uri": {
+            "type": "string"
+          },
+          "saml_acs_url": {
+            "type": "string"
+          },
+          "saml_entity_id": {
+            "type": "string"
+          },
+          "saml_metadata_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "oidc_redirect_uri",
+          "saml_acs_url",
+          "saml_entity_id",
+          "saml_metadata_url"
+        ],
+        "description": "What to enter at the IdP"
+      },
+      "FederationTestResult": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "boolean"
+          },
+          "result": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "done",
+          "result"
+        ]
+      },
       "WebAuthnCeremony": {
         "type": "object",
         "properties": {
@@ -5572,6 +5795,1197 @@
         "responses": {
           "204": {
             "description": "Revoked"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/federation/discover": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Does this email sign in through an identity provider?",
+        "description": "Home-realm discovery by email domain. Says nothing about whether the account exists.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederationDiscovery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/federation/start": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Start signing in through the organization's identity provider",
+        "description": "Returns the IdP URL to send the browser to, and the `state` that comes back with the answer (bind it to the browser, e.g. in a cookie).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "return_to": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "client": {
+                    "type": "string",
+                    "enum": [
+                      "web",
+                      "mobile",
+                      "cli"
+                    ],
+                    "default": "web"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederationStart"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/federation/complete": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Finish signing in with what the identity provider sent back",
+        "description": "OIDC: `code` (or `error`). SAML: `saml_response`. `state` is the OIDC state / SAML RelayState. A test sign-in (started by an admin) returns `purpose: test` and creates no session.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "code": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "saml_response": {
+                    "type": "string",
+                    "maxLength": 400000
+                  },
+                  "error": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "error_description": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "client": {
+                    "type": "string",
+                    "enum": [
+                      "web",
+                      "mobile",
+                      "cli"
+                    ]
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/AuthResult"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "purpose": {
+                              "type": "string",
+                              "enum": [
+                                "login"
+                              ]
+                            },
+                            "return_to": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "purpose",
+                            "return_to"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "purpose": {
+                          "type": "string",
+                          "enum": [
+                            "test"
+                          ]
+                        },
+                        "idp_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                        },
+                        "state": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "purpose",
+                        "idp_id",
+                        "state"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/federation/saml/{slug}/metadata": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "SAML service provider metadata, for the IdP admin",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SAML metadata",
+            "content": {
+              "application/samlmetadata+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/identity-providers": {
+      "get": {
+        "tags": [
+          "Identity providers"
+        ],
+        "summary": "Identity providers people sign in with",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/IdentityProvider"
+                      }
+                    },
+                    "service_provider": {
+                      "$ref": "#/components/schemas/FederationServiceProvider"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "service_provider"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Identity providers"
+        ],
+        "summary": "Connect an identity provider (requires recent MFA)",
+        "description": "OIDC: `issuer`, `client_id`, `client_secret` (the issuer's discovery document is checked now). SAML: `metadata_xml`, or `idp_entity_id` + `idp_sso_url` + `certificates`. Run a test sign-in before making it required.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "protocol": {
+                    "type": "string",
+                    "enum": [
+                      "oidc",
+                      "saml"
+                    ]
+                  },
+                  "issuer": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "format": "uri"
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "metadata_xml": {
+                    "type": "string",
+                    "maxLength": 500000
+                  },
+                  "idp_entity_id": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "idp_sso_url": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "format": "uri"
+                  },
+                  "certificates": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 20000
+                    },
+                    "maxItems": 5
+                  },
+                  "domains": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^(?=.{1,253}$)([a-z0-9-]+\\.)+[a-z]{2,}$"
+                    },
+                    "maxItems": 50
+                  },
+                  "jit_provisioning": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "mfa": {
+                    "type": "string",
+                    "enum": [
+                      "when_signalled",
+                      "always",
+                      "never"
+                    ],
+                    "default": "when_signalled",
+                    "description": "when_signalled: the IdP's MFA counts when it says MFA was used (amr / AuthnContext); always: every sign-in through it counts as MFA; never: Nexus MFA always applies"
+                  },
+                  "email_attribute": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "default": ""
+                  },
+                  "scopes": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "pattern": "(^|\\s)openid(\\s|$)",
+                    "default": "openid email profile"
+                  }
+                },
+                "required": [
+                  "name",
+                  "protocol",
+                  "domains"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/IdentityProvider"
+                      }
+                    },
+                    "service_provider": {
+                      "$ref": "#/components/schemas/FederationServiceProvider"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "service_provider"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/identity-providers/{id}": {
+      "patch": {
+        "tags": [
+          "Identity providers"
+        ],
+        "summary": "Change an identity provider (requires recent MFA)",
+        "description": "Making it `required` (no passwords or passkeys for its domains, except break-glass accounts) needs a successful test sign-in since its connection settings last changed.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "idp_sso_url": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "format": "uri"
+                  },
+                  "certificates": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 20000
+                    },
+                    "minItems": 1,
+                    "maxItems": 5
+                  },
+                  "metadata_xml": {
+                    "type": "string",
+                    "maxLength": 500000
+                  },
+                  "domains": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^(?=.{1,253}$)([a-z0-9-]+\\.)+[a-z]{2,}$"
+                    },
+                    "maxItems": 50
+                  },
+                  "jit_provisioning": {
+                    "type": "boolean"
+                  },
+                  "mfa": {
+                    "type": "string",
+                    "enum": [
+                      "when_signalled",
+                      "always",
+                      "never"
+                    ],
+                    "description": "when_signalled: the IdP's MFA counts when it says MFA was used (amr / AuthnContext); always: every sign-in through it counts as MFA; never: Nexus MFA always applies"
+                  },
+                  "email_attribute": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "scopes": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "pattern": "(^|\\s)openid(\\s|$)"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/IdentityProvider"
+                      }
+                    },
+                    "service_provider": {
+                      "$ref": "#/components/schemas/FederationServiceProvider"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "service_provider"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Identity providers"
+        ],
+        "summary": "Disconnect an identity provider (requires recent MFA)",
+        "description": "People it signed in keep their Nexus accounts; they sign in with a password reset or a passkey afterwards.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/IdentityProvider"
+                      }
+                    },
+                    "service_provider": {
+                      "$ref": "#/components/schemas/FederationServiceProvider"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "service_provider"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/identity-providers/{id}/test": {
+      "post": {
+        "tags": [
+          "Identity providers"
+        ],
+        "summary": "Start a test sign-in",
+        "description": "Sign in at the IdP as anyone; Nexus shows what came back and who it would sign in, without creating a session.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "redirect_url": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "redirect_url",
+                    "state"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/identity-providers/{id}/tests/{state}": {
+      "get": {
+        "tags": [
+          "Identity providers"
+        ],
+        "summary": "The outcome of a test sign-in",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederationTestResult"
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid request",

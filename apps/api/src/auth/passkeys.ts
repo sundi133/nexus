@@ -21,6 +21,7 @@ import { bearer, body, Factor, Id, iso, isoOrNull, json, problemResponses } from
 import { requireSession } from "./guard.js";
 import { RateLimiter } from "./ratelimit.js";
 import { createSession, markFreshMfa } from "./routes.js";
+import { refuseIfFederationRequired } from "../federation/enforce.js";
 
 /**
  * Passkeys (WebAuthn, SPEC AUTH-03/05). Phishing-resistant: the browser binds
@@ -275,6 +276,7 @@ export function registerPasskeyRoutes(app: App) {
       const deps = c.get("deps");
       if (!passkeyLimiter.take(`${email.toLowerCase()}|${c.get("meta").ip}`)) throw new ApiError(429, "rate_limited", "Too many attempts");
       const user = await findActiveUser(deps, email);
+      await refuseIfFederationRequired(deps, email, user ?? undefined);
       if (user) {
         const out = await deps.db.tenant(user.org_id, (tx) => authOptions(tx, deps, user.org_id, user.user_id));
         if (out.hasPasskeys) return c.json({ challenge_id: out.challenge_id, options: out.options }, 200);
@@ -311,6 +313,7 @@ export function registerPasskeyRoutes(app: App) {
       const meta = c.get("meta");
       const invalid = new ApiError(401, "passkey_invalid", "That passkey couldn't be verified. Try again or use your password.");
       const user = await findActiveUser(deps, input.email);
+      await refuseIfFederationRequired(deps, input.email, user ?? undefined);
       if (!user) throw invalid;
       const out = await deps.db.tenant(user.org_id, async (tx) => {
         const actor = { type: "user" as const, id: user.user_id, display: input.email.toLowerCase() };

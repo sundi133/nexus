@@ -45,6 +45,13 @@ Every organization's data is separated in two independent layers.
   - Rate-limited to 600 requests per minute. Every use is audited as the key itself.
 - **Devices:** the agent enrolls with a single-use token and then signs every check-in with a device-bound ES256 key. The key's folder is readable only by root, or on Windows by SYSTEM and Administrators (not inherited from `ProgramData`). The Windows installer keeps the enrollment token out of its logs, and the agent deletes it after use. Agent updates are signed releases, verified before install.
 - **Password reset:** single-use, short-lived links, stored hashed. The request always returns the same response, so it can't be used to discover which accounts exist. A reset signs out every session.
+- **Sign-in through the organization's IdP (OIDC or SAML):**
+  - Only for email domains the organization has verified by DNS. An IdP can only vouch for people in its own domains, so a compromised or misconfigured IdP can't sign in anyone else.
+  - OIDC uses the authorization code flow with PKCE, state and nonce. ID tokens are checked against the IdP's published keys, issuer (from discovery, which must match exactly), audience and expiry. Emails the IdP marks unverified are refused.
+  - SAML is SP-initiated only, so every response must answer a request we sent (InResponseTo), which also makes it single-use. Signatures are checked with the certificate on file (never one in the message; SHA-1 refused), and everything is read from the signed bytes, which defeats signature wrapping. Issuer, audience, recipient and time window are checked. Encrypted assertions are refused with an explanation.
+  - Each sign-in is tied to the browser that started it by a short-lived cookie, which prevents login CSRF, and the state can be used only once.
+  - The IdP's MFA counts only when the IdP reports it (`amr` or AuthnContext), unless an admin chooses otherwise.
+  - Making an IdP *required* disables Nexus passwords, passkey sign-in and password resets for its domains. It needs a successful test sign-in since the last connection change. Break-glass accounts are exempt.
 - **Break-glass accounts:** designated owners, exempt from directory sync and conditional access, so an SSO or directory outage can't lock everyone out. Every use alerts all admins with a critical alert and is audited.
 
 ## Secrets at rest

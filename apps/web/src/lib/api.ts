@@ -18,7 +18,10 @@ export const api = createClient({
 export { ApiProblem, unwrap };
 
 /** POST to a BFF auth endpoint (these set/clear the session cookie). */
-export async function bffAuth<T>(path: "login" | "signup" | "logout" | "accept-invite" | "passkey", body?: unknown): Promise<T> {
+export async function bffAuth<T>(
+  path: "login" | "signup" | "logout" | "accept-invite" | "passkey" | "federation/discover" | "federation/start" | "federation/test",
+  body?: unknown,
+): Promise<T> {
   const res = await fetch(`/bff/auth/${path}`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-nexus-csrf": "1" },

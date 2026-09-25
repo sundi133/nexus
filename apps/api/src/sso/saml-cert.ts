@@ -1,3 +1,4 @@
+import "reflect-metadata"; // @peculiar/x509 needs it; don't rely on another package having loaded it first
 import * as x509 from "@peculiar/x509";
 import { createHash, randomBytes, webcrypto } from "node:crypto";
 import type { Deps } from "../context.js";

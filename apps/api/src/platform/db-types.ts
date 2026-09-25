@@ -67,7 +67,7 @@ export interface Database {
     ip: string;
     user_agent: string;
     mfa_at: NullableTimestamp;
-    mfa_method: "totp" | "push" | "webauthn" | "recovery_code" | null;
+    mfa_method: "totp" | "push" | "webauthn" | "recovery_code" | "idp" | null;
     created_at: Generated<Date>;
     last_seen_at: Timestamp;
     expires_at: Timestamp;
@@ -251,6 +251,55 @@ export interface Database {
     conditions: Json;
     created_at: Generated<Date>;
     updated_at: Timestamp;
+  };
+  identity_providers: {
+    id: string;
+    org_id: string;
+    name: string;
+    protocol: "oidc" | "saml";
+    issuer: string | null;
+    client_id: string | null;
+    client_secret: Buffer | null;
+    scopes: Generated<string>;
+    idp_entity_id: string | null;
+    idp_sso_url: string | null;
+    idp_certs: Generated<string[]>;
+    email_attribute: Generated<string>;
+    domains: Generated<string[]>;
+    jit_provisioning: Generated<boolean>;
+    mfa: Generated<"when_signalled" | "always" | "never">;
+    required: Generated<boolean>;
+    enabled: Generated<boolean>;
+    last_test_ok_at: NullableTimestamp;
+    last_login_at: NullableTimestamp;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  federated_identities: {
+    id: string;
+    org_id: string;
+    idp_id: string;
+    subject: string;
+    user_id: string;
+    created_at: Generated<Date>;
+    last_login_at: NullableTimestamp;
+  };
+  federation_requests: {
+    id: string;
+    org_id: string;
+    idp_id: string;
+    purpose: "login" | "test";
+    nonce: Generated<string>;
+    code_verifier: Generated<string>;
+    saml_request_id: Generated<string>;
+    return_to: Generated<string>;
+    client: Generated<string>;
+    requested_by: string | null;
+    result: Json | null;
+    created_at: Generated<Date>;
+    expires_at: Timestamp;
+    used_at: NullableTimestamp;
   };
   org_domains: {
     id: string;

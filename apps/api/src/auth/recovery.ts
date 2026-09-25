@@ -16,6 +16,7 @@ import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "./passwords.j
 import { RateLimiter } from "./ratelimit.js";
 import { getSettings } from "../org/settings.js";
 import { verifiedFactorTypes } from "./routes.js";
+import { federationRequiredFor } from "../federation/enforce.js";
 import { hashToken } from "./tokens.js";
 
 /**
@@ -216,6 +217,7 @@ export function registerRecoveryRoutes(app: App) {
       if (!resetLimiter.take(email) || !resetIpLimiter.take(meta.ip)) return c.body(null, 202);
       const found = await deps.db.unscoped(async (tx) => (await sql<{ user_id: string; org_id: string; status: string }>`SELECT * FROM nexus_auth_find_user(${email})`.execute(tx)).rows[0]);
       if (!found || found.status !== "active") return c.body(null, 202);
+      if (await federationRequiredFor(deps, email, found)) return c.body(null, 202); // they sign in with their IdP; there's no Nexus password to reset
       const token = `nxr_${randomBytes(32).toString("base64url")}`;
       await deps.db.tenant(found.org_id, async (tx) => {
         await tx.updateTable("password_resets").set({ used_at: new Date() }).where("user_id", "=", found.user_id).where("used_at", "is", null).execute();

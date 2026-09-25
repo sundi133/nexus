@@ -12,7 +12,7 @@ import { badRequest, conflict, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, json, problemResponses } from "../schemas.js";
 import { activeSamlCert, type SamlCert } from "./saml-cert.js";
-import { AttributeMapping, DEFAULT_ATTRIBUTES, idpUrls, parseSpMetadata, type SamlConfig } from "./saml.js";
+import { AttributeMapping, DEFAULT_ATTRIBUTES, idpUrls, parseSpMetadata, type SamlConfig } from "./saml-config.js";
 
 export const hashSecret = (s: string) => createHash("sha256").update(s).digest();
 const newClientId = () => `nx_${randomBytes(12).toString("base64url")}`;
