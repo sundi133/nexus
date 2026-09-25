@@ -187,12 +187,18 @@ export async function completeFederation(deps: Deps, meta: RequestMeta, input: C
         .execute();
       await audit(tx, orgId, { meta, display: idp.name }, { type: "user.created", actor: { type: "system", id: null, display: idp.name }, target: { type: "user", id, display: claims.email }, details: { via: "federation", idp: idp.name } });
       await touchUsers(tx, orgId, [id]);
-      found = { user: { id, email: claims.email, status: "active", given_name: claims.givenName, family_name: claims.familyName }, linked: false };
+      found = { user: { id, email: claims.email, status: "active", given_name: claims.givenName, family_name: claims.familyName, break_glass: false }, linked: false };
     }
     const u = found.user;
     if (u.status === "suspended" || u.status === "deprovisioned") throw await refuse("account_inactive", "This account is not active. Contact your administrator.", u.id);
+    // Emergency accounts never depend on an IdP: they sign in with their sealed password.
+    if (u.break_glass) throw await refuse("break_glass", "Break-glass accounts sign in with their emergency password, not through the identity provider.", u.id);
     if (!found.linked) {
-      await tx.insertInto("federated_identities").values({ id: newId(), org_id: orgId, idp_id: idp.id, subject: claims.subject, user_id: u.id }).onConflict((oc) => oc.columns(["idp_id", "user_id"]).doUpdateSet({ subject: claims.subject })).execute();
+      // Already linked to a different identity at this IdP: another IdP account is presenting the same
+      // email (e.g. an editable email attribute). Never move the link; an admin can unlink deliberately.
+      const existing = await tx.selectFrom("federated_identities").select("subject").where("idp_id", "=", idp.id).where("user_id", "=", u.id).executeTakeFirst();
+      if (existing && existing.subject !== claims.subject) throw await refuse("identity_mismatch", `${claims.email} is already linked to a different account at ${idp.name}. Ask your administrator.`, u.id);
+      await tx.insertInto("federated_identities").values({ id: newId(), org_id: orgId, idp_id: idp.id, subject: claims.subject, user_id: u.id }).onConflict((oc) => oc.doNothing()).execute();
     }
     const fill: Record<string, unknown> = {};
     if (u.status === "staged") fill.status = "active"; // an invitation, answered by signing in with the IdP
@@ -231,11 +237,11 @@ export async function completeFederation(deps: Deps, meta: RequestMeta, input: C
   });
 }
 
-type Account = { user: { id: string; email: string; status: string; given_name: string; family_name: string }; linked: boolean };
+type Account = { user: { id: string; email: string; status: string; given_name: string; family_name: string; break_glass: boolean }; linked: boolean };
 
 /** The account this IdP identity belongs to: by the IdP's stable subject first, then by email. */
 async function findAccount(tx: Tx, idpId: string, claims: FederatedClaims): Promise<Account | null> {
-  const cols = ["users.id", "users.email", "users.status", "users.given_name", "users.family_name"] as const;
+  const cols = ["users.id", "users.email", "users.status", "users.given_name", "users.family_name", "users.break_glass"] as const;
   const linked = await tx
     .selectFrom("federated_identities")
     .innerJoin("users", "users.id", "federated_identities.user_id")

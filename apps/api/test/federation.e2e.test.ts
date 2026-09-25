@@ -254,6 +254,32 @@ describe("signing in with OIDC", () => {
     const refused = await (await oidcLogin(grace, { sub: "okta|grace-subject" })).complete();
     expect(refused.body).toMatchObject({ status: 401, code: "account_inactive" });
   });
+
+  it("never moves a link to a different IdP identity presenting the same email", async () => {
+    const ivy = `ivy@${OIDC_DOMAIN}`;
+    await h.call("POST", "/v1/users", { token: admin, body: { email: ivy, given_name: "Ivy", password: PASSWORD } });
+    expect((await (await oidcLogin(ivy, { sub: "okta|ivy-real" })).complete()).status).toBe(200);
+    const hijack = await (await oidcLogin(ivy, { sub: "okta|someone-else" })).complete();
+    expect(hijack.body.code).toBe("identity_mismatch");
+    expect((await (await oidcLogin(ivy, { sub: "okta|ivy-real" })).complete()).status).toBe(200); // the real one still works
+  });
+
+  it("keeps break-glass accounts off the IdP", async () => {
+    const bg = `emergency@${OIDC_DOMAIN}`;
+    const id = (await h.call("POST", "/v1/users", { token: admin, body: { email: bg, given_name: "Break", password: PASSWORD } })).body.id;
+    await owner.query("UPDATE users SET break_glass = true WHERE id = $1", [id]);
+    expect((await (await oidcLogin(bg)).complete()).body.code).toBe("break_glass");
+  });
+
+  it("lets only owners, signed in, change which IdP vouches for people", async () => {
+    const email = `adm@${OIDC_DOMAIN}`;
+    await h.call("POST", "/v1/users", { token: admin, body: { email, given_name: "Adm", password: PASSWORD, roles: ["admin"] } });
+    const t = (await h.call("POST", "/v1/auth/login", { body: { email, password: PASSWORD } })).body.token;
+    const idp = (await idps()).data[0];
+    expect((await h.call("PATCH", `/v1/identity-providers/${idp.id}`, { token: t, body: { mfa: "always" } })).status).toBe(403);
+    expect((await h.call("DELETE", `/v1/identity-providers/${idp.id}`, { token: t })).status).toBe(403);
+    expect((await h.call("GET", "/v1/identity-providers", { token: t })).status).toBe(200); // seeing them is fine
+  });
 });
 
 describe("signing in with SAML", () => {

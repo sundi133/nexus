@@ -270,3 +270,19 @@ describe("safety", () => {
     expect(h.deps.mailer.sent.length).toBe(mails); // they'll sign in with Okta
   });
 });
+
+describe("protecting owners and admins", () => {
+  it("won't change an admin's email, or suspend or delete the last owner", async () => {
+    const rootId = (await h.call("GET", "/v1/me", { token: admin })).body.user.id;
+    const before = await user(rootId);
+    const emailChange = await scim("PATCH", `/Users/${rootId}`, { schemas: [PATCH], Operations: [{ op: "replace", value: { userName: at("attacker"), emails: [{ value: at("attacker"), primary: true, type: "work" }] } }] });
+    expect(emailChange.status).toBeLessThan(300); // accepted, but the email stays
+    expect((await user(rootId)).email).toBe(before.email);
+    await scim("PATCH", `/Users/${rootId}`, { schemas: [PATCH], Operations: [{ op: "replace", path: "active", value: false }] });
+    expect((await user(rootId)).status).toBe("active");
+    expect((await scim("DELETE", `/Users/${rootId}`)).status).toBe(409);
+    expect((await user(rootId)).status).toBe("active");
+    const refused = (await h.call("GET", "/v1/audit/events?type=directory.change_refused", { token: admin })).body.data.map((e: any) => e.details.reason);
+    expect(refused).toEqual(expect.arrayContaining(["email of an admin", "last owner"]));
+  });
+});

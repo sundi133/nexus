@@ -13,6 +13,7 @@ import { emailAdmission } from "../../org/domains.js";
 import { plan, PROVIDER_NAME, summarize, type Local, type Plan, type Remote } from "./plan.js";
 import { fetchDirectory, ProviderError } from "./providers.js";
 import { fetchLdap } from "./ldap.js";
+import { isLastOwner, isPrivileged } from "../privileged.js";
 
 export const secretAad = (connectionId: string) => `directory_connection:${connectionId}`;
 
@@ -105,6 +106,10 @@ export async function applyPlan(tx: Tx, conn: Conn, p: Plan, meta: RequestMeta) 
   for (const u of p.update_users) {
     const set: Record<string, string> = {};
     for (const [f, ch] of Object.entries(u.changes)) set[f] = ch.to;
+    if (set.email && (await isPrivileged(tx, u.local_id))) {
+      skipped.push({ email: u.email, reason: `Not changing an admin's email to ${set.email}: only an owner changes it, in Nexus` });
+      delete set.email;
+    }
     if (set.email && (await emailTaken(set.email))) {
       skipped.push({ email: u.email, reason: `Can't change email to ${set.email}: it's already in use` });
       delete set.email;
@@ -118,6 +123,10 @@ export async function applyPlan(tx: Tx, conn: Conn, p: Plan, meta: RequestMeta) 
   }
 
   for (const s of p.suspend_users) {
+    if (await isLastOwner(tx, s.local_id)) {
+      skipped.push({ email: s.email, reason: "Not suspending the organization's last owner" });
+      continue;
+    }
     await tx.updateTable("users").set({ status: "suspended", updated_at: new Date() }).where("id", "=", s.local_id).execute();
     const sessions = await revokeUserSessions(tx, s.local_id);
     await tx.updateTable("directory_links").set({ suspended_by_sync: true }).where("connection_id", "=", conn.id).where("kind", "=", "user").where("local_id", "=", s.local_id).execute();

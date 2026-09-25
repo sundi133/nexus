@@ -138,3 +138,23 @@ describe("governance", () => {
     expect((await owner.query("SELECT count(*)::int AS n FROM role_grants WHERE user_id = $1", [P.emma!.id])).rows[0].n).toBe(0);
   });
 });
+
+describe("admins are for owners to manage", () => {
+  it("stops help desk from resetting an admin's MFA or reactivating them, and scoped staff from seeing them", async () => {
+    const e = uniqueEmail("hd");
+    await h.call("POST", "/v1/users", { token: as("root"), body: { email: e, given_name: "Hd", password: PASSWORD, roles: ["helpdesk"] } });
+    const hd = (await h.call("POST", "/v1/auth/login", { body: { email: e, password: PASSWORD } })).body.token;
+    const adminId = P.admin!.id;
+    expect((await h.call("POST", `/v1/users/${adminId}/reset-mfa`, { token: hd, body: {} })).body.title).toBe("Only an owner can reset an admin's MFA");
+    await h.call("POST", `/v1/users/${adminId}/suspend`, { token: as("root"), body: {} });
+    expect((await h.call("POST", `/v1/users/${adminId}/activate`, { token: hd, body: {} })).status).toBe(403);
+    expect((await h.call("POST", `/v1/users/${adminId}/activate`, { token: as("root"), body: {} })).status).toBe(200);
+    // A scoped help desk whose group includes an admin still can't touch them.
+    await h.call("POST", `/v1/groups/${emea}/members`, { token: as("root"), body: { user_ids: [adminId] } });
+    await person("scoped");
+    await grant("scoped", [{ role: "helpdesk", scope_group_ids: [emea] }]);
+    await login("scoped");
+    expect((await h.call("GET", `/v1/users/${adminId}`, { token: as("scoped") })).status).toBe(404);
+    expect((await h.call("GET", "/v1/users", { token: as("scoped") })).body.data.map((u: any) => u.id)).not.toContain(adminId);
+  });
+});

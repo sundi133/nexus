@@ -12,6 +12,7 @@ import { isUniqueViolation } from "../../platform/db.js";
 import { ApiError } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { touchGroups, touchUsers } from "../../provisioning/service.js";
+import { isLastOwner, isPrivileged } from "../privileged.js";
 import { issueInvitation, sendInvite, type PendingInvite } from "../invitations.js";
 import { offboard } from "../offboarding.js";
 import { revokeUserSessions } from "../users.js";
@@ -170,6 +171,12 @@ async function applyUser(tx: Tx, deps: Deps, meta: RequestMeta, conn: Conn, befo
   await link(tx, conn, "user", id, f.external_id);
   const changes: Record<string, { from: string; to: string }> = {};
   for (const k of ["email", "given_name", "family_name", "title", "department"] as const) if (f[k] !== before[k]) changes[k] = { from: before[k], to: f[k] };
+  const privileged = await isPrivileged(tx, id);
+  if (changes.email && privileged) {
+    // An admin's email is their sign-in and recovery channel: only an owner changes it, in Nexus.
+    await audit(tx, conn.org_id, who, { type: "directory.change_refused", actor, target: { type: "user", id, display: before.email }, outcome: "denied", details: { ...detailsBase, reason: "email of an admin", wanted: changes.email.to } });
+    delete changes.email;
+  }
   if (changes.email) {
     const problem = await emailProblem(f.email);
     if (problem) throw problem;
@@ -189,7 +196,9 @@ async function applyUser(tx: Tx, deps: Deps, meta: RequestMeta, conn: Conn, befo
   }
 
   const wasActive = before.status === "active" || before.status === "staged";
-  if (wasActive && !f.active && conn.deprovision === "suspend") {
+  if (wasActive && !f.active && conn.deprovision === "suspend" && (await isLastOwner(tx, id))) {
+    await audit(tx, conn.org_id, who, { type: "directory.change_refused", actor, target: { type: "user", id, display: before.email }, outcome: "denied", details: { ...detailsBase, reason: "last owner" } });
+  } else if (wasActive && !f.active && conn.deprovision === "suspend") {
     await checkDeactivationGuard(tx, conn);
     await tx.updateTable("users").set({ status: "suspended", updated_at: new Date() }).where("id", "=", id).execute();
     const sessions = await revokeUserSessions(tx, id);
@@ -416,6 +425,7 @@ export function registerScimServer(app: App) {
         await tx.deleteFrom("directory_links").where("connection_id", "=", conn.id).where("kind", "=", "user").where("local_id", "=", u.id).execute();
         return;
       }
+      if (await isLastOwner(tx, u.id)) throw new ScimError(409, "This is the organization's last owner: add another owner in Nexus first");
       await checkDeactivationGuard(tx, conn);
       await offboard(tx, conn.org_id, u.id, { meta: c.get("meta"), actor: actorOf(conn).display, details: { connection_id: conn.id, via: "scim" } }, `Deleted in ${conn.name}`);
       await tx.deleteFrom("directory_links").where("connection_id", "=", conn.id).where("kind", "=", "user").where("local_id", "=", u.id).execute();

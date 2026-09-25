@@ -48,7 +48,7 @@ function Providers() {
         title="Single sign-on"
         description="Let people sign in to Nexus with the identity provider you already use: Okta, Microsoft Entra ID, Google Workspace, or any OIDC or SAML IdP."
         actions={
-          can("org:manage") ? (
+          can("admins:manage") ? (
             <Button variant="primary" onClick={() => setAdding(true)}>
               <Plus /> Connect an identity provider
             </Button>
@@ -122,7 +122,7 @@ function ProviderCard({ idp: d, sp }: { idp: Idp; sp: Sp }) {
             {d.last_test_ok_at ? `tested ${timeAgo(d.last_test_ok_at)}` : <span className="text-warning">not tested yet</span>}
           </p>
         </div>
-        {can("org:manage") ? (
+        {can("admins:manage") ? (
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="secondary" loading={test.isPending} onClick={() => test.mutate()}>
               <LogIn /> Test sign-in

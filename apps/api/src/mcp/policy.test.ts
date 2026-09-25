@@ -75,3 +75,28 @@ describe("authorize", () => {
     expect(conditionHolds({ argument: "env", op: "not_in", values: ["prod"] }, {})).toBe(true);
   });
 });
+
+describe("unusable argument values fail closed", () => {
+  const tool: Tool = { name: "query", status: "approved", risk: "read", hash: "h", approved_hash: "h" };
+  const who = { agentId: "a1", tags: [] };
+  const allowNotProd: Rule = { id: "allow", effect: "allow", subject_type: "all_agents", subject_id: null, subject_tag: null, tools: ["*"], risks: null, conditions: [{ argument: "database", op: "not_in", values: ["prod"] }] };
+  const denyProd: Rule = { id: "deny", effect: "deny", subject_type: "all_agents", subject_id: null, subject_tag: null, tools: ["*"], risks: null, conditions: [{ argument: "repo", op: "in", values: ["prod"] }] };
+  const allowAll: Rule = { ...allowNotProd, id: "all", conditions: [] };
+
+  it("an allow rule doesn't pass objects, null or nested values", () => {
+    expect(authorize(tool, [allowNotProd], who, { database: "staging" }).allow).toBe(true);
+    for (const database of [{ name: "prod" }, null, [["prod"]], ["dev", null]]) expect(authorize(tool, [allowNotProd], who, { database }).allow).toBe(false);
+  });
+
+  it("a deny rule matches them", () => {
+    expect(authorize(tool, [allowAll, denyProd], who, { repo: ["prod", null] }).allow).toBe(false);
+    expect(authorize(tool, [allowAll, denyProd], who, { repo: { name: "prod" } }).allow).toBe(false);
+    expect(authorize(tool, [allowAll, denyProd], who, { repo: "web" }).allow).toBe(true);
+  });
+
+  it("prefix rules can't be walked out of", () => {
+    const docsOnly: Rule = { ...allowNotProd, id: "docs", conditions: [{ argument: "path", op: "prefix", values: ["docs/"] }] };
+    expect(authorize(tool, [docsOnly], who, { path: "docs/guide.md" }).allow).toBe(true);
+    for (const path of ["docs/../secrets.env", "docs/%2e%2e/secrets", "docs\\..\\secrets", "docs//etc"]) expect(authorize(tool, [docsOnly], who, { path }).allow).toBe(false);
+  });
+});

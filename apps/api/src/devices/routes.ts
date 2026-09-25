@@ -1,4 +1,5 @@
 import { mdmForDevice } from "./mdm.js";
+import { notPrivileged } from "../directory/privileged.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { randomBytes } from "node:crypto";
 import { sql } from "kysely";
@@ -226,7 +227,7 @@ export function registerDeviceRoutes(app: App) {
       const scope = scopeGroups(p, "devices:read");
       const rows = await c.get("deps").db.tenant(p.orgId, (tx) => {
         let query = deviceQuery(tx).orderBy("devices.id", "desc").limit(q.limit + 1);
-        if (scope) query = query.where((eb) => eb.exists(eb.selectFrom("group_members").whereRef("group_members.user_id", "=", "devices.primary_user_id").where("group_members.group_id", "in", scope)));
+        if (scope) query = query.where((eb) => eb.exists(eb.selectFrom("group_members").whereRef("group_members.user_id", "=", "devices.primary_user_id").where("group_members.group_id", "in", scope))).where(notPrivileged("devices.primary_user_id"));
         if (after) query = query.where("devices.id", "<", after);
         if (q.platform) query = query.where("devices.platform", "=", q.platform);
         if (q.compliance) query = query.where("devices.compliance", "=", q.compliance);

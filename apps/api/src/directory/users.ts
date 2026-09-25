@@ -1,5 +1,6 @@
 import { touchUsers } from "../provisioning/service.js";
 import { scheduleDynamicEvaluation } from "./dynamic-groups-schedule.js";
+import { isPrivileged, notPrivileged } from "./privileged.js";
 import { suspendOwnedAgents } from "../ai-agents/lifecycle.js";
 import { assertEmailAllowed } from "../org/domains.js";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -139,7 +140,7 @@ export function registerUserRoutes(app: App) {
       const rows = await c.get("deps").db.tenant(p.orgId, (tx) => {
         let query = userQuery(tx).orderBy("users.id", "desc").limit(q.limit + 1);
         const scope = scopeGroups(p, "users:read");
-        if (scope) query = query.where((eb) => eb.exists(eb.selectFrom("group_members").whereRef("group_members.user_id", "=", "users.id").where("group_members.group_id", "in", scope)));
+        if (scope) query = query.where((eb) => eb.exists(eb.selectFrom("group_members").whereRef("group_members.user_id", "=", "users.id").where("group_members.group_id", "in", scope))).where(notPrivileged("users.id"));
         if (after) query = query.where("users.id", "<", after);
         if (q.status) query = query.where("users.status", "=", q.status);
         else query = query.where("users.status", "<>", "deprovisioned");
@@ -349,6 +350,12 @@ export function registerUserRoutes(app: App) {
       },
     );
 
+  /** Help desk and security staff don't act on admins' credentials or status: owners do. */
+  const assertOwnerForAdmins = async (tx: Tx, who: Who, userId: string, what: string) => {
+    if (principalCan(who.principal, "admins:manage")) return;
+    if (await isPrivileged(tx, userId)) throw forbidden(`Only an owner can ${what}`);
+  };
+
   const assertNotSelfOrLastOwner = async (tx: Tx, who: Who, user: { id: string; roles: string[] | null }) => {
     if (user.id === who.principal.userId) throw badRequest("cannot_target_self", "You can't do this to your own account");
     if (user.roles?.includes("owner") && !principalCan(who.principal, "admins:manage")) {
@@ -366,9 +373,11 @@ export function registerUserRoutes(app: App) {
     return { sessions_revoked: await revokeUserSessions(tx, user.id) };
   });
 
-  action("activate", "Reactivate a suspended or staged user", async (tx, _who, user) => {
+  action("activate", "Reactivate a suspended or staged user", async (tx, who, user) => {
     if (user.status === "active") throw conflict("already_active", "User is already active");
     if (user.status === "deprovisioned") throw conflict("deprovisioned", "Deprovisioned users can't be reactivated");
+    // An admin suspended or contained after a compromise comes back only with an owner's say-so.
+    await assertOwnerForAdmins(tx, who, user.id, "reactivate an admin");
     await tx.updateTable("users").set({ status: "active", updated_at: new Date() }).where("id", "=", user.id).execute();
     return {};
   });
@@ -379,6 +388,7 @@ export function registerUserRoutes(app: App) {
 
   action("reset-mfa", "Remove all of a user's MFA factors so they can re-enroll", async (tx, who, user) => {
     if (user.id === who.principal.userId) throw badRequest("cannot_target_self", "Manage your own factors in Settings → Security");
+    await assertOwnerForAdmins(tx, who, user.id, "reset an admin's MFA");
     const del = await tx.deleteFrom("auth_factors").where("user_id", "=", user.id).executeTakeFirst();
     return { factors_removed: Number(del.numDeletedRows), sessions_revoked: await revokeUserSessions(tx, user.id) };
   });

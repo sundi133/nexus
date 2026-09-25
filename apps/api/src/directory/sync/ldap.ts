@@ -5,6 +5,7 @@ import { DirectoryError, type LdapConfig, readDirectory, verifyPassword } from "
 import type { Deps } from "../../context.js";
 import { _isPrivate } from "../../platform/outbound.js";
 import { ProviderError } from "./providers.js";
+import { isPrivileged } from "../privileged.js";
 import type { Remote } from "./plan.js";
 
 /**
@@ -80,6 +81,8 @@ export async function directoryPasswordCheck(deps: Deps, orgId: string, userId: 
       .executeTakeFirst(),
   );
   if (!conn?.secret) return null;
+  // Admins keep their Nexus password: whoever configures a directory mustn't decide an owner's password.
+  if (await deps.db.tenant(orgId, (tx) => isPrivileged(tx, userId))) return null;
   const cfg = LdapConfigSchema.safeParse(conn.config);
   if (!cfg.success || !cfg.data.password_auth) return null;
   const servicePassword = deps.sealer.open(conn.secret, secretAad(conn.id)).toString();

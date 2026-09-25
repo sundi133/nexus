@@ -4,6 +4,7 @@ import type { Env, Principal } from "../context.js";
 import { ApiError, forbidden, unauthorized } from "../platform/errors.js";
 import { can, type Permission, resolveGrants, type Role, rolePermissions } from "../rbac.js";
 import type { Tx } from "../platform/db.js";
+import { isPrivileged } from "../directory/privileged.js";
 import { hashToken } from "./tokens.js";
 import { RateLimiter } from "./ratelimit.js";
 
@@ -154,6 +155,8 @@ export function scopeGroups(p: Principal, perm: Permission): string[] | null {
 export async function isUserInScope(tx: Tx, p: Principal, perm: Permission, userId: string) {
   const groups = scopeGroups(p, perm);
   if (!groups) return scopeOf(p, perm) === "all";
+  // A scoped admin never acts on someone with admin access, even one in their groups.
+  if (await isPrivileged(tx, userId)) return false;
   return !!(await tx.selectFrom("group_members").select("user_id").where("user_id", "=", userId).where("group_id", "in", groups).executeTakeFirst());
 }
 

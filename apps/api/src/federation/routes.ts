@@ -6,6 +6,7 @@ import type { App, Env, Principal } from "../context.js";
 import { audit } from "../audit/record.js";
 import { AuthResult, verifiedFactorTypes } from "../auth/routes.js";
 import { requirePermission, requireRecentMfa } from "../auth/guard.js";
+import { forbidden } from "../platform/errors.js";
 import { RateLimiter } from "../auth/ratelimit.js";
 import { isUniqueViolation, type Tx } from "../platform/db.js";
 import { ApiError, badRequest, conflict, notFound } from "../platform/errors.js";
@@ -129,6 +130,16 @@ const fedError = (err: unknown, status: 400 | 401 = 400) => {
   if (err instanceof UnsafeUrlError) return badRequest("unsafe_url", err.message);
   return err;
 };
+
+/**
+ * Which IdP vouches for people (including owners) is owner-level trust: an admin or an API key
+ * that could swap the IdP's certificate or issuer could sign in as anyone. Owners only, in person.
+ */
+function requireIdpAdmin(c: Parameters<typeof requirePermission>[0]) {
+  const p = requirePermission(c, "admins:manage");
+  if (p.apiKey) throw forbidden("Identity provider trust can only be changed by an owner, signed in");
+  return p;
+}
 
 export function registerFederationRoutes(app: App) {
   // ---- Signing in (public) ---------------------------------------------------------
@@ -295,7 +306,7 @@ export function registerFederationRoutes(app: App) {
       responses: { 201: json(ListResponse, "Created"), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "org:manage");
+      const p = requireIdpAdmin(c);
       const input = c.req.valid("json");
       const deps = c.get("deps");
       const id = newId();
@@ -373,7 +384,7 @@ export function registerFederationRoutes(app: App) {
       responses: { 200: json(ListResponse), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "org:manage");
+      const p = requireIdpAdmin(c);
       const { id } = c.req.valid("param");
       const input = c.req.valid("json");
       const deps = c.get("deps");
@@ -434,7 +445,7 @@ export function registerFederationRoutes(app: App) {
       responses: { 200: json(ListResponse), ...problemResponses },
     }),
     async (c) => {
-      const p = requirePermission(c, "org:manage");
+      const p = requireIdpAdmin(c);
       const { id } = c.req.valid("param");
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         await stepUp(c, tx, p);

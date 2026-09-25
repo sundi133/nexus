@@ -58,23 +58,36 @@ export type Caller = { agentId: string; tags: string[] };
 export type Tool = { name: string; status: string; risk: Risk; hash: string; approved_hash: string | null };
 export type Decision = { allow: boolean; reason: string; rule_id: string | null };
 
-/** The value at a dotted path in the arguments, as a string (or undefined). */
-function argAt(args: Record<string, unknown>, path: string): string[] | undefined {
+type ArgValue = { kind: "missing" } | { kind: "invalid" } | { kind: "ok"; values: string[] };
+
+/** The scalar values at a dotted path in the arguments. Anything else is "invalid", never "missing". */
+function argAt(args: Record<string, unknown>, path: string): ArgValue {
   let v: unknown = args;
   for (const k of path.split(".")) {
-    if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+    if (v === null || typeof v !== "object" || Array.isArray(v)) return v === undefined ? { kind: "missing" } : { kind: "invalid" };
+    if (!Object.prototype.hasOwnProperty.call(v, k)) return { kind: "missing" };
     v = (v as Record<string, unknown>)[k];
   }
-  if (v === undefined || v === null) return undefined;
-  // Arrays: every element must satisfy the condition.
+  if (v === undefined) return { kind: "missing" };
+  // Arrays: every element must satisfy the condition, and every element must be a plain value.
   const list = Array.isArray(v) ? v : [v];
-  if (list.some((x) => typeof x === "object")) return undefined;
-  return list.map((x) => String(x));
+  if (!list.length) return { kind: "missing" };
+  if (list.some((x) => x === null || (typeof x !== "string" && typeof x !== "number" && typeof x !== "boolean"))) return { kind: "invalid" };
+  return { kind: "ok", values: list.map((x) => String(x)) };
 }
 
-export function conditionHolds(c: Condition, args: Record<string, unknown>): boolean {
-  const vals = argAt(args, c.argument);
-  if (!vals || !vals.length) return c.op === "not_in"; // missing: only "not one of" holds
+/** Paths that could walk out of an allowed prefix ("docs/../secrets", encoded dots, backslashes). */
+const suspiciousPath = (v: string) => /(^|[\\/])\.\.?([\\/]|$)|\\|%2e|%2f|%5c|\/\//i.test(v);
+
+/**
+ * Whether a rule's condition holds. Unusable values (objects, null, nested arrays, path tricks
+ * for prefix rules) fail closed: an allow rule's condition fails, a deny rule's matches.
+ */
+export function conditionHolds(c: Condition, args: Record<string, unknown>, rule: "allow" | "deny" = "allow"): boolean {
+  const a = argAt(args, c.argument);
+  if (a.kind === "invalid") return rule === "deny";
+  if (a.kind === "missing") return c.op === "not_in"; // missing: only "not one of" holds
+  const vals = a.values;
   switch (c.op) {
     case "equals":
       return vals.every((v) => v === c.values[0]);
@@ -83,6 +96,7 @@ export function conditionHolds(c: Condition, args: Record<string, unknown>): boo
     case "not_in":
       return vals.every((v) => !c.values.includes(v));
     case "prefix":
+      if (vals.some(suspiciousPath)) return rule === "deny";
       return vals.every((v) => c.values.some((p) => v.startsWith(p)));
   }
 }
@@ -103,7 +117,7 @@ export function authorize(tool: Tool | undefined, rules: Rule[], who: Caller, ar
   if (!isUsable(tool)) return { allow: false, reason: tool.approved_hash ? "This tool changed since it was approved and needs re-approval" : "This tool hasn't been approved yet", rule_id: null };
   const applicable = rules.filter((r) => subjectMatches(r, who) && toolMatches(r, tool));
   for (const r of applicable.filter((x) => x.effect === "deny")) {
-    if (args === null ? !r.conditions.length : r.conditions.every((c) => conditionHolds(c, args))) return { allow: false, reason: "Denied by a rule", rule_id: r.id };
+    if (args === null ? !r.conditions.length : r.conditions.every((c) => conditionHolds(c, args, "deny"))) return { allow: false, reason: "Denied by a rule", rule_id: r.id };
   }
   const allows = applicable.filter((x) => x.effect === "allow");
   if (!allows.length) return { allow: false, reason: "No rule allows this agent to use this tool", rule_id: null };

@@ -88,6 +88,13 @@ describe.skipIf(!HOST)("Active Directory / LDAP", () => {
     expect((await login("dave@acme.test", "dave-password")).status).toBe(401); // disabled in the directory: never got an account
   });
 
+  it("doesn't let the directory decide an admin's password", async () => {
+    const carol = await user("carol@acme.test");
+    expect((await login("carol@acme.test", "carol-password")).status).toBe(200);
+    await h.call("PUT", `/v1/users/${carol.id}/roles`, { token: admin, body: { roles: ["admin"] } });
+    expect((await login("carol@acme.test", "carol-password")).status).toBe(401); // admins use a Nexus password
+  });
+
   it("leaves password changes to the directory", async () => {
     const t = (await login("bob@acme.test", "bob-password")).body.token;
     const r = await h.call("PUT", "/v1/me/password", { token: t, body: { current_password: "bob-password", new_password: "a-brand-new-password-1" } });
