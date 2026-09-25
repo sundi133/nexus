@@ -2,6 +2,10 @@ package run
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -10,6 +14,7 @@ import (
 
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
+	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/release"
 	"github.com/votal-ai/nexus/agent/internal/update"
 )
@@ -18,6 +23,8 @@ type fake struct {
 	calls    []map[string]any
 	failWith error
 	offer    *release.Offer
+	commands []command.Signed
+	key      string
 }
 
 func (f *fake) Checkin(_ context.Context, p any) (*client.CheckinResult, error) {
@@ -25,7 +32,9 @@ func (f *fake) Checkin(_ context.Context, p any) (*client.CheckinResult, error) 
 	if f.failWith != nil {
 		return nil, f.failWith
 	}
-	return &client.CheckinResult{CheckinInterval: 60, InventoryInterval: 900, Compliance: "compliant", Update: f.offer}, nil
+	cmds := f.commands
+	f.commands = nil
+	return &client.CheckinResult{CheckinInterval: 60, InventoryInterval: 900, Compliance: "compliant", Update: f.offer, Commands: cmds, CommandKey: f.key}, nil
 }
 
 func TestInventoryOnlyWhenChanged(t *testing.T) {
@@ -101,5 +110,43 @@ func TestReportsUpdateResultsAndAppliesOffers(t *testing.T) {
 	}
 	if len(u.applied) != 1 || u.applied[0] != "0.3.0" || len(u.health) != 1 || !u.health[0] {
 		t.Fatalf("applied %v, health %v", u.applied, u.health)
+	}
+}
+
+// A command in one check-in's response is run, and its result goes back on the next check-in.
+func TestCommandResultsReportedNextCheckin(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	enc := base64.RawURLEncoding
+	hdr := enc.EncodeToString([]byte(`{"alg":"EdDSA","typ":"nexus-command+jwt"}`))
+	p, _ := json.Marshal(map[string]any{"jti": "c1", "sub": "dev-1", "act": "refresh", "exp": time.Now().Add(time.Hour).Unix()})
+	body := hdr + "." + enc.EncodeToString(p)
+	jws := body + "." + enc.EncodeToString(ed25519.Sign(priv, []byte(body)))
+
+	f := &fake{commands: []command.Signed{{ID: "c1", JWS: jws}}, key: enc.EncodeToString(pub)}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	l := &Loop{Client: f, Version: "t", Log: log, Collect: func(context.Context) collect.Snapshot { return collect.Snapshot{} },
+		Commands: &command.Runner{StateDir: t.TempDir(), DeviceID: "dev-1", Exec: command.Actions(), Log: log}}
+	ctx := context.Background()
+	if _, err := l.Once(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if !l.soon {
+		t.Fatal("should check in again right away to report")
+	}
+	if _, err := l.Once(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal(f.calls[1]["command_results"])
+	if string(got) != `[{"id":"c1","status":"done","output":"Reported"}]` {
+		t.Fatalf("second check-in reported %s", got)
+	}
+	if _, has := f.calls[1]["inventory"]; !has {
+		t.Fatal("a refresh should send full inventory")
+	}
+	if _, err := l.Once(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := f.calls[2]["command_results"]; has {
+		t.Fatal("results reported twice")
 	}
 }

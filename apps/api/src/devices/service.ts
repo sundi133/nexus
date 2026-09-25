@@ -29,6 +29,9 @@ export const EVAL_COLUMNS = ["id", "org_id", "hostname", "platform", "os_version
  * and on a compliance change records it and tells the people who should act.
  */
 export async function evaluateDevice(tx: Tx, device: DeviceForEval, policies: Policy[], who: { meta: RequestMeta }) {
+  // One evaluation of a device at a time (check-ins, policy changes and MDM syncs can overlap).
+  // NO KEY UPDATE: serializes evaluations without conflicting with the KEY SHARE locks foreign keys take (e.g. MDM links).
+  await tx.selectFrom("devices").select("id").where("id", "=", device.id).forNoKeyUpdate().execute();
   const facts = PostureFacts.safeParse(device.posture).data ?? null;
   const previous = new Map(
     (await tx.selectFrom("device_checks").select(["check_key", "status", "failing_since"]).where("device_id", "=", device.id).execute()).map((c) => [c.check_key, c]),
@@ -109,6 +112,8 @@ export async function reevaluateAll(tx: Tx, who: { meta: RequestMeta }) {
     .selectFrom("devices")
     .select([...EVAL_COLUMNS])
     .where("status", "=", "active")
+    .orderBy("id") // the same lock order everywhere, so concurrent re-evaluations queue instead of deadlocking
+    .forNoKeyUpdate()
     .execute();
   let changed = 0;
   for (const d of devices) {

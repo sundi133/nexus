@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/identity"
 	"github.com/votal-ai/nexus/agent/internal/release"
 )
@@ -118,6 +119,8 @@ type EnrollResult struct {
 	Organization    string `json:"organization"`
 	CheckinInterval int    `json:"checkin_interval_seconds"`
 	WebOrigin       string `json:"web_origin"`
+	// CommandKey is the organization's command-signing key, pinned at enrollment.
+	CommandKey string `json:"command_key"`
 }
 
 func (c *Client) Enroll(ctx context.Context, token string, info DeviceInfo) (*EnrollResult, error) {
@@ -133,6 +136,9 @@ type CheckinResult struct {
 	WebOrigin         string `json:"web_origin"`
 	// Update is set when the server's rollout says this device should update.
 	Update *release.Offer `json:"update"`
+	// Commands are signed actions for this device (lock, restart, refresh).
+	Commands   []command.Signed `json:"commands"`
+	CommandKey string           `json:"command_key"`
 }
 
 func (c *Client) Checkin(ctx context.Context, payload any) (*CheckinResult, error) {

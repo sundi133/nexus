@@ -1,3 +1,4 @@
+import { CommandResults, commandKey, pendingCommands, recordCommandResults } from "./commands.js";
 import { z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -80,6 +81,8 @@ const CheckinBody = z.object({
   update_result: z
     .object({ version: z.string().max(40), state: z.enum(["installed", "failed", "rolled_back"]), error: z.string().max(500).optional() })
     .optional(),
+  // What happened to commands from earlier check-ins (CMD-04).
+  command_results: CommandResults.optional(),
 });
 
 const bsh = (body: string) => createHash("sha256").update(body).digest("base64url");
@@ -194,7 +197,8 @@ export function registerAgentRoutes(app: App) {
         details: { platform: input.device.platform, os_version: input.device.os_version, serial: input.device.serial, token: tok.name, assigned_user_id: tok.assign_user_id },
       });
       const org = await tx.selectFrom("organizations").select("name").where("id", "=", found.org_id).executeTakeFirstOrThrow();
-      return { device_id: id, organization: org.name, checkin_interval_seconds: CHECKIN_INTERVAL_S, web_origin: deps.cfg.publicUrl };
+      const key = await commandKey(tx, deps, found.org_id);
+      return { device_id: id, organization: org.name, checkin_interval_seconds: CHECKIN_INTERVAL_S, web_origin: deps.cfg.publicUrl, command_key: key.publicKey };
     });
     return c.json(out, 201);
   });
@@ -247,8 +251,11 @@ export function registerAgentRoutes(app: App) {
         .executeTakeFirstOrThrow();
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
       if (input.update_result) await recordResult(tx, dev.org_id, d, input.update_result, meta);
+      if (input.command_results?.length) await recordCommandResults(tx, d, input.command_results, meta);
+      const commands = await pendingCommands(tx, deps, d);
+      const key = await commandKey(tx, deps, dev.org_id);
       const update = await offerFor(tx, dev.org_id, d, releaseStore(deps.cfg), meta);
-      return { checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update };
+      return { checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update, commands, command_key: key.publicKey };
     });
     return c.json(out, 200);
   });

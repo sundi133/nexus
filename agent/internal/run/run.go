@@ -12,6 +12,7 @@ import (
 
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
+	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/release"
 	"github.com/votal-ai/nexus/agent/internal/update"
 )
@@ -37,9 +38,13 @@ type Loop struct {
 	OnCheckin func(*client.CheckinResult)
 	// Updater, if set, reports update outcomes and applies offered updates (Run only).
 	Updater Updater
+	// Commands, if set, runs signed actions from the server and reports how they went.
+	Commands *command.Runner
 
 	lastInventory     [32]byte
 	lastInventoryTime time.Time
+	pending           []command.Result // to report on the next check-in
+	soon              bool             // check in again right away (to report, or after a refresh)
 }
 
 // Once performs one check-in. Inventory is sent when it changed or every inventoryEvery.
@@ -59,6 +64,10 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	if sendInventory {
 		payload["inventory"] = snap.Inventory
 	}
+	sentResults := len(l.pending)
+	if sentResults > 0 {
+		payload["command_results"] = l.pending
+	}
 	var reported *release.Result
 	if l.Updater != nil {
 		if reported = l.Updater.Result(); reported != nil {
@@ -74,6 +83,20 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	}
 	if err == nil && l.OnCheckin != nil {
 		l.OnCheckin(res)
+	}
+	if err == nil {
+		l.pending = l.pending[sentResults:]
+		if l.Commands != nil {
+			if perr := l.Commands.Pin(res.CommandKey); perr != nil {
+				l.Log.Warn("command key", "err", perr)
+			}
+			if len(res.Commands) > 0 {
+				results := l.Commands.Handle(ctx, res.Commands)
+				l.pending = append(l.pending, results...)
+				l.soon = len(results) > 0
+				l.lastInventoryTime = time.Time{} // a refresh sends full inventory
+			}
+		}
 	}
 	return res, err
 }
@@ -111,6 +134,9 @@ func (l *Loop) Run(ctx context.Context) error {
 				inventoryEvery = time.Duration(res.InventoryInterval) * time.Second
 			}
 			wait = interval
+			if l.soon {
+				wait, l.soon = 2*time.Second, false // report command results promptly
+			}
 			l.Log.Info("checked in", "compliance", res.Compliance, "next_in", wait)
 		}
 		// ±10% jitter so a fleet doesn't check in in lockstep.

@@ -26,6 +26,7 @@ export type MdmDevice = {
   compliance_detail: string;
   encrypted: boolean | null;
   last_contact_at: Date | null;
+  management_id: string;
 };
 
 export const IntuneConfig = z.object({
@@ -74,6 +75,7 @@ export async function fetchIntune(ep: Endpoints, rawCfg: unknown, secret: string
       compliance_detail: state.detail,
       encrypted: typeof x.isEncrypted === "boolean" ? x.isEncrypted : null,
       last_contact_at: date(x.lastSyncDateTime),
+      management_id: "",
     };
   });
 }
@@ -116,6 +118,7 @@ export async function fetchJamf(ep: Endpoints, rawCfg: unknown, secret: string):
         compliance_detail: encrypted === false ? "FileVault is off" : "",
         encrypted,
         last_contact_at: date(x.general?.lastContactTime),
+        management_id: String(x.general?.managementId ?? ""),
       });
     }
     if (results.length < size || out.length >= Number(body?.totalCount ?? Infinity)) break;
@@ -125,4 +128,34 @@ export async function fetchJamf(ep: Endpoints, rawCfg: unknown, secret: string):
 
 export function fetchMdm(ep: Endpoints, provider: "intune" | "jamf", cfg: unknown, secret: string) {
   return provider === "intune" ? fetchIntune(ep, cfg, secret) : fetchJamf(ep, cfg, secret);
+}
+
+/**
+ * Asks the MDM to act on a device. Intune: remoteLock / rebootNow / wipe
+ * (needs DeviceManagementManagedDevices.PrivilegedOperations.All). Jamf: MDM
+ * commands by management ID; lock and erase set the given 6-digit PIN.
+ */
+export async function mdmAction(ep: Endpoints, provider: "intune" | "jamf", rawCfg: unknown, secret: string, device: { external_id: string; management_id: string }, action: "lock" | "restart" | "wipe", pin: string | null) {
+  if (provider === "intune") {
+    const cfg = IntuneConfig.parse(rawCfg);
+    const token = await entraToken(ep, cfg, secret);
+    const op = { lock: "remoteLock", restart: "rebootNow", wipe: "wipe" }[action];
+    await getJson(
+      `${ep.graphBase}/v1.0/deviceManagement/managedDevices/${encodeURIComponent(device.external_id)}/${op}`,
+      { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: action === "wipe" ? JSON.stringify({ keepEnrollmentData: false, keepUserData: false }) : undefined },
+      `Intune ${op}`,
+    );
+    return;
+  }
+  const cfg = JamfConfig.parse(rawCfg);
+  const base = cfg.base_url.replace(/\/+$/, "");
+  await assertSafeUrl(base, { allowPrivate: ep.allowPrivateOutbound });
+  if (!device.management_id) throw new ProviderError("Jamf didn't report this Mac's management ID; read Jamf again, then retry", true);
+  const token = await jamfToken(base, cfg, secret);
+  const commandData = action === "lock" ? { commandType: "DEVICE_LOCK", pin } : action === "wipe" ? { commandType: "ERASE_DEVICE", pin, obliterationBehavior: "Default" } : { commandType: "RESTART_DEVICE", rebuildKernelCache: false, notifyUser: true };
+  await getJson(
+    `${base}/api/v2/mdm/commands`,
+    { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ clientData: [{ managementId: device.management_id }], commandData }) },
+    `Jamf ${commandData.commandType}`,
+  );
 }

@@ -27,6 +27,7 @@ import (
 
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
+	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/identity"
 	"github.com/votal-ai/nexus/agent/internal/local"
 	"github.com/votal-ai/nexus/agent/internal/release"
@@ -158,6 +159,9 @@ func enroll(ctx context.Context, store state.Store, server, token string) error 
 	if err := store.Save(key, state.Enrollment{Server: server, DeviceID: res.DeviceID, Organization: res.Organization, WebOrigin: res.WebOrigin}); err != nil {
 		return fmt.Errorf("enrolled, but saving state failed: %w", err)
 	}
+	if err := (&command.Runner{StateDir: store.Dir}).Pin(res.CommandKey); err != nil {
+		return fmt.Errorf("enrolled, but pinning the command key failed: %w", err)
+	}
 	fmt.Printf("Enrolled %s in %s (device %s).\nStart reporting with: nexus-agent run\n", snap.Device.Hostname, res.Organization, res.DeviceID)
 	return nil
 }
@@ -197,7 +201,8 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			}
 		}
 	}
-	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin}
+	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin,
+		Commands: &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), Log: log}}
 	if once {
 		res, err := loop.Once(ctx, 0)
 		if err != nil {

@@ -24,7 +24,7 @@ import { reevaluateAll } from "./service.js";
  */
 
 export const mdmSecretAad = (id: string) => `mdm_connection:${id}`;
-import { MDM_PROVIDER as PROVIDER } from "./mdm-signals.js";
+import { MDM_PROVIDER as PROVIDER, mdmRowsForDevice } from "./mdm-signals.js";
 const SYSTEM_META: RequestMeta = { ip: "", userAgent: "nexus-mdm-sync", requestId: "" };
 
 // ---- Sync ------------------------------------------------------------------------------------
@@ -71,6 +71,7 @@ export async function syncMdm(deps: Deps, orgId: string, connectionId: string) {
             compliance_detail: eb.ref("excluded.compliance_detail"),
             encrypted: eb.ref("excluded.encrypted"),
             last_contact_at: eb.ref("excluded.last_contact_at"),
+            management_id: eb.ref("excluded.management_id"),
             updated_at: eb.ref("excluded.updated_at"),
           })),
         )
@@ -333,12 +334,7 @@ export function registerMdmRoutes(app: App) {
 }
 
 /** For a device's detail page: what each MDM says about it. */
-export async function mdmForDevice(tx: Tx, deviceId: string) {
-  const rows = await tx
-    .selectFrom("mdm_devices")
-    .innerJoin("mdm_connections", "mdm_connections.id", "mdm_devices.connection_id")
-    .select(["mdm_connections.provider", "mdm_connections.name as connection", "mdm_devices.managed", "mdm_devices.compliant", "mdm_devices.compliance_detail", "mdm_devices.encrypted", "mdm_devices.last_contact_at"])
-    .where("mdm_devices.device_id", "=", deviceId)
-    .execute();
+export async function mdmForDevice(tx: Tx, device: { id: string; serial: string }) {
+  const rows = await mdmRowsForDevice(tx, device);
   return rows.map((r) => ({ source: PROVIDER[r.provider], connection: r.connection, managed: r.managed, compliant: r.compliant, detail: r.compliance_detail, encrypted: r.encrypted, last_contact_at: isoOrNull(r.last_contact_at) }));
 }

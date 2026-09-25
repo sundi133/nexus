@@ -22,6 +22,8 @@ export const PERMISSIONS = [
   "devices:write", // enroll/remove devices, assign users, device policies
   "policies:write", // conditional access policies
   "devices:updates", // agent software rollouts (fleet-wide changes, so not helpdesk)
+  "devices:actions", // refresh, lock and restart a device
+  "devices:wipe", // erase a device through its MDM (irreversible)
   "directory:sync", // connect Google Workspace / Entra ID (can create and suspend many users)
   "api_keys:manage", // create and revoke API keys
   "integrations:manage", // webhooks and SIEM streaming (they export the audit log)
@@ -33,13 +35,13 @@ const READ: Permission[] = ["users:read", "groups:read", "audit:read", "apps:rea
 const GRANTS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
   admin: PERMISSIONS.filter((p) => p !== "admins:manage"),
-  helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign", "devices:write"],
-  security_analyst: [...READ, "users:lifecycle"],
+  helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign", "devices:write", "devices:actions"],
+  security_analyst: [...READ, "users:lifecycle", "devices:actions"],
   readonly: READ,
 };
 
 /** What an API key may be granted: everything except managing admins and keys (a key can't entrench itself). */
-export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage");
+export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage" && p !== "devices:wipe");
 
 export function permissionsFor(roles: readonly Role[]): Permission[] {
   const set = new Set<Permission>();

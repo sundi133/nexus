@@ -97,7 +97,8 @@ func (s Store) EnrollConfig() string { return filepath.Join(s.Dir, "enroll.conf"
 
 // Forget removes the enrollment (after the server says the device was removed).
 func (s Store) Forget() error {
-	for _, p := range []string{s.statePath(), s.keyPath()} {
+	// The pinned command key and command history go too: a re-enrollment may be into another organization.
+	for _, p := range []string{s.statePath(), s.keyPath(), filepath.Join(s.Dir, "command.key"), filepath.Join(s.Dir, "commands-done.json")} {
 		if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}

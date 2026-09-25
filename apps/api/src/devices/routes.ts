@@ -126,7 +126,7 @@ async function detail(tx: Tx, id: string): Promise<z.infer<typeof DeviceDetail>>
     last_ip: d.last_ip,
     compliance_changed_at: isoOrNull(d.compliance_changed_at),
     inventory: d.inventory as Record<string, unknown>,
-    mdm: await mdmForDevice(tx, id),
+    mdm: await mdmForDevice(tx, { id, serial: d.serial }),
     checks: checks
       .sort((a, b) => order(a.check_key) - order(b.check_key))
       .map((ch) => {

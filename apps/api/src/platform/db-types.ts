@@ -258,6 +258,27 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Timestamp;
   };
+  command_keys: {
+    org_id: string;
+    public_key: string;
+    private_key: Buffer;
+    created_at: Generated<Date>;
+  };
+  device_commands: {
+    id: string;
+    org_id: string;
+    device_id: string;
+    action: "refresh" | "lock" | "restart" | "wipe";
+    channel: "agent" | "mdm";
+    status: Generated<"queued" | "sent" | "done" | "failed" | "expired" | "canceled">;
+    reason: Generated<string>;
+    output: Generated<string>;
+    requested_by: string | null;
+    created_at: Generated<Date>;
+    expires_at: Timestamp;
+    sent_at: NullableTimestamp;
+    finished_at: NullableTimestamp;
+  };
   mdm_connections: {
     id: string;
     org_id: string;
@@ -291,6 +312,7 @@ export interface Database {
     last_contact_at: NullableTimestamp;
     device_id: string | null;
     updated_at: Generated<Date>;
+    management_id: Generated<string>;
   };
   identity_providers: {
     id: string;

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { ConfirmAction } from "@/components/features/confirm-action";
 import { CheckList, ComplianceBadge, OnlineDot, PLATFORM_LABEL, PlatformIcon } from "@/components/features/device-bits";
+import { CommandHistory, DeviceActions } from "@/components/features/device-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, Card, CardHeader, EmptyState, ErrorBanner, KeyValue, Skeleton } from "@/components/ui/misc";
@@ -59,6 +60,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
         </div>
         {can("devices:write") ? (
           <div className="flex gap-2">
+            <DeviceActions device={d} />
             <Button onClick={() => setAssigning(true)}>
               <UserRound /> {d.primary_user ? "Change user" : "Assign user"}
             </Button>
@@ -70,7 +72,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
       </div>
 
       <Tabs defaultValue="compliance">
-        <TabsList tabs={[{ value: "compliance", label: failing ? `Compliance (${failing} failing)` : "Compliance" }, { value: "details", label: "Details" }, { value: "activity", label: "Activity" }]} />
+        <TabsList tabs={[{ value: "compliance", label: failing ? `Compliance (${failing} failing)` : "Compliance" }, { value: "details", label: "Details" }, { value: "actions", label: "Actions" }, { value: "activity", label: "Activity" }]} />
         <TabsContent value="compliance">
           <Card className="overflow-hidden">
             <CardHeader title="Policy checks" description={d.compliance_changed_at ? `Compliance last changed ${formatDateTime(d.compliance_changed_at)}` : "Evaluated on every check-in (about once a minute)."} />
@@ -126,6 +128,11 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
                 ]}
               />
             </div>
+          </Card>
+        </TabsContent>
+        <TabsContent value="actions">
+          <Card className="overflow-hidden">
+            <CommandHistory deviceId={d.id} />
           </Card>
         </TabsContent>
         <TabsContent value="activity">
