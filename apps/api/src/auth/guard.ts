@@ -4,6 +4,10 @@ import type { Env, Principal } from "../context.js";
 import { ApiError, forbidden, unauthorized } from "../platform/errors.js";
 import { can, type Permission, type Role } from "../rbac.js";
 import { hashToken } from "./tokens.js";
+import { RateLimiter } from "./ratelimit.js";
+
+// Per API key: generous for automation, bounded so a runaway script can't swamp a tenant.
+const keyLimiter = new RateLimiter(600, 60_000);
 import type { SessionState } from "../platform/db-types.js";
 
 type SessionLookup = {
@@ -25,7 +29,31 @@ type SessionLookup = {
 export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
   const header = c.req.header("authorization");
   const token = header?.startsWith("Bearer ") ? header.slice(7).trim() : null;
-  if (token?.startsWith("nxs_")) {
+  if (token?.startsWith("nxk_")) {
+    const { db } = c.get("deps");
+    const key = await db.unscoped(async (tx) => {
+      const r = await sql<{ id: string; org_id: string; name: string; scopes: string[]; created_by: string | null; last_used_at: Date | null }>`SELECT * FROM nexus_auth_api_key(${hashToken(token)})`.execute(tx);
+      return r.rows[0];
+    });
+    if (key) {
+      if (!keyLimiter.take(key.id)) throw new ApiError(429, "rate_limited", "This API key is sending too many requests. Slow down and retry.");
+      if (!key.last_used_at || Date.now() - key.last_used_at.getTime() > 60_000) {
+        const ip = c.get("meta").ip;
+        await db.tenant(key.org_id, (tx) => tx.updateTable("api_keys").set({ last_used_at: new Date(), last_used_ip: ip }).where("id", "=", key.id).execute());
+      }
+      c.set("principal", {
+        orgId: key.org_id,
+        userId: key.created_by ?? "00000000-0000-0000-0000-000000000000",
+        email: `API key “${key.name}”`,
+        sessionId: "",
+        sessionState: "active",
+        client: "api",
+        mfaAt: new Date(), // keys have no MFA; their scopes are the control (and step-up-worthy scopes need an admin to grant them)
+        roles: [],
+        apiKey: { id: key.id, name: key.name, scopes: new Set(key.scopes as Permission[]) },
+      });
+    }
+  } else if (token?.startsWith("nxs_")) {
     const { db } = c.get("deps");
     const found = await db.unscoped(async (tx) => {
       const r = await sql<SessionLookup>`SELECT * FROM nexus_auth_session(${hashToken(token)})`.execute(tx);
@@ -64,9 +92,10 @@ export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
  * accepted where the handler opts in: `allowPendingMfa` (verifying a factor)
  * or `allowEnroll` (setting up the first factor the org policy requires).
  */
-export function requireSession(c: Context<Env>, opts: { allowPendingMfa?: boolean; allowEnroll?: boolean } = {}): Principal {
+export function requireSession(c: Context<Env>, opts: { allowPendingMfa?: boolean; allowEnroll?: boolean; allowApiKey?: boolean } = {}): Principal {
   const p = c.get("principal");
   if (!p) throw unauthorized();
+  if (p.apiKey && !opts.allowApiKey) throw forbidden("API keys can't use personal endpoints; sign in as a person instead");
   if (p.sessionState === "pending_mfa" && !opts.allowPendingMfa) {
     throw new ApiError(401, "mfa_required", "Complete multi-factor authentication to continue");
   }
@@ -77,8 +106,8 @@ export function requireSession(c: Context<Env>, opts: { allowPendingMfa?: boolea
 }
 
 export function requirePermission(c: Context<Env>, perm: Permission): Principal {
-  const p = requireSession(c);
-  if (!can(p.roles, perm)) throw forbidden();
+  const p = requireSession(c, { allowApiKey: true });
+  if (p.apiKey ? !p.apiKey.scopes.has(perm) : !can(p.roles, perm)) throw forbidden(p.apiKey ? `This API key doesn't have the ${perm} scope` : undefined);
   return p;
 }
 

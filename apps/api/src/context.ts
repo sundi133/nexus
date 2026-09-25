@@ -5,7 +5,7 @@ import type { Sealer } from "./platform/seal.js";
 import type { Realtime } from "./platform/realtime.js";
 import type { Mailer } from "./platform/mailer.js";
 import type { PushSender } from "./platform/push.js";
-import type { Role } from "./rbac.js";
+import type { Permission, Role } from "./rbac.js";
 import type { SessionState } from "./platform/db-types.js";
 
 /** The authenticated caller. Every client (web BFF, mobile, CLI) resolves to one of these. */
@@ -18,6 +18,8 @@ export type Principal = {
   client: string;
   mfaAt: Date | null;
   roles: Role[];
+  /** Set when the caller is an API key: its scopes replace roles, and it can't use personal (/v1/me) endpoints. */
+  apiKey?: { id: string; name: string; scopes: ReadonlySet<Permission> };
 };
 
 export type RequestMeta = { ip: string; userAgent: string; requestId: string };

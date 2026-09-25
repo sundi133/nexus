@@ -26,6 +26,9 @@ import { registerAgentUpdateRoutes } from "./devices/update-routes.js";
 import { registerDirectorySyncRoutes } from "./directory/sync/routes.js";
 import { registerProvisioningRoutes } from "./provisioning/routes.js";
 import { registerOffboardingRoutes } from "./directory/offboarding.js";
+import { registerApiKeyRoutes } from "./auth/api-keys.js";
+import { registerEventDestinationRoutes } from "./integrations/routes.js";
+import { scheduleEventDelivery } from "./integrations/stream.js";
 import { scheduleProvisioningReconcile } from "./provisioning/service.js";
 import { scheduleDirectorySyncs } from "./directory/sync/service.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
@@ -105,6 +108,8 @@ export function createApp(deps: Deps) {
   registerDirectorySyncRoutes(app);
   registerProvisioningRoutes(app);
   registerOffboardingRoutes(app);
+  registerApiKeyRoutes(app);
+  registerEventDestinationRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -123,4 +128,5 @@ export function createApp(deps: Deps) {
 export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleDirectorySyncs(jobs, deps);
   scheduleProvisioningReconcile(jobs, deps);
+  scheduleEventDelivery(jobs, deps);
 }

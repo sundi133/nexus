@@ -5,10 +5,12 @@ import {
   FileClock,
   FolderSync,
   Home,
+  Key,
   KeyRound,
   LayoutGrid,
   MonitorSmartphone,
   PackageCheck,
+  Radio,
   Laptop,
   ScrollText,
   Server,
@@ -71,6 +73,8 @@ export const NAV: NavSection[] = [
     items: [
       { label: "My security", href: "/settings/security", icon: KeyRound },
       { label: "Organization", href: "/settings/organization", icon: Settings },
+      { label: "Integrations", href: "/settings/integrations", icon: Radio },
+      { label: "API keys", href: "/settings/api-keys", icon: Key },
     ],
   },
 ];

@@ -23,6 +23,8 @@ export const PERMISSIONS = [
   "policies:write", // conditional access policies
   "devices:updates", // agent software rollouts (fleet-wide changes, so not helpdesk)
   "directory:sync", // connect Google Workspace / Entra ID (can create and suspend many users)
+  "api_keys:manage", // create and revoke API keys
+  "integrations:manage", // webhooks and SIEM streaming (they export the audit log)
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -35,6 +37,9 @@ const GRANTS: Record<Role, readonly Permission[]> = {
   security_analyst: [...READ, "users:lifecycle"],
   readonly: READ,
 };
+
+/** What an API key may be granted: everything except managing admins and keys (a key can't entrench itself). */
+export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage");
 
 export function permissionsFor(roles: readonly Role[]): Permission[] {
   const set = new Set<Permission>();

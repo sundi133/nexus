@@ -8,7 +8,7 @@ export type AuditInput = {
   target?: { type: string; id: string | null; display?: string };
   details?: Record<string, unknown>;
   /** Override the actor (e.g. during login, before a principal exists). */
-  actor?: { type: "user" | "system"; id: string | null; display?: string };
+  actor?: { type: "user" | "system" | "api_key"; id: string | null; display?: string };
   sessionId?: string | null;
 };
 
@@ -22,9 +22,10 @@ export async function audit(
   who: { principal?: Principal; display?: string; meta: RequestMeta },
   e: AuditInput,
 ) {
+  const key = who.principal?.apiKey;
   const actor = e.actor ?? {
-    type: who.principal ? ("user" as const) : ("system" as const),
-    id: who.principal?.userId ?? null,
+    type: key ? ("api_key" as const) : who.principal ? ("user" as const) : ("system" as const),
+    id: key ? key.id : (who.principal?.userId ?? null),
     display: who.display ?? who.principal?.email ?? "",
   };
   await tx
@@ -40,7 +41,7 @@ export async function audit(
       target_type: e.target?.type ?? "",
       target_id: e.target?.id ?? null,
       target_display: e.target?.display ?? "",
-      session_id: e.sessionId ?? who.principal?.sessionId ?? null,
+      session_id: e.sessionId ?? (who.principal?.sessionId || null),
       ip: who.meta.ip,
       user_agent: who.meta.userAgent,
       details: JSON.stringify(e.details ?? {}),

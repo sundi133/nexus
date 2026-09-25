@@ -250,6 +250,53 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Timestamp;
   };
+  event_destinations: {
+    id: string;
+    org_id: string;
+    kind: "webhook" | "splunk_hec" | "datadog";
+    name: string;
+    url: string;
+    secret: Buffer;
+    config: Json;
+    format: Generated<"nexus" | "ocsf">;
+    event_filter: Generated<string[]>;
+    enabled: Generated<boolean>;
+    cursor_txid: string; // xid8, as text
+    cursor_id: string;
+    consecutive_failures: Generated<number>;
+    next_attempt_at: Generated<Date>;
+    last_error: Generated<string>;
+    last_delivered_at: NullableTimestamp;
+    disabled_reason: Generated<string>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  event_deliveries: {
+    id: string;
+    org_id: string;
+    destination_id: string;
+    at: Generated<Date>;
+    ok: boolean;
+    http_status: Generated<number>;
+    events: Generated<number>;
+    duration_ms: Generated<number>;
+    error: Generated<string>;
+  };
+  api_keys: {
+    id: string;
+    org_id: string;
+    name: string;
+    prefix: string;
+    key_hash: Buffer;
+    scopes: string[];
+    created_by: string | null;
+    expires_at: Timestamp;
+    last_used_at: NullableTimestamp;
+    last_used_ip: Generated<string>;
+    revoked_at: NullableTimestamp;
+    created_at: Generated<Date>;
+  };
   app_provisioning: {
     app_id: string;
     org_id: string;
