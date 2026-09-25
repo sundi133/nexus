@@ -1,0 +1,7 @@
+# Used by smoke-test.sh: one API replica, published on localhost ports, no Caddy/TLS.
+services:
+  api:
+    deploy: { replicas: 1 }
+    ports: ["127.0.0.1:18080:8080"]
+  web:
+    ports: ["127.0.0.1:13100:3100"]

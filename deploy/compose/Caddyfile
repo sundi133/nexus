@@ -1,0 +1,16 @@
+# Automatic HTTPS (Let's Encrypt) in front of the console and the API.
+{$NEXUS_CONSOLE_HOST} {
+	encode zstd gzip
+	reverse_proxy web:3100
+}
+
+{$NEXUS_API_HOST} {
+	encode zstd gzip
+	# /metrics is for your Prometheus only: keep it off the public edge.
+	@metrics path /metrics
+	respond @metrics 404
+	reverse_proxy api:8080 {
+		lb_policy round_robin
+		health_uri /healthz
+	}
+}

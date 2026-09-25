@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 // Security headers for production builds (dev keeps Next's HMR working).
@@ -26,6 +27,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@nexus/api-client"],
   poweredByHeader: false,
   output: "standalone", // small production image (see deploy/)
+  outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)), // monorepo: trace workspace packages too
   async headers() {
     if (process.env.NODE_ENV !== "production") return [];
     return [

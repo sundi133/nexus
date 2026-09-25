@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  platform:
+    name: Typecheck, tests, builds
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nexus_owner
+          POSTGRES_PASSWORD: nexus_owner
+          POSTGRES_DB: nexus
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nexus_owner -d nexus"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Create the runtime role and test database (like deploy/compose/initdb)
+        env: { PGPASSWORD: nexus_owner }
+        run: |
+          psql -h localhost -p 55432 -U nexus_owner -d nexus -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE nexus_app LOGIN PASSWORD 'nexus_app'" \
+            -c "GRANT CONNECT ON DATABASE nexus TO nexus_app" \
+            -c "CREATE DATABASE nexus_test OWNER nexus_owner" \
+            -c "GRANT CONNECT ON DATABASE nexus_test TO nexus_app"
+      - name: Typecheck
+        run: |
+          pnpm --filter @nexus/api typecheck
+          pnpm --filter @nexus/web exec tsc --noEmit
+          pnpm --filter @nexus/mobile exec tsc --noEmit
+      - name: API tests (incl. security guards)
+        run: pnpm --filter @nexus/api test
+      - name: OpenAPI spec and client are up to date
+        run: |
+          pnpm api:spec
+          git diff --exit-code apps/api/openapi.json packages/api-client/src/schema.d.ts
+      - name: Production builds
+        run: |
+          pnpm --filter @nexus/api build
+          pnpm --filter @nexus/web build
+      - name: Dependency audit (fails on high or critical)
+        run: pnpm audit --prod --audit-level high
+
+  agent:
+    name: Go agent
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: agent } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: agent/go.mod }
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./... && GOOS=windows go vet ./... && GOOS=darwin go vet ./...
+      - run: go test ./...
+
+  images:
+    name: Container images + production smoke test
+    runs-on: ubuntu-latest
+    needs: [platform]
+    steps:
+      - uses: actions/checkout@v4
+      - run: deploy/compose/smoke-test.sh
