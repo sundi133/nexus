@@ -128,3 +128,15 @@ describe("request size", () => {
     await h.close();
   });
 });
+
+describe("who can create an organization", () => {
+  it("is closed when configured, and 'first' allows none once one exists", async () => {
+    const closed = await bootApp({ signup: "closed" });
+    const r = await closed.call("POST", "/v1/signup", { body: { organization_name: "Nope", email: "nope@example.test", password: "correct-horse-battery-staple", given_name: "N" } });
+    expect(r.body.code).toBe("signup_closed");
+    await closed.close();
+    const first = await bootApp({ signup: "first" }); // the test database already has organizations
+    expect((await first.call("POST", "/v1/signup", { body: { organization_name: "Late", email: "late@example.test", password: "correct-horse-battery-staple", given_name: "L" } })).status).toBe(403);
+    await first.close();
+  });
+});

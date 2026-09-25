@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning src/main.ts",
+    "dev": "tsx watch --conditions=development --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning src/main.ts",
     "start": "node --env-file-if-exists=../../.env dist/main.js",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts",
-    "spec": "tsx src/cli/spec.ts > openapi.json",
+    "spec": "tsx --conditions=development src/cli/spec.ts > openapi.json",
     "reseal": "tsx --env-file-if-exists=../../.env src/cli/reseal.ts",
     "test": "vitest run"
   },

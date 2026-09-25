@@ -4,9 +4,27 @@
   "private": true,
   "description": "Reads users and groups from Active Directory or any LDAP directory (shared by the API's LDAP sync and the on-prem CLI connector)",
   "type": "module",
-  "main": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "tsc --noEmit" },
-  "dependencies": { "ldapts": "^9.2.0" },
-  "devDependencies": { "@types/node": "^26.6.2", "typescript": "~5.9.3" }
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ldapts": "^9.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "~5.9.3"
+  },
+  "files": [
+    "dist",
+    "src"
+  ]
 }

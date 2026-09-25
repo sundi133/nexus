@@ -1,6 +1,9 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // Workspace packages export their TypeScript source under "development" (production uses their build).
+  resolve: { conditions: ["development"] },
+  ssr: { resolve: { conditions: ["development"], externalConditions: ["development"] } },
   test: {
     include: ["test/**/*.test.ts", "src/**/*.test.ts"],
     testTimeout: 20_000,

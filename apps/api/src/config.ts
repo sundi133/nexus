@@ -34,6 +34,9 @@ export type Config = {
   allowPrivateOutbound: boolean;
   // Directory (LDAP/AD) hosts on private networks: self-hosted deployments next to their AD set this.
   allowPrivateDirectory: boolean;
+  // Who can create an organization: "open" (hosted service, dev), "first" (self-hosted: only the
+  // first one, then closed), "closed" (organizations are created by the operator only).
+  signup: "open" | "first" | "closed";
   // Have I Been Pwned range API for breached-password checks ("" = off).
   hibpBase: string;
   // Push delivery. Unset = pushes are recorded/logged only (development).
@@ -108,6 +111,7 @@ export function loadConfig(env = process.env): Config {
     pagerdutyEventsUrl: env.NEXUS_PAGERDUTY_EVENTS_URL ?? "https://events.pagerduty.com/v2/enqueue",
     opsgenieBase: { us: env.NEXUS_OPSGENIE_BASE ?? "https://api.opsgenie.com", eu: env.NEXUS_OPSGENIE_EU_BASE ?? "https://api.eu.opsgenie.com" },
     allowPrivateOutbound: mode !== "prod" && env.NEXUS_ALLOW_PRIVATE_OUTBOUND !== "false",
+    signup: (["open", "first", "closed"] as const).find((m) => m === env.NEXUS_SIGNUP) ?? (mode === "prod" ? "first" : "open"),
     allowPrivateDirectory: env.NEXUS_ALLOW_PRIVATE_DIRECTORY ? env.NEXUS_ALLOW_PRIVATE_DIRECTORY === "true" : mode !== "prod",
     hibpBase: env.NEXUS_HIBP_BASE ?? (mode === "test" ? "" : "https://api.pwnedpasswords.com"),
     apns:

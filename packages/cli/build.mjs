@@ -11,4 +11,5 @@ await build({
   outfile: "dist/nexus.mjs",
   banner: { js: '#!/usr/bin/env node\nimport { createRequire as __nexusRequire } from "node:module";\nconst require = __nexusRequire(import.meta.url);' },
   legalComments: "none",
+  conditions: ["development"], // bundle workspace packages from source
 });

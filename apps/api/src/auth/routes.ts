@@ -218,6 +218,9 @@ export function registerAuthRoutes(app: App) {
       const input = c.req.valid("json");
       const { db, cfg } = c.get("deps");
       const meta = c.get("meta");
+      const signupClosed = () => new ApiError(403, "signup_closed", "New organizations can't be created here. Ask your administrator for an invitation.");
+      if (cfg.signup === "closed") throw signupClosed();
+      if (cfg.signup === "first" && (await db.unscoped(async (tx) => (await sql<{ t: boolean }>`SELECT nexus_any_org() AS t`.execute(tx)).rows[0]!.t))) throw signupClosed();
 
       const { emailTaken, slug } = await db.unscoped(async (tx) => {
         const emailTaken = (await sql<{ t: boolean }>`SELECT nexus_email_taken(${input.email}) AS t`.execute(tx))
@@ -240,6 +243,11 @@ export function registerAuthRoutes(app: App) {
       const passwordHash = await hashPassword(input.password);
 
       const result = await db.tenant(orgId, async (tx) => {
+        if (cfg.signup === "first") {
+          // Two simultaneous "first" sign-ups: only one wins.
+          await sql`SELECT pg_advisory_xact_lock(hashtext('nexus-first-signup'))`.execute(tx);
+          if ((await sql<{ t: boolean }>`SELECT nexus_any_org() AS t`.execute(tx)).rows[0]!.t) throw signupClosed();
+        }
         await tx
           .insertInto("organizations")
           .values({ id: orgId, name: input.organization_name, slug, settings: JSON.stringify({}) })
