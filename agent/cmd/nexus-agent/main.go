@@ -21,6 +21,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -147,7 +148,7 @@ func enroll(ctx context.Context, store state.Store, server, token string) error 
 	if err != nil {
 		return err
 	}
-	snap := collect.Collect(ctx)
+	snap := deviceSnapshot(ctx)
 	res, err := c.Enroll(ctx, token, client.DeviceInfo{
 		Hostname: snap.Device.Hostname, Platform: snap.Device.Platform, OSName: snap.Device.OSName,
 		OSVersion: snap.Device.OSVersion, OSBuild: snap.Device.OSBuild, Arch: snap.Device.Arch,
@@ -250,6 +251,24 @@ var enrollRetry = 30 * time.Second // first retry; doubles up to 10 minutes
 // awaitEnrollment enrolls from the installer's enroll.conf when it appears
 // (retrying with backoff while the network or token is not ready), or returns
 // once someone enrolls the device by hand.
+// deviceSnapshot describes the device for enrollment. Collecting is slow on Windows (several
+// PowerShell calls), so one snapshot is reused while enrollment retries. Replaceable in tests.
+var deviceSnapshot = func() func(context.Context) collect.Snapshot {
+	var (
+		mu   sync.Mutex
+		snap *collect.Snapshot
+	)
+	return func(ctx context.Context) collect.Snapshot {
+		mu.Lock()
+		defer mu.Unlock()
+		if snap == nil {
+			s := collect.Collect(ctx)
+			snap = &s
+		}
+		return *snap
+	}
+}()
+
 func awaitEnrollment(ctx context.Context, store state.Store, log *slog.Logger) error {
 	wait, waiting := enrollRetry, false
 	for {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/votal-ai/nexus/agent/internal/collect"
 	"io"
 	"log/slog"
 	"net/http"
@@ -54,6 +55,12 @@ func TestAwaitEnrollmentFromInstallerConfig(t *testing.T) {
 	}))
 	defer srv.Close()
 	enrollRetry = 10 * time.Millisecond
+	// Real collection shells out (PowerShell on Windows) and takes seconds: not what this tests.
+	deviceSnapshot = func(context.Context) collect.Snapshot {
+		var s collect.Snapshot
+		s.Device.Hostname, s.Device.Platform = "test-host", "test"
+		return s
+	}
 	store := state.Store{Dir: t.TempDir()}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 

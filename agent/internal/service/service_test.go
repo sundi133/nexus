@@ -45,7 +45,8 @@ func TestPackagedUnitMatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := SystemdUnit("/opt/nexus/bin/nexus-agent", "/var/lib/nexus-agent"); string(shipped) != want {
+	// A checkout on Windows may turn LF into CRLF; the file ships with LF (.gitattributes).
+	if want := SystemdUnit("/opt/nexus/bin/nexus-agent", "/var/lib/nexus-agent"); strings.ReplaceAll(string(shipped), "\r\n", "\n") != want {
 		t.Fatalf("packaging/linux/nexus-agent.service differs from SystemdUnit():\n%s", want)
 	}
 }

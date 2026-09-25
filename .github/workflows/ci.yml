@@ -43,7 +43,7 @@ jobs:
       - name: Typecheck
         run: |
           pnpm --filter @nexus/api typecheck
-          pnpm --filter @nexus/web exec tsc --noEmit
+          pnpm --filter @nexus/web typecheck   # generates Next.js route types first
           pnpm --filter @nexus/mobile exec tsc --noEmit
           pnpm --filter @nexus/cli typecheck
           pnpm --filter @nexus/ldap-directory typecheck

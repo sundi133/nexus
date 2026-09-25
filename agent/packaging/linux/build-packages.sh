@@ -2,9 +2,11 @@
 # Builds .deb and .rpm packages from a release directory.
 #   build-packages.sh VERSION RELEASE_DIR OUT_DIR [ARCHES]
 set -euo pipefail
-version="${1#v}"; rel="$2"; outdir="$3"; arches="${4:-amd64 arm64}"
+version="${1#v}"; rel="$2"; arches="${4:-amd64 arm64}"
 here="$(cd "$(dirname "$0")" && pwd)"
-mkdir -p "$outdir"
+# Absolute before anything changes directory (nfpm runs from the packaging folder).
+mkdir -p "$3"
+outdir="$(cd "$3" && pwd)"
 nfpm=(go run github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.41.3)
 for arch in $arches; do
   bin="$(cd "$rel" && pwd)/nexus-agent-linux-$arch"
@@ -14,7 +16,7 @@ for arch in $arches; do
   sed -e "s|\${NEXUS_VERSION}|$version|g" -e "s|\${NEXUS_ARCH}|$arch|g" -e "s|\${NEXUS_BIN}|$bin|g" "$here/nfpm.yaml" > "$cfg"
   for fmt in deb rpm; do
     echo "==> $fmt $arch"
-    (cd "$here" && "${nfpm[@]}" package --config "$cfg" --packager "$fmt" --target "$(cd "$outdir" && pwd)/")
+    (cd "$here" && "${nfpm[@]}" package --config "$cfg" --packager "$fmt" --target "$outdir/")
   done
   rm -f "$cfg"
 done
