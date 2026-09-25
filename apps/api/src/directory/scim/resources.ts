@@ -31,7 +31,7 @@ type Json = Record<string, any>;
 
 // ---- Representations ------------------------------------------------------------------
 
-export type LocalUser = { id: string; email: string; given_name: string; family_name: string; title: string; department: string; status: string; created_at: Date; updated_at: Date };
+export type LocalUser = { id: string; email: string; given_name: string; family_name: string; title: string; department: string; status: string; created_at: Date; updated_at: Date; manager_id?: string | null };
 
 export function toScimUser(u: LocalUser, a: { externalId: string | null; groups: { id: string; name: string }[]; base: string }): Json {
   const display = `${u.given_name} ${u.family_name}`.trim() || u.email;
@@ -45,7 +45,7 @@ export function toScimUser(u: LocalUser, a: { externalId: string | null; groups:
     emails: [{ value: u.email, type: "work", primary: true }],
     active: u.status === "active" || u.status === "staged",
     ...(u.title ? { title: u.title } : {}),
-    [SCHEMA.enterprise]: u.department ? { department: u.department } : {},
+    [SCHEMA.enterprise]: { ...(u.department ? { department: u.department } : {}), ...(u.manager_id ? { manager: { value: u.manager_id, $ref: `${a.base}/Users/${u.manager_id}` } } : {}) },
     groups: a.groups.map((g) => ({ value: g.id, display: g.name, $ref: `${a.base}/Groups/${g.id}` })),
     meta: { resourceType: "User", created: u.created_at.toISOString(), lastModified: u.updated_at.toISOString(), location: `${a.base}/Users/${u.id}`, version: `W/"${u.updated_at.getTime()}"` },
   };
@@ -75,7 +75,7 @@ export const toBool = (v: unknown): boolean | undefined => {
   return undefined;
 };
 
-export type UserFields = { email: string; given_name: string; family_name: string; title: string; department: string; active: boolean; external_id: string | null };
+export type UserFields = { email: string; given_name: string; family_name: string; title: string; department: string; active: boolean; external_id: string | null; manager_id?: string | null };
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -99,6 +99,8 @@ export function userFields(r: Json): UserFields {
     department: String(get(ext, "department") ?? "").slice(0, 200),
     active,
     external_id: get(r, "externalId") ? String(get(r, "externalId")).slice(0, 500) : null,
+    // The manager is a SCIM user ID, i.e. a Nexus user ID; absent means "not managed through SCIM".
+    ...(get(ext, "manager") !== undefined ? { manager_id: get(get(ext, "manager") as Json, "value") ? String(get(get(ext, "manager") as Json, "value")) : null } : {}),
   };
 }
 

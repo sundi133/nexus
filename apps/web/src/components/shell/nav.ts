@@ -57,6 +57,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "Applications", href: "/apps", icon: AppWindow },
       { label: "Conditional access", href: "/conditional-access", icon: ShieldCheck },
+      { label: "Access requests", href: "/access-requests", icon: KeyRound },
     ],
   },
   {

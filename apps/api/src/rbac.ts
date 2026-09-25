@@ -27,6 +27,7 @@ export const PERMISSIONS = [
   "directory:sync", // connect Google Workspace / Entra ID (can create and suspend many users)
   "api_keys:manage", // create and revoke API keys
   "integrations:manage", // webhooks and SIEM streaming (they export the audit log)
+  "access:manage", // what can be requested and how it's approved; see and revoke all grants
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 

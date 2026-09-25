@@ -86,7 +86,7 @@ const listResponse = (all: unknown[], p: { startIndex: number; count: number }) 
 
 // ---- Users ------------------------------------------------------------------------------
 
-const userCols = ["users.id", "users.email", "users.given_name", "users.family_name", "users.title", "users.department", "users.status", "users.created_at", "users.updated_at"] as const;
+const userCols = ["users.id", "users.email", "users.given_name", "users.family_name", "users.title", "users.department", "users.status", "users.created_at", "users.updated_at", "users.manager_id"] as const;
 /** People SCIM can see: everyone but break-glass accounts and the deprovisioned. */
 const visibleUsers = (tx: Tx) => tx.selectFrom("users").select(userCols).where("users.break_glass", "=", false).where("users.status", "<>", "deprovisioned");
 
@@ -155,6 +155,9 @@ async function applyUser(tx: Tx, deps: Deps, meta: RequestMeta, conn: Conn, befo
       .values({ id, org_id: conn.org_id, email: f.email, given_name: f.given_name, family_name: f.family_name, title: f.title, department: f.department, status: f.active ? "staged" : "suspended", password_hash: null, attributes: "{}", updated_at: new Date() })
       .execute();
     await link(tx, conn, "user", id, f.external_id);
+    if (f.manager_id && /^[0-9a-f-]{36}$/i.test(f.manager_id) && (await visibleUsers(tx).where("users.id", "=", f.manager_id).executeTakeFirst())) {
+      await tx.updateTable("users").set({ manager_id: f.manager_id }).where("id", "=", id).execute();
+    }
     if (!f.active) await tx.updateTable("directory_links").set({ suspended_by_sync: true }).where("connection_id", "=", conn.id).where("kind", "=", "user").where("local_id", "=", id).execute();
     await audit(tx, conn.org_id, who, { type: "user.created", actor, target: { type: "user", id, display: f.email }, details: { ...detailsBase, active: f.active } });
     await touchUsers(tx, conn.org_id, [id]);
@@ -174,6 +177,15 @@ async function applyUser(tx: Tx, deps: Deps, meta: RequestMeta, conn: Conn, befo
   if (Object.keys(changes).length) {
     await tx.updateTable("users").set({ ...Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.to])), updated_at: new Date() }).where("id", "=", id).execute();
     await audit(tx, conn.org_id, who, { type: "user.updated", actor, target: { type: "user", id, display: f.email }, details: { ...detailsBase, changes } });
+  }
+
+  if (f.manager_id !== undefined && f.manager_id !== (before.manager_id ?? null)) {
+    // Only someone SCIM can see, and never themselves; otherwise the value is ignored.
+    const ok = f.manager_id === null || (f.manager_id !== id && /^[0-9a-f-]{36}$/i.test(f.manager_id) && !!(await visibleUsers(tx).where("users.id", "=", f.manager_id).executeTakeFirst()));
+    if (ok) {
+      await tx.updateTable("users").set({ manager_id: f.manager_id, updated_at: new Date() }).where("id", "=", id).execute();
+      await audit(tx, conn.org_id, who, { type: "user.updated", actor, target: { type: "user", id, display: f.email }, details: { ...detailsBase, changes: { manager_id: { from: before.manager_id ?? null, to: f.manager_id } } } });
+    }
   }
 
   const wasActive = before.status === "active" || before.status === "staged";

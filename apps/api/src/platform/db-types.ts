@@ -36,6 +36,7 @@ export interface Database {
     last_login_at: NullableTimestamp;
     created_at: Generated<Date>;
     updated_at: Timestamp;
+    manager_id: Generated<string | null>;
   };
   user_roles: {
     org_id: string;
@@ -278,6 +279,48 @@ export interface Database {
     expires_at: Timestamp;
     sent_at: NullableTimestamp;
     finished_at: NullableTimestamp;
+  };
+  access_catalog: {
+    id: string;
+    org_id: string;
+    resource_type: "app" | "group" | "role";
+    resource_id: string | null;
+    role: string | null;
+    description: Generated<string>;
+    enabled: Generated<boolean>;
+    max_hours: Generated<number>;
+    allow_permanent: Generated<boolean>;
+    stages: Json;
+    eligible: Json;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  access_requests: {
+    id: string;
+    org_id: string;
+    catalog_id: string;
+    requester_id: string;
+    justification: string;
+    duration_hours: number | null;
+    status: Generated<"pending" | "active" | "denied" | "canceled" | "ended" | "revoked">;
+    stage: Generated<number>;
+    auto_approved: Generated<boolean>;
+    granted_at: NullableTimestamp;
+    expires_at: NullableTimestamp;
+    ended_at: NullableTimestamp;
+    end_reason: Generated<string>;
+    created_at: Generated<Date>;
+  };
+  access_decisions: {
+    id: string;
+    org_id: string;
+    request_id: string;
+    stage: number;
+    approver_id: string | null;
+    decision: "approve" | "deny";
+    comment: Generated<string>;
+    at: Generated<Date>;
   };
   mdm_connections: {
     id: string;

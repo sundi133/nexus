@@ -38,7 +38,9 @@ const UserInput = z.object({
   roles: z.array(Role).default([]),
 });
 
-const UserPatch = patchOf(UserInput.pick({ given_name: true, family_name: true, title: true, department: true })).openapi("UserPatch");
+const UserPatch = patchOf(UserInput.pick({ given_name: true, family_name: true, title: true, department: true }))
+  .extend({ manager_id: Id.nullable().optional().openapi({ description: "Their manager, or null for none" }) })
+  .openapi("UserPatch");
 
 const userQuery = (tx: Tx) =>
   tx
@@ -86,6 +88,18 @@ async function ownerCount(tx: Tx) {
 }
 
 /** Revokes every live session for a user; returns how many were revoked. */
+/** A manager must be someone else in the organization, and not someone who reports to this person. */
+async function checkManager(tx: Tx, userId: string, managerId: string) {
+  if (managerId === userId) throw badRequest("invalid_manager", "Someone can't be their own manager");
+  let cur: string | null = managerId;
+  for (let i = 0; cur && i < 50; i++) {
+    const m: { id: string; manager_id: string | null } | undefined = await tx.selectFrom("users").select(["id", "manager_id"]).where("id", "=", cur).executeTakeFirst();
+    if (!m) throw badRequest("invalid_manager", "That manager isn't in this organization");
+    if (m.manager_id === userId) throw badRequest("invalid_manager", "That would make a reporting loop");
+    cur = m.manager_id;
+  }
+}
+
 export async function revokeUserSessions(tx: Tx, userId: string) {
   const r = await tx
     .updateTable("sessions")
@@ -268,6 +282,7 @@ export function registerUserRoutes(app: App) {
       const patch = c.req.valid("json");
       const user = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         const before = await getUserOr404(tx, id);
+        if (patch.manager_id) await checkManager(tx, id, patch.manager_id);
         const changes = Object.fromEntries(
           Object.entries(patch).filter(([k, v]) => v !== undefined && before[k as keyof typeof before] !== v),
         );

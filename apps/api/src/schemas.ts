@@ -63,6 +63,7 @@ export const User = z
     mfa_enrolled: z.boolean(),
     managed_by: z.string().nullable().openapi({ description: "The directory this person is synced from (its values win on the next sync), or null" }),
     break_glass: z.boolean().openapi({ description: "An emergency owner account: exempt from lockout-prone policies, alerts on every use" }),
+    manager_id: Id.nullable().openapi({ description: "Their manager (approves access requests with a manager stage)" }),
     last_login_at: Timestamp.nullable(),
     created_at: Timestamp,
     updated_at: Timestamp,
@@ -168,6 +169,7 @@ export type UserRow = {
   mfa_enrolled: boolean | 0 | 1 | null; // Kysely SqlBool
   managed_by?: string | null; // directory provider key
   break_glass?: boolean;
+  manager_id?: string | null;
 };
 
 export const toUser = (u: UserRow): z.infer<typeof User> => ({
@@ -181,8 +183,9 @@ export const toUser = (u: UserRow): z.infer<typeof User> => ({
   status: u.status,
   roles: (u.roles ?? []) as z.infer<typeof Role>[],
   mfa_enrolled: Boolean(u.mfa_enrolled),
-  managed_by: u.managed_by === "google" ? "Google Workspace" : u.managed_by === "entra" ? "Microsoft Entra ID" : null,
+  managed_by: u.managed_by === "google" ? "Google Workspace" : u.managed_by === "entra" ? "Microsoft Entra ID" : u.managed_by === "scim" ? "SCIM" : null,
   break_glass: u.break_glass ?? false,
+  manager_id: u.manager_id ?? null,
   last_login_at: isoOrNull(u.last_login_at),
   created_at: iso(u.created_at),
   updated_at: iso(u.updated_at),
