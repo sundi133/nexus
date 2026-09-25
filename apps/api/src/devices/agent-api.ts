@@ -243,7 +243,7 @@ export function registerAgentRoutes(app: App) {
           updated_at: new Date(),
         })
         .where("id", "=", kid)
-        .returning(["id", "org_id", "hostname", "platform", "arch", "os_version", "agent_version", "last_seen_at", "posture", "compliance", "primary_user_id", "compliance_grace_until"])
+        .returning(["id", "org_id", "hostname", "platform", "arch", "os_version", "agent_version", "last_seen_at", "posture", "compliance", "primary_user_id", "compliance_grace_until", "serial"])
         .executeTakeFirstOrThrow();
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
       if (input.update_result) await recordResult(tx, dev.org_id, d, input.update_result, meta);

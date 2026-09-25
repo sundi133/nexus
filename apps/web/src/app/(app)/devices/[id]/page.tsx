@@ -94,6 +94,25 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
               />
             </div>
           </Card>
+          {d.mdm.length ? (
+            <Card>
+              <CardHeader title="Device management (MDM)" description="What your MDM reports about this device, matched by serial number." />
+              <div className="space-y-3 p-4">
+                {d.mdm.map((m) => (
+                  <KeyValue
+                    key={m.connection}
+                    items={[
+                      ["Source", `${m.source} (${m.connection})`],
+                      ["Managed", m.managed ? "Yes" : "No"],
+                      ["Compliance", m.compliant === null ? "Not reported" : m.compliant ? "Compliant" : `Non-compliant${m.detail ? ` (${m.detail})` : ""}`],
+                      ["Encrypted", m.encrypted === null ? "Not reported" : m.encrypted ? "Yes" : "No"],
+                      ["Last contact", m.last_contact_at ? formatDateTime(m.last_contact_at) : "—"],
+                    ]}
+                  />
+                ))}
+              </div>
+            </Card>
+          ) : null}
           <Card>
             <CardHeader title="Hardware and users" />
             <div className="p-4">

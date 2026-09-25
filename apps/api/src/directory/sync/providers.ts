@@ -23,7 +23,7 @@ type Endpoints = Pick<Config, "googleTokenUrl" | "googleAdminBase" | "entraLogin
 const MAX_PAGES = 1000;
 const TIMEOUT_MS = 30_000;
 
-async function getJson(url: string, init: RequestInit, what: string): Promise<any> {
+export async function getJson(url: string, init: RequestInit, what: string): Promise<any> {
   let res: Response;
   try {
     res = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS), redirect: "error" });
@@ -153,7 +153,7 @@ export const EntraConfig = z.object({
   client_id: z.uuid(),
 });
 
-async function entraToken(ep: Endpoints, cfg: z.infer<typeof EntraConfig>, secret: string) {
+export async function entraToken(ep: Endpoints, cfg: z.infer<typeof EntraConfig>, secret: string) {
   const body = await getJson(
     `${ep.entraLoginBase}/${encodeURIComponent(cfg.tenant_id)}/oauth2/v2.0/token`,
     {
@@ -167,7 +167,7 @@ async function entraToken(ep: Endpoints, cfg: z.infer<typeof EntraConfig>, secre
   return String(body.access_token);
 }
 
-async function graphPages(ep: Endpoints, first: string, token: string, what: string) {
+export async function graphPages(ep: Endpoints, first: string, token: string, what: string) {
   const items: any[] = [];
   let url: string | undefined = first;
   for (let i = 0; i < MAX_PAGES && url; i++) {

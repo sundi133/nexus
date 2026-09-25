@@ -74,5 +74,6 @@ const CHECK_TITLES: Record<string, string> = {
   screen_lock: "Screen lock",
   os_version: "OS version",
   system_integrity: "System integrity",
+  mdm_compliant: "MDM compliance",
 };
 export const checkTitle = (k: string) => CHECK_TITLES[k] ?? k;

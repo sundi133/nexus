@@ -20,7 +20,7 @@ export const PostureFacts = z
   .openapi("PostureFacts");
 export type PostureFacts = z.infer<typeof PostureFacts>;
 
-export const CHECK_KEYS = ["disk_encryption", "firewall", "screen_lock", "os_version", "system_integrity"] as const;
+export const CHECK_KEYS = ["disk_encryption", "firewall", "screen_lock", "os_version", "system_integrity", "mdm_compliant"] as const;
 export type CheckKey = (typeof CHECK_KEYS)[number];
 
 export const PolicyParams = {
@@ -29,6 +29,7 @@ export const PolicyParams = {
   screen_lock: z.object({ max_delay_minutes: z.number().int().min(0).max(60) }),
   os_version: z.object({ minimum: z.object({ macos: z.string().max(20), windows: z.string().max(30), linux: z.string().max(20) }) }),
   system_integrity: z.object({}),
+  mdm_compliant: z.object({}),
 } as const;
 
 export type PolicyMode = "audit" | "enforce";
@@ -42,6 +43,8 @@ export const DEFAULT_POLICIES: Policy[] = [
   // Empty minimum = not enforced for that platform until an admin sets one.
   { key: "os_version", ...base, params: { minimum: { macos: "14.0", windows: "10.0.19045", linux: "" } } },
   { key: "system_integrity", ...base, params: {} },
+  // Off until an MDM is connected and an admin opts in.
+  { key: "mdm_compliant", ...base, enabled: false, params: {} },
 ];
 
 export const CHECK_INFO: Record<CheckKey, { title: string; why: string }> = {
@@ -50,6 +53,7 @@ export const CHECK_INFO: Record<CheckKey, { title: string; why: string }> = {
   screen_lock: { title: "Screen lock", why: "An unattended, unlocked device is an open door." },
   os_version: { title: "Operating system up to date", why: "Old versions miss security fixes that attackers actively use." },
   system_integrity: { title: "System integrity protection", why: "SIP / Secure Boot stop malware from tampering with the OS." },
+  mdm_compliant: { title: "Managed and compliant in your MDM", why: "Your MDM (Intune, Jamf) enforces settings Nexus doesn't check itself, like app control and configuration profiles." },
 };
 
 const FIX: Record<CheckKey, Record<DevicePlatform, string>> = {
@@ -72,6 +76,11 @@ const FIX: Record<CheckKey, Record<DevicePlatform, string>> = {
     macos: "Open System Settings → General → Software Update and install the latest update.",
     windows: "Open Settings → Windows Update and install all available updates.",
     linux: "Install the latest updates with your package manager, then reboot.",
+  },
+  mdm_compliant: {
+    macos: "Enroll this Mac in your organization's device management (for example Jamf or Intune), or fix what it reports. Ask IT if you're not sure how.",
+    windows: "Enroll this PC in your organization's device management (Intune): Settings → Accounts → Access work or school. Then fix what Company Portal reports.",
+    linux: "Linux devices are usually not managed by an MDM. Ask IT whether this policy applies to you.",
   },
   system_integrity: {
     macos: "System Integrity Protection is off. Ask IT: it can only be re-enabled from Recovery mode.",
@@ -100,10 +109,23 @@ export const lockDelay = (seconds: number) => (seconds === 0 ? "immediately" : s
 
 const onOff = (status: "on" | "off" | "unknown"): CheckResult["status"] => (status === "on" ? "pass" : status === "off" ? "fail" : "unknown");
 
-export function evaluate(device: { platform: DevicePlatform; os_version: string }, facts: PostureFacts | null, policies: Policy[]): CheckResult[] {
+/** What the organization's MDMs say about a device (DEV + MDM signals). */
+export type MdmSignal = { source: string; managed: boolean; compliant: boolean | null; detail: string };
+export type EvalContext = { mdmConnected: boolean; mdm: MdmSignal | null };
+
+export function evaluate(device: { platform: DevicePlatform; os_version: string; serial?: string }, facts: PostureFacts | null, policies: Policy[], ctx: EvalContext = { mdmConnected: false, mdm: null }): CheckResult[] {
   const out: CheckResult[] = [];
   for (const p of policies) {
     if (!p.enabled) continue;
+    if (p.key === "mdm_compliant") {
+      const m = ctx.mdm;
+      if (!ctx.mdmConnected) out.push({ key: p.key, status: "not_applicable", detail: "No MDM connected" });
+      else if (!m) out.push({ key: p.key, status: "fail", detail: device.serial ? `Not found in your MDM (serial ${device.serial})` : "Not found in your MDM (no serial number reported)" });
+      else if (!m.managed) out.push({ key: p.key, status: "fail", detail: `Not managed by ${m.source}` });
+      else if (m.compliant === false) out.push({ key: p.key, status: "fail", detail: `${m.source} reports it non-compliant${m.detail ? ` (${m.detail})` : ""}` });
+      else out.push({ key: p.key, status: "pass", detail: m.compliant ? `Compliant in ${m.source}` : `Managed by ${m.source}` });
+      continue;
+    }
     if (!facts && p.key !== "os_version") {
       out.push({ key: p.key, status: "unknown", detail: "Waiting for the device's first report" });
       continue;

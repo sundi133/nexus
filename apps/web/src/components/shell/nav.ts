@@ -47,6 +47,7 @@ export const NAV: NavSection[] = [
     title: "Devices",
     items: [
       { label: "All devices", href: "/devices", icon: Laptop, shortcut: "G D" },
+      { label: "Device management", href: "/mdm", icon: Server },
       { label: "Device policies", href: "/device-policies", icon: Wrench },
       { label: "Agent updates", href: "/agent-updates", icon: PackageCheck },
     ],

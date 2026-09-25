@@ -15,6 +15,7 @@ import { registerAuthRoutes } from "./auth/routes.js";
 import { registerFederationRoutes } from "./federation/routes.js";
 import { registerScimServer } from "./directory/scim/server.js";
 import { scheduleGraceChecks } from "./devices/service.js";
+import { registerMdmRoutes, scheduleMdmSyncs } from "./devices/mdm.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
@@ -148,6 +149,7 @@ export function createApp(deps: Deps) {
   registerAuthRoutes(app);
   registerFederationRoutes(app);
   registerScimServer(app);
+  registerMdmRoutes(app);
   registerPasskeyRoutes(app);
   registerPushRoutes(app);
   registerImportRoutes(app);
@@ -196,4 +198,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleEventDelivery(jobs, deps);
   scheduleDomainRechecks(jobs, deps);
   scheduleGraceChecks(jobs, deps);
+  scheduleMdmSyncs(jobs, deps);
 }

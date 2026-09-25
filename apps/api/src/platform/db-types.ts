@@ -258,6 +258,40 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Timestamp;
   };
+  mdm_connections: {
+    id: string;
+    org_id: string;
+    provider: "intune" | "jamf";
+    name: string;
+    config: Json;
+    secret: Buffer;
+    enabled: Generated<boolean>;
+    interval_minutes: Generated<number>;
+    last_sync_at: NullableTimestamp;
+    last_status: Generated<"never" | "ok" | "error">;
+    last_error: Generated<string>;
+    last_result: Json;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  mdm_devices: {
+    org_id: string;
+    connection_id: string;
+    external_id: string;
+    serial: Generated<string>;
+    name: Generated<string>;
+    platform: Generated<string>;
+    os_version: Generated<string>;
+    user_email: Generated<string>;
+    managed: Generated<boolean>;
+    compliant: boolean | null;
+    compliance_detail: Generated<string>;
+    encrypted: boolean | null;
+    last_contact_at: NullableTimestamp;
+    device_id: string | null;
+    updated_at: Generated<Date>;
+  };
   identity_providers: {
     id: string;
     org_id: string;

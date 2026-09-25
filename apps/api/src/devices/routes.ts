@@ -1,3 +1,4 @@
+import { mdmForDevice } from "./mdm.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { randomBytes } from "node:crypto";
 import { sql } from "kysely";
@@ -57,6 +58,19 @@ const DeviceDetail = DeviceSummary.extend({
   last_ip: z.string(),
   compliance_changed_at: z.string().nullable(),
   checks: z.array(DeviceCheck),
+  mdm: z
+    .array(
+      z.object({
+        source: z.string(),
+        connection: z.string(),
+        managed: z.boolean(),
+        compliant: z.boolean().nullable(),
+        detail: z.string(),
+        encrypted: z.boolean().nullable(),
+        last_contact_at: z.string().nullable(),
+      }),
+    )
+    .openapi({ description: "What each connected MDM (Intune, Jamf) reports about this device" }),
   inventory: z.record(z.string(), z.unknown()),
 }).openapi("DeviceDetail");
 
@@ -112,6 +126,7 @@ async function detail(tx: Tx, id: string): Promise<z.infer<typeof DeviceDetail>>
     last_ip: d.last_ip,
     compliance_changed_at: isoOrNull(d.compliance_changed_at),
     inventory: d.inventory as Record<string, unknown>,
+    mdm: await mdmForDevice(tx, id),
     checks: checks
       .sort((a, b) => order(a.check_key) - order(b.check_key))
       .map((ch) => {

@@ -720,6 +720,163 @@
           "result"
         ]
       },
+      "MdmConnection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "intune",
+              "jamf"
+            ]
+          },
+          "provider_name": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "account": {
+            "type": "string",
+            "description": "Tenant (Intune) or Jamf URL"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval_minutes": {
+            "type": "integer"
+          },
+          "last_sync_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_status": {
+            "type": "string",
+            "enum": [
+              "never",
+              "ok",
+              "error"
+            ]
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "devices": {
+            "type": "integer"
+          },
+          "matched": {
+            "type": "integer",
+            "description": "MDM devices that are also Nexus devices (same serial number)"
+          },
+          "without_agent": {
+            "type": "integer",
+            "description": "MDM devices with no Nexus agent: deploy it from the MDM"
+          },
+          "noncompliant": {
+            "type": "integer"
+          },
+          "syncing": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "provider_name",
+          "name",
+          "account",
+          "enabled",
+          "interval_minutes",
+          "last_sync_at",
+          "last_status",
+          "last_error",
+          "devices",
+          "matched",
+          "without_agent",
+          "noncompliant",
+          "syncing",
+          "created_at"
+        ]
+      },
+      "MdmDevice": {
+        "type": "object",
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "os_version": {
+            "type": "string"
+          },
+          "user_email": {
+            "type": "string"
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "compliant": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "compliance_detail": {
+            "type": "string"
+          },
+          "encrypted": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "last_contact_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "device_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          }
+        },
+        "required": [
+          "external_id",
+          "name",
+          "serial",
+          "platform",
+          "os_version",
+          "user_email",
+          "managed",
+          "compliant",
+          "compliance_detail",
+          "encrypted",
+          "last_contact_at",
+          "device_id"
+        ]
+      },
       "WebAuthnCeremony": {
         "type": "object",
         "properties": {
@@ -4389,6 +4546,54 @@
                   "$ref": "#/components/schemas/DeviceCheck"
                 }
               },
+              "mdm": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string"
+                    },
+                    "connection": {
+                      "type": "string"
+                    },
+                    "managed": {
+                      "type": "boolean"
+                    },
+                    "compliant": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "encrypted": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "last_contact_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "connection",
+                    "managed",
+                    "compliant",
+                    "detail",
+                    "encrypted",
+                    "last_contact_at"
+                  ]
+                },
+                "description": "What each connected MDM (Intune, Jamf) reports about this device"
+              },
               "inventory": {
                 "type": "object",
                 "additionalProperties": {}
@@ -4401,6 +4606,7 @@
               "last_ip",
               "compliance_changed_at",
               "checks",
+              "mdm",
               "inventory"
             ]
           }
@@ -4416,7 +4622,8 @@
               "firewall",
               "screen_lock",
               "os_version",
-              "system_integrity"
+              "system_integrity",
+              "mdm_compliant"
             ]
           },
           "title": {
@@ -4480,7 +4687,8 @@
               "firewall",
               "screen_lock",
               "os_version",
-              "system_integrity"
+              "system_integrity",
+              "mdm_compliant"
             ]
           },
           "title": {
@@ -7059,6 +7267,781 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FederationTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mdm/connections": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Connected MDMs (Intune, Jamf) and what they report",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MdmConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Connect Microsoft Intune or Jamf Pro (read-only; requires recent MFA)",
+        "description": "The credentials are tried first. Intune needs an Entra app with DeviceManagementManagedDevices.Read.All; Jamf an API client with Read Computers.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "credentials": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tenant_id": {
+                            "type": "string",
+                            "pattern": "^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9.-]+\\.[A-Za-z]{2,})$/i"
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "intune"
+                            ]
+                          },
+                          "client_secret": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "tenant_id",
+                          "client_id",
+                          "provider",
+                          "client_secret"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "base_url": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "format": "uri",
+                            "example": "https://acme.jamfcloud.com"
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "jamf"
+                            ]
+                          },
+                          "client_secret": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "base_url",
+                          "client_id",
+                          "provider",
+                          "client_secret"
+                        ]
+                      }
+                    ]
+                  },
+                  "interval_minutes": {
+                    "type": "integer",
+                    "minimum": 15,
+                    "maximum": 1440,
+                    "default": 60
+                  }
+                },
+                "required": [
+                  "name",
+                  "credentials"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MdmConnection"
+                      }
+                    },
+                    "found": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "found"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mdm/connections/{id}": {
+      "patch": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Change an MDM connection (requires recent MFA)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "interval_minutes": {
+                    "type": "integer",
+                    "minimum": 15,
+                    "maximum": 1440
+                  },
+                  "credentials": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "tenant_id": {
+                            "type": "string",
+                            "pattern": "^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9.-]+\\.[A-Za-z]{2,})$/i"
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "intune"
+                            ]
+                          },
+                          "client_secret": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "tenant_id",
+                          "client_id",
+                          "provider",
+                          "client_secret"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "base_url": {
+                            "type": "string",
+                            "maxLength": 300,
+                            "format": "uri",
+                            "example": "https://acme.jamfcloud.com"
+                          },
+                          "client_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "jamf"
+                            ]
+                          },
+                          "client_secret": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "base_url",
+                          "client_id",
+                          "provider",
+                          "client_secret"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MdmConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Disconnect an MDM (requires recent MFA)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MdmConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mdm/connections/{id}/sync": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Read the MDM now",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MdmConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mdm/connections/{id}/devices": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Devices the MDM manages",
+        "description": "`without_agent=true`: only those with no Nexus agent (deploy the agent from the MDM to cover them).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "without_agent",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MdmDevice"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
                 }
               }
             }
@@ -20070,7 +21053,8 @@
                 "firewall",
                 "screen_lock",
                 "os_version",
-                "system_integrity"
+                "system_integrity",
+                "mdm_compliant"
               ]
             },
             "required": true,

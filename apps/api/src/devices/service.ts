@@ -5,6 +5,7 @@ import { notifyUsers } from "../notify/send.js";
 import type { Tx } from "../platform/db.js";
 import { enqueue, registerJobHandler, type JobRunner } from "../platform/jobs.js";
 import type { Compliance, DevicePlatform } from "../platform/db-types.js";
+import { mdmContext } from "./mdm-signals.js";
 import { CHECK_INFO, CHECK_KEYS, DEFAULT_POLICIES, enforce, evaluate, PostureFacts, type CheckKey, type Policy } from "./posture.js";
 
 export const ONLINE_WINDOW_MS = 3 * 60_000;
@@ -20,8 +21,8 @@ export async function getPolicies(tx: Tx): Promise<Policy[]> {
   }).filter((p) => (CHECK_KEYS as readonly string[]).includes(p.key)) as Policy[];
 }
 
-type DeviceForEval = { id: string; org_id: string; hostname: string; platform: DevicePlatform; os_version: string; posture: unknown; compliance: Compliance; primary_user_id: string | null; compliance_grace_until?: Date | null };
-export const EVAL_COLUMNS = ["id", "org_id", "hostname", "platform", "os_version", "posture", "compliance", "primary_user_id", "compliance_grace_until"] as const;
+type DeviceForEval = { id: string; org_id: string; hostname: string; platform: DevicePlatform; os_version: string; serial?: string; posture: unknown; compliance: Compliance; primary_user_id: string | null; compliance_grace_until?: Date | null };
+export const EVAL_COLUMNS = ["id", "org_id", "hostname", "platform", "os_version", "serial", "posture", "compliance", "primary_user_id", "compliance_grace_until"] as const;
 
 /**
  * Re-evaluates a device against the org's policies, stores per-check results,
@@ -32,7 +33,7 @@ export async function evaluateDevice(tx: Tx, device: DeviceForEval, policies: Po
   const previous = new Map(
     (await tx.selectFrom("device_checks").select(["check_key", "status", "failing_since"]).where("device_id", "=", device.id).execute()).map((c) => [c.check_key, c]),
   );
-  const { checks: results, compliance, grace_until } = enforce(evaluate(device, facts, policies), policies, previous);
+  const { checks: results, compliance, grace_until } = enforce(evaluate(device, facts, policies, await mdmContext(tx, device)), policies, previous);
 
   await tx.deleteFrom("device_checks").where("device_id", "=", device.id).execute();
   if (results.length) {
