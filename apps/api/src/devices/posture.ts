@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import type { CheckStatus, Compliance, DevicePlatform } from "../platform/db-types.js";
 import { usableSerial } from "./serial.js";
+import { type AIContext, type AIInventory, classify, serverTarget } from "./ai.js";
 
 /**
  * Device posture (SPEC DEV-05, DPOL-01/03). The agent reports raw facts; the
@@ -21,7 +22,7 @@ export const PostureFacts = z
   .openapi("PostureFacts");
 export type PostureFacts = z.infer<typeof PostureFacts>;
 
-export const CHECK_KEYS = ["disk_encryption", "firewall", "screen_lock", "os_version", "system_integrity", "mdm_compliant"] as const;
+export const CHECK_KEYS = ["disk_encryption", "firewall", "screen_lock", "os_version", "system_integrity", "mdm_compliant", "ai_mcp_governed"] as const;
 export type CheckKey = (typeof CHECK_KEYS)[number];
 
 export const PolicyParams = {
@@ -31,6 +32,14 @@ export const PolicyParams = {
   os_version: z.object({ minimum: z.object({ macos: z.string().max(20), windows: z.string().max(30), linux: z.string().max(20) }) }),
   system_integrity: z.object({}),
   mdm_compliant: z.object({}),
+  ai_mcp_governed: z.object({
+    allowed_hosts: z
+      .array(z.string().trim().toLowerCase().regex(/^(\*\.)?[a-z0-9.-]+$/, "A host name, or *.domain for its subdomains").max(200))
+      .max(100)
+      .openapi({ description: "Remote MCP hosts people may use directly, besides the Nexus gateway" }),
+    allow_local: z.boolean().openapi({ description: "Allow MCP servers that run on the device (stdio)" }),
+    allow_inline_secrets: z.boolean().openapi({ description: "Allow API keys and tokens written into MCP config files" }),
+  }),
 } as const;
 
 export type PolicyMode = "audit" | "enforce";
@@ -46,6 +55,8 @@ export const DEFAULT_POLICIES: Policy[] = [
   { key: "system_integrity", ...base, params: {} },
   // Off until an MDM is connected and an admin opts in.
   { key: "mdm_compliant", ...base, enabled: false, params: {} },
+  // Off until an admin opts in; starts in audit mode so it reports without blocking anyone.
+  { key: "ai_mcp_governed", ...base, enabled: false, mode: "audit", params: { allowed_hosts: [], allow_local: true, allow_inline_secrets: false } },
 ];
 
 export const CHECK_INFO: Record<CheckKey, { title: string; why: string }> = {
@@ -55,6 +66,10 @@ export const CHECK_INFO: Record<CheckKey, { title: string; why: string }> = {
   os_version: { title: "Operating system up to date", why: "Old versions miss security fixes that attackers actively use." },
   system_integrity: { title: "System integrity protection", why: "SIP / Secure Boot stop malware from tampering with the OS." },
   mdm_compliant: { title: "Managed and compliant in your MDM", why: "Your MDM (Intune, Jamf) enforces settings Nexus doesn't check itself, like app control and configuration profiles." },
+  ai_mcp_governed: {
+    title: "AI tools use approved MCP servers",
+    why: "MCP servers let AI assistants act with your access. Going through the Nexus gateway puts every tool call under policy and in the audit log, and keeps tokens out of config files.",
+  },
 };
 
 const FIX: Record<CheckKey, Record<DevicePlatform, string>> = {
@@ -82,6 +97,11 @@ const FIX: Record<CheckKey, Record<DevicePlatform, string>> = {
     macos: "Enroll this Mac in your organization's device management (for example Jamf or Intune), or fix what it reports. Ask IT if you're not sure how.",
     windows: "Enroll this PC in your organization's device management (Intune): Settings → Accounts → Access work or school. Then fix what Company Portal reports.",
     linux: "Linux devices are usually not managed by an MDM. Ask IT whether this policy applies to you.",
+  },
+  ai_mcp_governed: {
+    macos: "Connect your AI tools (Claude, Cursor, VS Code…) to MCP servers through the Nexus MCP gateway (IT can give you the URL), and remove API keys written into MCP config files.",
+    windows: "Connect your AI tools (Claude, Cursor, VS Code…) to MCP servers through the Nexus MCP gateway (IT can give you the URL), and remove API keys written into MCP config files.",
+    linux: "Connect your AI tools (Claude, Cursor, VS Code…) to MCP servers through the Nexus MCP gateway (IT can give you the URL), and remove API keys written into MCP config files.",
   },
   system_integrity: {
     macos: "System Integrity Protection is off. Ask IT: it can only be re-enabled from Recovery mode.",
@@ -112,7 +132,7 @@ const onOff = (status: "on" | "off" | "unknown"): CheckResult["status"] => (stat
 
 /** What the organization's MDMs say about a device (DEV + MDM signals). */
 export type MdmSignal = { source: string; managed: boolean; compliant: boolean | null; detail: string };
-export type EvalContext = { mdmConnected: boolean; mdm: MdmSignal | null };
+export type EvalContext = { mdmConnected: boolean; mdm: MdmSignal | null; ai?: { inventory: AIInventory | null; ctx: AIContext } };
 
 export function evaluate(device: { platform: DevicePlatform; os_version: string; serial?: string }, facts: PostureFacts | null, policies: Policy[], ctx: EvalContext = { mdmConnected: false, mdm: null }): CheckResult[] {
   const out: CheckResult[] = [];
@@ -134,6 +154,10 @@ export function evaluate(device: { platform: DevicePlatform; os_version: string;
       else if (!m.managed) out.push({ key: p.key, status: "fail", detail: `Not managed by ${m.source}` });
       else if (m.compliant === false) out.push({ key: p.key, status: "fail", detail: `${m.source} reports it non-compliant${m.detail ? ` (${m.detail})` : ""}` });
       else out.push({ key: p.key, status: "pass", detail: m.compliant ? `Compliant in ${m.source}` : `Managed by ${m.source}` });
+      continue;
+    }
+    if (p.key === "ai_mcp_governed") {
+      out.push(evaluateAI(p.params as z.infer<typeof PolicyParams.ai_mcp_governed>, ctx.ai));
       continue;
     }
     if (!facts && p.key !== "os_version") {
@@ -179,6 +203,23 @@ export function evaluate(device: { platform: DevicePlatform; os_version: string;
     }
   }
   return out;
+}
+
+function evaluateAI(params: z.infer<typeof PolicyParams.ai_mcp_governed>, ai: EvalContext["ai"]): CheckResult {
+  const key = "ai_mcp_governed" as const;
+  if (!ai?.inventory) return { key, status: "unknown", detail: "The agent hasn't reported AI tools yet (it needs a recent agent version)" };
+  const active = ai.inventory.mcp_servers.filter((x) => !x.disabled);
+  const problems: string[] = [];
+  for (const x of active) {
+    const who = `${x.name} (${x.client})`;
+    const c = classify(x, ai.ctx, params.allowed_hosts);
+    if (c.governance === "bypass") problems.push(`${who} connects straight to ${c.via}, bypassing the Nexus gateway`);
+    else if (c.governance === "remote") problems.push(`${who} uses ${serverTarget(x).split("/")[0]}, which isn't behind the Nexus gateway`);
+    else if (c.governance === "local" && !params.allow_local) problems.push(`${who} runs on the device (${x.package || x.command})`);
+    if (x.inline_secrets && !params.allow_inline_secrets) problems.push(`${who} has a token written into its config file`);
+  }
+  if (problems.length) return { key, status: "fail", detail: problems.slice(0, 3).join("; ") + (problems.length > 3 ? `; and ${problems.length - 3} more` : "") };
+  return { key, status: "pass", detail: active.length ? `${active.length} MCP server${active.length === 1 ? "" : "s"}, all approved` : "No MCP servers configured" };
 }
 
 export type EnforcedCheck = CheckResult & { enforced: boolean; failing_since: Date | null; grace_until: Date | null };

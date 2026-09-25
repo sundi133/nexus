@@ -8,12 +8,14 @@ import { use, useState } from "react";
 import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { ConfirmAction } from "@/components/features/confirm-action";
+import { DeviceServers, TOOL_KIND } from "@/components/features/ai-bits";
 import { CheckList, ComplianceBadge, OnlineDot, PLATFORM_LABEL, PlatformIcon } from "@/components/features/device-bits";
 import { CommandHistory, DeviceActions } from "@/components/features/device-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, Card, CardHeader, EmptyState, ErrorBanner, KeyValue, Skeleton } from "@/components/ui/misc";
 import { Dialog, DialogContent, Tabs, TabsContent, TabsList } from "@/components/ui/overlay";
+import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import { api, unwrap } from "@/lib/api";
 import { useCan } from "@/lib/queries";
 import { formatDateTime, timeAgo } from "@/lib/utils";
@@ -39,6 +41,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
   const d = device.data;
   const inv = d.inventory as { cpu?: string; memory_bytes?: number; uptime_seconds?: number; console_user?: string; local_users?: { name: string; admin: boolean }[] };
   const failing = d.checks.filter((c) => c.status === "fail").length;
+  const aiIssues = d.ai?.mcp_servers.filter((s) => !s.disabled && (s.governance === "bypass" || s.governance === "remote" || s.inline_secrets)).length ?? 0;
 
   return (
     <>
@@ -72,7 +75,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
       </div>
 
       <Tabs defaultValue="compliance">
-        <TabsList tabs={[{ value: "compliance", label: failing ? `Compliance (${failing} failing)` : "Compliance" }, { value: "details", label: "Details" }, { value: "actions", label: "Actions" }, { value: "activity", label: "Activity" }]} />
+        <TabsList tabs={[{ value: "compliance", label: failing ? `Compliance (${failing} failing)` : "Compliance" }, { value: "details", label: "Details" }, { value: "ai", label: aiIssues ? `AI (${aiIssues} to review)` : "AI" }, { value: "actions", label: "Actions" }, { value: "activity", label: "Activity" }]} />
         <TabsContent value="compliance">
           <Card className="overflow-hidden">
             <CardHeader title="Policy checks" description={d.compliance_changed_at ? `Compliance last changed ${formatDateTime(d.compliance_changed_at)}` : "Evaluated on every check-in (about once a minute)."} />
@@ -129,6 +132,47 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
               />
             </div>
           </Card>
+        </TabsContent>
+        <TabsContent value="ai" className="space-y-5">
+          {!d.ai ? (
+            <Card>
+              <EmptyState title="No AI report yet" description="This device's agent doesn't report AI tools yet. It will once it updates to a recent version." />
+            </Card>
+          ) : (
+            <>
+              <Card className="overflow-hidden">
+                <CardHeader title="MCP servers" description="Configured in this device's AI clients. Nexus reads which servers are set up, never prompts, files or secret values." />
+                {d.ai.mcp_servers.length ? <DeviceServers servers={d.ai.mcp_servers} /> : <EmptyState title="No MCP servers configured" />}
+              </Card>
+              <Card className="overflow-hidden">
+                <CardHeader title="AI tools" />
+                {d.ai.tools.length ? (
+                  <Table>
+                    <THead>
+                      <tr>
+                        <TH>Tool</TH>
+                        <TH>Kind</TH>
+                        <TH>Version</TH>
+                        <TH>Installed for</TH>
+                      </tr>
+                    </THead>
+                    <tbody>
+                      {d.ai.tools.map((t) => (
+                        <TR key={`${t.name}-${t.kind}-${t.user ?? ""}`}>
+                          <TD className="font-medium">{t.name}</TD>
+                          <TD className="text-fg-muted">{TOOL_KIND[t.kind]}</TD>
+                          <TD className="font-mono text-xs text-fg-muted">{t.version ?? "—"}</TD>
+                          <TD className="text-fg-muted">{t.user ?? "Everyone"}</TD>
+                        </TR>
+                      ))}
+                    </tbody>
+                  </Table>
+                ) : (
+                  <EmptyState title="No AI tools found" />
+                )}
+              </Card>
+            </>
+          )}
         </TabsContent>
         <TabsContent value="actions">
           <Card className="overflow-hidden">

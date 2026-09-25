@@ -66,6 +66,7 @@ function PolicyCard({ policy, editable }: { policy: Policy; editable: boolean })
     },
   });
   const minimum = (params.minimum ?? {}) as Record<string, string>;
+  const [hostsText, setHostsText] = useState(((policy.params as { allowed_hosts?: string[] }).allowed_hosts ?? []).join(", "));
 
   return (
     <Card className="p-4">
@@ -123,6 +124,31 @@ function PolicyCard({ policy, editable }: { policy: Policy; editable: boolean })
                   </option>
                 ))}
               </Select>
+            </div>
+          ) : null}
+          {enabled && policy.key === "ai_mcp_governed" ? (
+            <div className="mt-3 space-y-2 text-[13px]">
+              <label className="block text-xs text-fg-muted">
+                Remote MCP hosts allowed without the gateway (comma-separated; *.example.com for subdomains)
+                <Input
+                  className="mt-1 font-mono text-xs"
+                  placeholder="none: only the Nexus gateway"
+                  disabled={!editable}
+                  value={hostsText}
+                  onChange={(e) => {
+                    setHostsText(e.target.value);
+                    setParams({ ...params, allowed_hosts: e.target.value.split(",").map((h) => h.trim().toLowerCase()).filter(Boolean) });
+                  }}
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" disabled={!editable} checked={params.allow_local !== false} onChange={(e) => setParams({ ...params, allow_local: e.target.checked })} />
+                Allow MCP servers that run on the device
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" disabled={!editable} checked={params.allow_inline_secrets === true} onChange={(e) => setParams({ ...params, allow_inline_secrets: e.target.checked })} />
+                Allow tokens written into MCP config files
+              </label>
             </div>
           ) : null}
           {enabled && policy.key === "os_version" ? (

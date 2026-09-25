@@ -3033,7 +3033,8 @@
                     "screen_lock",
                     "os_version",
                     "system_integrity",
-                    "mdm_compliant"
+                    "mdm_compliant",
+                    "ai_mcp_governed"
                   ]
                 },
                 "enabled": {
@@ -7428,6 +7429,198 @@
           "error"
         ]
       },
+      "AIFleetInventory": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {
+              "devices": {
+                "type": "integer"
+              },
+              "reporting": {
+                "type": "integer",
+                "description": "Devices whose agent reports AI tools"
+              },
+              "with_ai_tools": {
+                "type": "integer"
+              },
+              "with_mcp": {
+                "type": "integer"
+              },
+              "ungoverned": {
+                "type": "integer",
+                "description": "Devices with an enabled MCP server that bypasses the gateway or uses a remote server that isn't allowed"
+              },
+              "inline_secrets": {
+                "type": "integer",
+                "description": "Devices with a token written into an MCP config file"
+              }
+            },
+            "required": [
+              "devices",
+              "reporting",
+              "with_ai_tools",
+              "with_mcp",
+              "ungoverned",
+              "inline_secrets"
+            ]
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FleetMcpServer"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "app",
+                    "cli",
+                    "extension"
+                  ]
+                },
+                "devices": {
+                  "type": "integer"
+                },
+                "versions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "kind",
+                "devices",
+                "versions"
+              ]
+            }
+          }
+        },
+        "required": [
+          "summary",
+          "servers",
+          "tools"
+        ]
+      },
+      "FleetMcpServer": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "http",
+              "sse"
+            ]
+          },
+          "governance": {
+            "type": "string",
+            "enum": [
+              "gateway",
+              "bypass",
+              "allowed",
+              "remote",
+              "local"
+            ],
+            "description": "gateway: through the Nexus MCP gateway; bypass: straight to a server that's behind the gateway; allowed: a host the policy allows; remote: any other remote server; local: runs on the device"
+          },
+          "via": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "devices": {
+            "type": "integer"
+          },
+          "people": {
+            "type": "integer"
+          },
+          "inline_secrets": {
+            "type": "integer",
+            "description": "Devices where this server's config holds a token in plain text"
+          },
+          "on": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "type": "string"
+                },
+                "hostname": {
+                  "type": "string"
+                },
+                "user_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "clients": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "inline_secrets": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "device_id",
+                "hostname",
+                "user_email",
+                "clients",
+                "inline_secrets"
+              ]
+            },
+            "description": "Up to 100 devices"
+          }
+        },
+        "required": [
+          "key",
+          "target",
+          "transport",
+          "governance",
+          "via",
+          "names",
+          "clients",
+          "devices",
+          "people",
+          "inline_secrets",
+          "on"
+        ]
+      },
       "DevicePage": {
         "type": "object",
         "properties": {
@@ -7718,6 +7911,9 @@
                 },
                 "description": "What each connected MDM (Intune, Jamf) reports about this device"
               },
+              "ai": {
+                "$ref": "#/components/schemas/DeviceAI"
+              },
               "inventory": {
                 "type": "object",
                 "additionalProperties": {}
@@ -7731,6 +7927,7 @@
               "compliance_changed_at",
               "checks",
               "mdm",
+              "ai",
               "inventory"
             ]
           }
@@ -7747,7 +7944,8 @@
               "screen_lock",
               "os_version",
               "system_integrity",
-              "mdm_compliant"
+              "mdm_compliant",
+              "ai_mcp_governed"
             ]
           },
           "title": {
@@ -7801,6 +7999,144 @@
           "updated_at"
         ]
       },
+      "DeviceAI": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "app",
+                    "cli",
+                    "extension"
+                  ]
+                },
+                "version": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "user": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "kind",
+                "version",
+                "user"
+              ]
+            }
+          },
+          "mcp_servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceMcpServer"
+            }
+          }
+        },
+        "required": [
+          "tools",
+          "mcp_servers"
+        ],
+        "description": "What the agent found in the device's AI clients; null until an agent that reports it checks in"
+      },
+      "DeviceMcpServer": {
+        "type": "object",
+        "properties": {
+          "client": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "user",
+              "project"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "transport": {
+            "type": "string",
+            "enum": [
+              "stdio",
+              "http",
+              "sse"
+            ]
+          },
+          "target": {
+            "type": "string"
+          },
+          "package": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "env_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "inline_secrets": {
+            "type": "boolean"
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "governance": {
+            "type": "string",
+            "enum": [
+              "gateway",
+              "bypass",
+              "allowed",
+              "remote",
+              "local"
+            ],
+            "description": "gateway: through the Nexus MCP gateway; bypass: straight to a server that's behind the gateway; allowed: a host the policy allows; remote: any other remote server; local: runs on the device"
+          },
+          "via": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For bypass: the gateway server it should go through"
+          }
+        },
+        "required": [
+          "client",
+          "user",
+          "scope",
+          "name",
+          "transport",
+          "target",
+          "package",
+          "env_keys",
+          "inline_secrets",
+          "disabled",
+          "governance",
+          "via"
+        ]
+      },
       "DevicePolicy": {
         "type": "object",
         "properties": {
@@ -7812,7 +8148,8 @@
               "screen_lock",
               "os_version",
               "system_integrity",
-              "mdm_compliant"
+              "mdm_compliant",
+              "ai_mcp_governed"
             ]
           },
           "title": {
@@ -31417,6 +31754,82 @@
         }
       }
     },
+    "/v1/devices/ai-inventory": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "AI tools and MCP servers across devices",
+        "description": "Aggregates what agents find in AI clients (Claude, Cursor, VS Code, Codex…): each MCP server with how it's governed, and each AI app, CLI and extension.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIFleetInventory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/devices": {
       "get": {
         "tags": [
@@ -32379,7 +32792,8 @@
                 "screen_lock",
                 "os_version",
                 "system_integrity",
-                "mdm_compliant"
+                "mdm_compliant",
+                "ai_mcp_governed"
               ]
             },
             "required": true,

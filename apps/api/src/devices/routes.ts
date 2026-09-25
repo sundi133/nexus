@@ -1,3 +1,4 @@
+import { DeviceAI, deviceAI } from "./ai-routes.js";
 import { mdmForDevice } from "./mdm.js";
 import { notPrivileged } from "../directory/privileged.js";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -72,6 +73,7 @@ const DeviceDetail = DeviceSummary.extend({
       }),
     )
     .openapi({ description: "What each connected MDM (Intune, Jamf) reports about this device" }),
+  ai: DeviceAI,
   inventory: z.record(z.string(), z.unknown()),
 }).openapi("DeviceDetail");
 
@@ -128,6 +130,7 @@ async function detail(tx: Tx, id: string): Promise<z.infer<typeof DeviceDetail>>
     compliance_changed_at: isoOrNull(d.compliance_changed_at),
     inventory: d.inventory as Record<string, unknown>,
     mdm: await mdmForDevice(tx, { id, serial: d.serial }),
+    ai: await deviceAI(tx, d.inventory),
     checks: checks
       .sort((a, b) => order(a.check_key) - order(b.check_key))
       .map((ch) => {

@@ -42,11 +42,12 @@ type LocalUser struct {
 }
 
 type Inventory struct {
-	CPU           string      `json:"cpu,omitempty"`
-	MemoryBytes   uint64      `json:"memory_bytes,omitempty"`
-	LocalUsers    []LocalUser `json:"local_users,omitempty"`
-	ConsoleUser   string      `json:"console_user,omitempty"`
-	UptimeSeconds int64       `json:"uptime_seconds,omitempty"`
+	CPU           string       `json:"cpu,omitempty"`
+	MemoryBytes   uint64       `json:"memory_bytes,omitempty"`
+	LocalUsers    []LocalUser  `json:"local_users,omitempty"`
+	ConsoleUser   string       `json:"console_user,omitempty"`
+	UptimeSeconds int64        `json:"uptime_seconds,omitempty"`
+	AI            *AIInventory `json:"ai,omitempty"`
 }
 
 type Device struct {
@@ -67,7 +68,11 @@ type Snapshot struct {
 }
 
 // Collect gathers a full snapshot for the current OS (see collect_<os>.go).
-func Collect(ctx context.Context) Snapshot { return collect(ctx) }
+func Collect(ctx context.Context) Snapshot {
+	s := collect(ctx)
+	s.Inventory.AI = DiscoverAI(aiEnv())
+	return s
+}
 
 // run executes a command with a timeout and returns trimmed stdout+stderr.
 // Many admin tools print their answer on stderr, so both are captured.

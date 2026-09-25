@@ -18825,6 +18825,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/devices/ai-inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * AI tools and MCP servers across devices
+         * @description Aggregates what agents find in AI clients (Claude, Cursor, VS Code, Codex…): each MCP server with how it's governed, and each AI app, CLI and extension.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AIFleetInventory"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -19646,7 +19730,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant";
+                    key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed";
                 };
                 cookie?: never;
             };
@@ -21324,7 +21408,7 @@ export interface components {
             }[];
             device_policies?: {
                 /** @enum {string} */
-                check: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant";
+                check: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed";
                 enabled: boolean;
                 /**
                  * @default enforce
@@ -22561,6 +22645,53 @@ export interface components {
             duration_ms: number;
             error: string;
         };
+        AIFleetInventory: {
+            summary: {
+                devices: number;
+                /** @description Devices whose agent reports AI tools */
+                reporting: number;
+                with_ai_tools: number;
+                with_mcp: number;
+                /** @description Devices with an enabled MCP server that bypasses the gateway or uses a remote server that isn't allowed */
+                ungoverned: number;
+                /** @description Devices with a token written into an MCP config file */
+                inline_secrets: number;
+            };
+            servers: components["schemas"]["FleetMcpServer"][];
+            tools: {
+                name: string;
+                /** @enum {string} */
+                kind: "app" | "cli" | "extension";
+                devices: number;
+                versions: string[];
+            }[];
+        };
+        FleetMcpServer: {
+            key: string;
+            target: string;
+            /** @enum {string} */
+            transport: "stdio" | "http" | "sse";
+            /**
+             * @description gateway: through the Nexus MCP gateway; bypass: straight to a server that's behind the gateway; allowed: a host the policy allows; remote: any other remote server; local: runs on the device
+             * @enum {string}
+             */
+            governance: "gateway" | "bypass" | "allowed" | "remote" | "local";
+            via: string | null;
+            names: string[];
+            clients: string[];
+            devices: number;
+            people: number;
+            /** @description Devices where this server's config holds a token in plain text */
+            inline_secrets: number;
+            /** @description Up to 100 devices */
+            on: {
+                device_id: string;
+                hostname: string;
+                user_email: string | null;
+                clients: string[];
+                inline_secrets: boolean;
+            }[];
+        };
         DevicePage: {
             data: components["schemas"]["Device"][];
             next_cursor: string | null;
@@ -22637,13 +22768,14 @@ export interface components {
                 encrypted: boolean | null;
                 last_contact_at: string | null;
             }[];
+            ai: components["schemas"]["DeviceAI"];
             inventory: {
                 [key: string]: unknown;
             };
         };
         DeviceCheck: {
             /** @enum {string} */
-            key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant";
+            key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed";
             title: string;
             why: string;
             /** @enum {string} */
@@ -22656,9 +22788,41 @@ export interface components {
             grace_until: string | null;
             updated_at: string;
         };
+        /** @description What the agent found in the device's AI clients; null until an agent that reports it checks in */
+        DeviceAI: {
+            tools: {
+                name: string;
+                /** @enum {string} */
+                kind: "app" | "cli" | "extension";
+                version: string | null;
+                user: string | null;
+            }[];
+            mcp_servers: components["schemas"]["DeviceMcpServer"][];
+        } | null;
+        DeviceMcpServer: {
+            client: string;
+            user: string;
+            /** @enum {string} */
+            scope: "user" | "project";
+            name: string;
+            /** @enum {string} */
+            transport: "stdio" | "http" | "sse";
+            target: string;
+            package: string | null;
+            env_keys: string[];
+            inline_secrets: boolean;
+            disabled: boolean;
+            /**
+             * @description gateway: through the Nexus MCP gateway; bypass: straight to a server that's behind the gateway; allowed: a host the policy allows; remote: any other remote server; local: runs on the device
+             * @enum {string}
+             */
+            governance: "gateway" | "bypass" | "allowed" | "remote" | "local";
+            /** @description For bypass: the gateway server it should go through */
+            via: string | null;
+        };
         DevicePolicy: {
             /** @enum {string} */
-            key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant";
+            key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed";
             title: string;
             why: string;
             enabled: boolean;

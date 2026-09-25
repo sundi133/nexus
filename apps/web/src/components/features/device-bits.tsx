@@ -75,5 +75,6 @@ const CHECK_TITLES: Record<string, string> = {
   os_version: "OS version",
   system_integrity: "System integrity",
   mdm_compliant: "MDM compliance",
+  ai_mcp_governed: "AI and MCP",
 };
 export const checkTitle = (k: string) => CHECK_TITLES[k] ?? k;

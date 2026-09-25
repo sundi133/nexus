@@ -5,6 +5,7 @@ import { notifyUsers } from "../notify/send.js";
 import type { Tx } from "../platform/db.js";
 import { enqueue, registerJobHandler, type JobRunner } from "../platform/jobs.js";
 import type { Compliance, DevicePlatform } from "../platform/db-types.js";
+import { loadAIContext, parseAI } from "./ai.js";
 import { mdmContext } from "./mdm-signals.js";
 import { CHECK_INFO, CHECK_KEYS, DEFAULT_POLICIES, enforce, evaluate, PostureFacts, type CheckKey, type Policy } from "./posture.js";
 
@@ -36,7 +37,12 @@ export async function evaluateDevice(tx: Tx, device: DeviceForEval, policies: Po
   const previous = new Map(
     (await tx.selectFrom("device_checks").select(["check_key", "status", "failing_since"]).where("device_id", "=", device.id).execute()).map((c) => [c.check_key, c]),
   );
-  const { checks: results, compliance, grace_until } = enforce(evaluate(device, facts, policies, await mdmContext(tx, device)), policies, previous);
+  const ctx = await mdmContext(tx, device);
+  if (policies.some((p) => p.key === "ai_mcp_governed" && p.enabled)) {
+    const row = await tx.selectFrom("devices").select("inventory").where("id", "=", device.id).executeTakeFirst();
+    ctx.ai = { inventory: parseAI(row?.inventory), ctx: await loadAIContext(tx) };
+  }
+  const { checks: results, compliance, grace_until } = enforce(evaluate(device, facts, policies, ctx), policies, previous);
 
   await tx.deleteFrom("device_checks").where("device_id", "=", device.id).execute();
   if (results.length) {

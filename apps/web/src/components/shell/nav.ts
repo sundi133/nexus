@@ -3,6 +3,7 @@ import {
   AppWindow,
   BellRing,
   Bot,
+  BrainCircuit,
   ClipboardCheck,
   FileBarChart,
   FileClock,
@@ -69,6 +70,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "Agents", href: "/agents", icon: Bot },
       { label: "MCP servers", href: "/mcp", icon: Server },
+      { label: "AI on devices", href: "/ai-devices", icon: BrainCircuit },
     ],
   },
   {

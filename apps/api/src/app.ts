@@ -61,10 +61,12 @@ import { registerEventDestinationRoutes } from "./integrations/routes.js";
 import { scheduleEventDelivery } from "./integrations/stream.js";
 import { scheduleProvisioningReconcile } from "./provisioning/service.js";
 import { scheduleDirectorySyncs } from "./directory/sync/service.js";
+import { registerAIRoutes } from "./devices/ai-routes.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
 import { registerDeviceTrustRoutes } from "./access/device-trust.js";
 import { registerAccessPolicyRoutes } from "./access/routes.js";
 import { ApiError, problem } from "./platform/errors.js";
+import { setGatewayBase } from "./devices/ai.js";
 
 export const API_INFO = {
   title: "Votal Nexus API",
@@ -74,6 +76,7 @@ export const API_INFO = {
 };
 
 export function createApp(deps: Deps) {
+  setGatewayBase(deps.cfg.apiPublicUrl); // AI discovery classifies device MCP servers against the gateway
   const app = new OpenAPIHono<Env>({
     defaultHook: (result, c) => {
       if (!result.success) {
@@ -220,6 +223,7 @@ export function createApp(deps: Deps) {
   registerDomainRoutes(app);
   registerBreakGlassRoutes(app);
   registerEventDestinationRoutes(app);
+  registerAIRoutes(app); // before /v1/devices/{id}
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);

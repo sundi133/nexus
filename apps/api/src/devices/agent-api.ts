@@ -6,12 +6,14 @@ import { calculateJwkThumbprint, EmbeddedJWK, importJWK, jwtVerify, type JWK } f
 import { sql } from "kysely";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
-import type { App, Env } from "../context.js";
+import type { App, Env, RequestMeta } from "../context.js";
+import type { Tx } from "../platform/db.js";
 import { audit } from "../audit/record.js";
 import { hashToken } from "../auth/tokens.js";
 import { ApiError, badRequest, conflict } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { CHECKIN_INTERVAL_S, evaluateDevice, getPolicies, INVENTORY_INTERVAL_S } from "./service.js";
+import { AIInventory, classify, diffServers, loadAIContext, parseAI, type ReportedServer, serverTarget } from "./ai.js";
 import { PostureFacts } from "./posture.js";
 import { releaseStore } from "./releases.js";
 import { offerFor, recordResult } from "./updates.js";
@@ -58,6 +60,8 @@ const Inventory = z
     local_users: z.array(z.object({ name: z.string().max(100), admin: z.boolean() })).max(200).optional(),
     console_user: z.string().max(100).nullable().optional(),
     uptime_seconds: z.number().int().nonnegative().optional(),
+    // Validated on its own (see the check-in): a malformed AI report mustn't stop posture reporting.
+    ai: z.unknown().optional(),
   })
   .passthrough();
 
@@ -84,6 +88,20 @@ const CheckinBody = z.object({
   // What happened to commands from earlier check-ins (CMD-04).
   command_results: CommandResults.optional(),
 });
+
+/** Records MCP servers appearing on or leaving a device (not the first report: that's the baseline). */
+async function auditAIChanges(tx: Tx, d: { id: string; org_id: string; hostname: string }, before: AIInventory | null, after: AIInventory, meta: RequestMeta) {
+  const { added, removed, first } = diffServers(before, after);
+  if (first || (!added.length && !removed.length)) return;
+  const ctx = await loadAIContext(tx);
+  const show = (x: ReportedServer) => ({ name: x.name, client: x.client, user: x.user, target: serverTarget(x), governance: classify(x, ctx).governance, inline_secrets: !!x.inline_secrets });
+  await audit(tx, d.org_id, { meta }, {
+    type: "device.ai_changed",
+    actor: { type: "system", id: null, display: "Nexus agent" },
+    target: { type: "device", id: d.id, display: d.hostname },
+    details: { added: added.slice(0, 20).map(show), removed: removed.slice(0, 20).map(show), added_count: added.length, removed_count: removed.length },
+  });
+}
 
 const bsh = (body: string) => createHash("sha256").update(body).digest("base64url");
 
@@ -224,6 +242,8 @@ export function registerAgentRoutes(app: App) {
     if (!dev) throw deviceError(401, "device_not_enrolled", "This device is not enrolled (it may have been removed)");
     const payload = await verifyProof(c, proof, await importJWK(dev.public_jwk, "ES256"), raw);
     const input = parse(CheckinBody, raw);
+    const ai = input.inventory && "ai" in input.inventory ? AIInventory.safeParse(input.inventory.ai) : null;
+    if (input.inventory && ai && !ai.success) delete input.inventory.ai;
 
     const out = await deps.db.tenant(dev.org_id, async (tx) => {
       // Replay protection: a proof can be used once.
@@ -236,6 +256,7 @@ export function registerAgentRoutes(app: App) {
         .executeTakeFirst();
       if (!fresh) throw deviceError(401, "replayed_device_proof", "This signed request was already used");
 
+      const before = ai?.success ? parseAI((await tx.selectFrom("devices").select("inventory").where("id", "=", kid).executeTakeFirst())?.inventory) : null;
       const d = await tx
         .updateTable("devices")
         .set({
@@ -249,6 +270,7 @@ export function registerAgentRoutes(app: App) {
         .where("id", "=", kid)
         .returning(["id", "org_id", "hostname", "platform", "arch", "os_version", "agent_version", "last_seen_at", "posture", "compliance", "primary_user_id", "compliance_grace_until", "serial"])
         .executeTakeFirstOrThrow();
+      if (ai?.success) await auditAIChanges(tx, d, before, ai.data, meta);
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
       if (input.update_result) await recordResult(tx, dev.org_id, d, input.update_result, meta);
       if (input.command_results?.length) await recordCommandResults(tx, d, input.command_results, meta);

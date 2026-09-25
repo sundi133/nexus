@@ -100,6 +100,7 @@ Go to **Applications → Add app**: pick one from the catalog or add any SAML/OI
 2. **MCP servers → Add server**, e.g. your GitHub or internal MCP server with a scoped token. Review the discovered tools, approve the read-only ones, and add a permission rule (e.g. agents tagged `support` may use read tools on `repo in [acme/web]`).
 3. Point your agent at the gateway URL shown on the server's page, with a Nexus token from the client credentials grant (the curl command is on the agent's page).
 4. Watch **Agents → activity** and **Audit log**. Try a denied call, and the **Suspend now** kill switch.
+5. Open **AI on devices** to see which AI tools and MCP servers the pilot group's laptops use, and which bypass the gateway or keep tokens in config files. Then turn on the **AI tools use approved MCP servers** device policy in audit mode ([AI-ON-DEVICES.md](AI-ON-DEVICES.md)).
 
 ## 8. SecOps
 
@@ -133,9 +134,10 @@ Tick these off with your pilot group; each item is a real enterprise scenario.
 8. An access review over one app: revoke someone and confirm they lose access when it closes.
 9. An AI agent calls an allowed tool through the gateway, is refused a disallowed one, and is cut off by **Suspend now** within seconds.
 10. Change an MCP tool's description upstream: it drops out of service until re-approved.
-11. Ten wrong passwords for one account raise an alert and page your on-call test service.
-12. The audit log verifies, and its digest matches your SIEM.
-13. Restore last night's backup to a scratch database with `restore-test.sh`.
+11. A developer adds an MCP server to Cursor or Claude Desktop that goes straight to GitHub: it shows as *Bypasses gateway* within a minute, and the audit log records it.
+12. Ten wrong passwords for one account raise an alert and page your on-call test service.
+13. The audit log verifies, and its digest matches your SIEM.
+14. Restore last night's backup to a scratch database with `restore-test.sh`.
 
 ## Known limits
 
