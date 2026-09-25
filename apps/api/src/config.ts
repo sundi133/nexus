@@ -27,6 +27,9 @@ export type Config = {
   googleAdminBase: string;
   entraLoginBase: string;
   graphBase: string;
+  // On-call paging endpoints (overridable only for tests).
+  pagerdutyEventsUrl: string;
+  opsgenieBase: { us: string; eu: string };
   // Allow outbound calls (SCIM, webhooks) to private/loopback addresses. Dev and test only.
   allowPrivateOutbound: boolean;
   // Have I Been Pwned range API for breached-password checks ("" = off).
@@ -100,6 +103,8 @@ export function loadConfig(env = process.env): Config {
     googleAdminBase: env.NEXUS_GOOGLE_ADMIN_BASE ?? "https://admin.googleapis.com",
     entraLoginBase: env.NEXUS_ENTRA_LOGIN_BASE ?? "https://login.microsoftonline.com",
     graphBase: env.NEXUS_GRAPH_BASE ?? "https://graph.microsoft.com",
+    pagerdutyEventsUrl: env.NEXUS_PAGERDUTY_EVENTS_URL ?? "https://events.pagerduty.com/v2/enqueue",
+    opsgenieBase: { us: env.NEXUS_OPSGENIE_BASE ?? "https://api.opsgenie.com", eu: env.NEXUS_OPSGENIE_EU_BASE ?? "https://api.eu.opsgenie.com" },
     allowPrivateOutbound: mode !== "prod" && env.NEXUS_ALLOW_PRIVATE_OUTBOUND !== "false",
     hibpBase: env.NEXUS_HIBP_BASE ?? (mode === "test" ? "" : "https://api.pwnedpasswords.com"),
     apns:

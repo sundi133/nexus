@@ -32,16 +32,19 @@ export const PERMISSIONS = [
   "agents:manage", // register AI agents and their credentials
   "agents:suspend", // the kill switch (incident response)
   "mcp:manage", // MCP servers, tool approval and tool permissions
+  "alerts:read",
+  "alerts:triage", // acknowledge, assign, snooze and resolve alerts
+  "alerts:manage", // alert rules and on-call paging
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-const READ: Permission[] = ["users:read", "groups:read", "audit:read", "apps:read", "devices:read", "agents:read"];
+const READ: Permission[] = ["users:read", "groups:read", "audit:read", "apps:read", "devices:read", "agents:read", "alerts:read"];
 
 const GRANTS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
   admin: PERMISSIONS.filter((p) => p !== "admins:manage"),
-  helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign", "devices:write", "devices:actions"],
-  security_analyst: [...READ, "users:lifecycle", "devices:actions", "agents:suspend"],
+  helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign", "devices:write", "devices:actions", "alerts:triage"],
+  security_analyst: [...READ, "users:lifecycle", "devices:actions", "agents:suspend", "alerts:triage"],
   readonly: READ,
 };
 

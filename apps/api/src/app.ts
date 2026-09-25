@@ -25,6 +25,9 @@ import { registerMcpGateway } from "./mcp/gateway.js";
 import { registerMcpRoutes } from "./mcp/routes.js";
 import { scheduleMcpSyncs } from "./mcp/service.js";
 import { scheduleAuditIntegrity } from "./audit/integrity.js";
+import { scheduleAlerts } from "./alerts/engine.js";
+import { registerAlertRoutes } from "./alerts/routes.js";
+import "./alerts/oncall.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
@@ -166,6 +169,7 @@ export function createApp(deps: Deps) {
   registerAiAgentRoutes(app);
   registerMcpRoutes(app);
   registerMcpGateway(app);
+  registerAlertRoutes(app);
   registerPasskeyRoutes(app);
   registerPushRoutes(app);
   registerImportRoutes(app);
@@ -220,4 +224,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleDynamicGroups(jobs, deps);
   scheduleMcpSyncs(jobs, deps);
   scheduleAuditIntegrity(jobs, deps);
+  scheduleAlerts(jobs, deps);
 }

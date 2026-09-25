@@ -721,6 +721,82 @@ export interface Database {
     sealed_at: Generated<Date>;
     pruned_at: NullableTimestamp;
   };
+  alert_rules: {
+    id: string;
+    org_id: string;
+    builtin_key: string | null;
+    name: string;
+    description: Generated<string>;
+    enabled: Generated<boolean>;
+    severity: "low" | "medium" | "high" | "critical";
+    match: Json;
+    group_by: Generated<"none" | "actor" | "target" | "ip">;
+    threshold: Generated<number>;
+    window_minutes: Generated<number>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  alert_cursors: {
+    org_id: string;
+    cursor_txid: string;
+    cursor_id: string;
+  };
+  alert_hits: {
+    org_id: string;
+    rule_id: string;
+    group_key: string;
+    event_id: string;
+    at: Date;
+  };
+  alerts: {
+    id: string;
+    org_id: string;
+    rule_id: string | null;
+    rule_name: string;
+    group_key: string;
+    subject: Generated<string>;
+    title: string;
+    severity: "low" | "medium" | "high" | "critical";
+    status: Generated<"open" | "acknowledged" | "resolved">;
+    count: Generated<number>;
+    event_ids: Generated<string[]>;
+    first_seen_at: Date;
+    last_seen_at: Date;
+    assignee_id: string | null;
+    snoozed_until: NullableTimestamp;
+    acknowledged_by: Generated<string>;
+    acknowledged_at: NullableTimestamp;
+    resolved_by: Generated<string>;
+    resolved_at: NullableTimestamp;
+    resolution: Generated<"" | "true_positive" | "false_positive" | "benign">;
+    paged: Json<string[]>;
+    created_at: Generated<Date>;
+  };
+  alert_notes: {
+    id: string;
+    org_id: string;
+    alert_id: string;
+    author_id: string | null;
+    author: string;
+    body: string;
+    at: Generated<Date>;
+  };
+  oncall_integrations: {
+    id: string;
+    org_id: string;
+    kind: "pagerduty" | "opsgenie";
+    name: string;
+    secret: Buffer;
+    region: Generated<"us" | "eu">;
+    min_severity: Generated<"low" | "medium" | "high" | "critical">;
+    enabled: Generated<boolean>;
+    inbound_hash: string;
+    last_error: Generated<string>;
+    last_sent_at: NullableTimestamp;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
   directory_links: {
     org_id: string;
     connection_id: string;

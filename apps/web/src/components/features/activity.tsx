@@ -84,6 +84,14 @@ const VERBS: Record<string, string> = {
   "mcp.tool_denied": "was denied",
   "audit.sealed": "sealed a block of the audit log",
   "audit.integrity_failed": "detected tampering in the audit log",
+  "alert.opened": "raised",
+  "alert.acknowledged": "acknowledged",
+  "alert.resolved": "resolved",
+  "alert.snoozed": "snoozed",
+  "alert.assigned": "assigned",
+  "alert.rule_created": "added the alert rule",
+  "alert.rule_changed": "changed the alert rule",
+  "alert.oncall_connected": "connected on-call paging",
 };
 
 export function describe(e: AuditEvent) {
@@ -107,6 +115,7 @@ function targetHref(e: AuditEvent) {
   if (e.target.type === "application") return `/apps/${e.target.id}`;
   if (e.target.type === "device") return `/devices/${e.target.id}`;
   if (e.target.type === "agent") return `/agents/${e.target.id}`;
+  if (e.target.type === "alert") return `/alerts/${e.target.id}`;
   if (e.target.type === "mcp_server") return `/mcp/${e.target.id}`;
   if (e.target.type === "mcp_tool" && e.details.server_id) return `/mcp/${String(e.details.server_id)}`;
   return null;

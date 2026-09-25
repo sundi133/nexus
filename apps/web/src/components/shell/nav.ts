@@ -1,6 +1,7 @@
 import {
   Activity,
   AppWindow,
+  BellRing,
   Bot,
   ClipboardCheck,
   FileClock,
@@ -71,7 +72,10 @@ export const NAV: NavSection[] = [
   },
   {
     title: "Insights",
-    items: [{ label: "Audit log", href: "/audit", icon: ScrollText, shortcut: "G A" }],
+    items: [
+      { label: "Alerts", href: "/alerts", icon: BellRing },
+      { label: "Audit log", href: "/audit", icon: ScrollText, shortcut: "G A" },
+    ],
   },
   {
     title: "Settings",
