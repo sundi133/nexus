@@ -9612,8 +9612,8 @@ export interface paths {
             };
         };
         /**
-         * Choose which notifications reach your phone and email
-         * @description Critical security notifications always reach both.
+         * Choose which notifications reach your phone and email, and when
+         * @description Critical security notifications always reach both, right away. Omitted fields keep their current values.
          */
         put: {
             parameters: {
@@ -9624,7 +9624,31 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["NotificationPreferences"];
+                    "application/json": {
+                        /**
+                         * @description all | important (warnings and critical) | critical only
+                         * @enum {string}
+                         */
+                        email?: "all" | "important" | "critical";
+                        /**
+                         * @description all | important (warnings and critical) | critical only
+                         * @enum {string}
+                         */
+                        push?: "all" | "important" | "critical";
+                        /** @description Used for quiet hours and the digest */
+                        timezone?: string;
+                        /** @description Hold non-critical push and email during these hours; a summary follows when they end */
+                        quiet_hours?: {
+                            enabled: boolean;
+                            start: string;
+                            end: string;
+                        };
+                        /** @description Send non-critical email as one daily digest at this time */
+                        digest?: {
+                            enabled: boolean;
+                            time: string;
+                        };
+                    };
                 };
             };
             responses: {
@@ -13635,12 +13659,25 @@ export interface components {
              * @enum {string}
              */
             push: "all" | "important" | "critical";
+            /** @description Used for quiet hours and the digest */
+            timezone: string;
+            /** @description Hold non-critical push and email during these hours; a summary follows when they end */
+            quiet_hours: {
+                enabled: boolean;
+                start: string;
+                end: string;
+            };
+            /** @description Send non-critical email as one daily digest at this time */
+            digest: {
+                enabled: boolean;
+                time: string;
+            };
         };
         NotificationDelivery: {
             /** @enum {string} */
             channel: "push" | "email" | "slack";
             /** @enum {string} */
-            status: "sent" | "failed" | "skipped";
+            status: "sent" | "failed" | "skipped" | "held";
             detail: string;
             at: string;
         };

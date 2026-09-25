@@ -3515,11 +3515,58 @@
               "critical"
             ],
             "description": "all | important (warnings and critical) | critical only"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Used for quiet hours and the digest"
+          },
+          "quiet_hours": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "start": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "end": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              }
+            },
+            "required": [
+              "enabled",
+              "start",
+              "end"
+            ],
+            "description": "Hold non-critical push and email during these hours; a summary follows when they end"
+          },
+          "digest": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "time": {
+                "type": "string",
+                "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+              }
+            },
+            "required": [
+              "enabled",
+              "time"
+            ],
+            "description": "Send non-critical email as one daily digest at this time"
           }
         },
         "required": [
           "email",
-          "push"
+          "push",
+          "timezone",
+          "quiet_hours",
+          "digest"
         ]
       },
       "NotificationDelivery": {
@@ -3538,7 +3585,8 @@
             "enum": [
               "sent",
               "failed",
-              "skipped"
+              "skipped",
+              "held"
             ]
           },
           "detail": {
@@ -15477,8 +15525,8 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "Choose which notifications reach your phone and email",
-        "description": "Critical security notifications always reach both.",
+        "summary": "Choose which notifications reach your phone and email, and when",
+        "description": "Critical security notifications always reach both, right away. Omitted fields keep their current values.",
         "security": [
           {
             "bearer": []
@@ -15489,7 +15537,71 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NotificationPreferences"
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "important",
+                      "critical"
+                    ],
+                    "description": "all | important (warnings and critical) | critical only"
+                  },
+                  "push": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "important",
+                      "critical"
+                    ],
+                    "description": "all | important (warnings and critical) | critical only"
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "description": "Used for quiet hours and the digest"
+                  },
+                  "quiet_hours": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "start": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                      },
+                      "end": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                      }
+                    },
+                    "required": [
+                      "enabled",
+                      "start",
+                      "end"
+                    ],
+                    "description": "Hold non-critical push and email during these hours; a summary follows when they end"
+                  },
+                  "digest": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "time": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                      }
+                    },
+                    "required": [
+                      "enabled",
+                      "time"
+                    ],
+                    "description": "Send non-critical email as one daily digest at this time"
+                  }
+                }
               }
             }
           }

@@ -270,6 +270,12 @@ export interface Database {
     org_id: string;
     email: Generated<"all" | "important" | "critical">;
     push: Generated<"all" | "important" | "critical">;
+    timezone: Generated<string>;
+    quiet_enabled: Generated<boolean>;
+    quiet_start: Generated<string>;
+    quiet_end: Generated<string>;
+    digest_enabled: Generated<boolean>;
+    digest_time: Generated<string>;
     updated_at: Generated<Date>;
   };
   org_alert_channels: {
@@ -283,7 +289,7 @@ export interface Database {
     org_id: string;
     notification_id: string | null;
     channel: "push" | "email" | "slack";
-    status: "sent" | "failed" | "skipped";
+    status: "sent" | "failed" | "skipped" | "held";
     detail: Generated<string>;
     at: Generated<Date>;
   };

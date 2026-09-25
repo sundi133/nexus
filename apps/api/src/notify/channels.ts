@@ -6,20 +6,38 @@ import { requirePermission, requireRecentMfa, requireSession } from "../auth/gua
 import { ApiError, badRequest, notFound } from "../platform/errors.js";
 import { assertSafeUrl, UnsafeUrlError } from "../platform/outbound.js";
 import { bearer, body, Id, iso, json, problemResponses } from "../schemas.js";
-import { postToSlack, slackAad } from "./deliver.js";
+import { sql } from "kysely";
+import { loadPrefs, postToSlack, slackAad } from "./deliver.js";
+import { isTimeZone } from "./schedule.js";
 
 const Level = z.enum(["all", "important", "critical"]).openapi({ description: "all | important (warnings and critical) | critical only" });
-const Prefs = z.object({ email: Level, push: Level }).openapi("NotificationPreferences");
+const Time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "A time like 22:00");
+const Prefs = z
+  .object({
+    email: Level,
+    push: Level,
+    timezone: z.string().max(64).refine(isTimeZone, "An IANA time zone like Europe/Berlin").openapi({ description: "Used for quiet hours and the digest" }),
+    quiet_hours: z.object({ enabled: z.boolean(), start: Time, end: Time }).openapi({ description: "Hold non-critical push and email during these hours; a summary follows when they end" }),
+    digest: z.object({ enabled: z.boolean(), time: Time }).openapi({ description: "Send non-critical email as one daily digest at this time" }),
+  })
+  .openapi("NotificationPreferences");
+type PrefsT = z.infer<typeof Prefs>;
+const toApi = (r: Awaited<ReturnType<typeof loadPrefs>>): PrefsT => ({
+  email: r.email,
+  push: r.push,
+  timezone: r.timezone,
+  quiet_hours: { enabled: r.quiet_enabled, start: r.quiet_start, end: r.quiet_end },
+  digest: { enabled: r.digest_enabled, time: r.digest_time },
+});
 const Channels = z.object({ slack_configured: z.boolean(), slack_min_severity: z.enum(["info", "warning", "critical"]) }).openapi("AlertChannels");
-const Delivery = z.object({ channel: z.enum(["push", "email", "slack"]), status: z.enum(["sent", "failed", "skipped"]), detail: z.string(), at: z.string() }).openapi("NotificationDelivery");
+const Delivery = z.object({ channel: z.enum(["push", "email", "slack"]), status: z.enum(["sent", "failed", "skipped", "held"]), detail: z.string(), at: z.string() }).openapi("NotificationDelivery");
 
 export function registerChannelRoutes(app: App) {
   app.openapi(
     createRoute({ method: "get", path: "/v1/me/notification-preferences", tags: ["Notifications"], summary: "Which notifications reach your phone and email", security: bearer, responses: { 200: json(Prefs), ...problemResponses } }),
     async (c) => {
       const p = requireSession(c);
-      const r = await c.get("deps").db.tenant(p.orgId, (tx) => tx.selectFrom("notification_preferences").select(["email", "push"]).where("user_id", "=", p.userId).executeTakeFirst());
-      return c.json({ email: r?.email ?? "important", push: r?.push ?? "important" }, 200);
+      return c.json(toApi(await c.get("deps").db.tenant(p.orgId, (tx) => loadPrefs(tx, p.userId))), 200);
     },
   );
 
@@ -28,23 +46,38 @@ export function registerChannelRoutes(app: App) {
       method: "put",
       path: "/v1/me/notification-preferences",
       tags: ["Notifications"],
-      summary: "Choose which notifications reach your phone and email",
-      description: "Critical security notifications always reach both.",
+      summary: "Choose which notifications reach your phone and email, and when",
+      description: "Critical security notifications always reach both, right away. Omitted fields keep their current values.",
       security: bearer,
-      request: body(Prefs),
+      request: body(Prefs.partial()),
       responses: { 200: json(Prefs), ...problemResponses },
     }),
     async (c) => {
       const p = requireSession(c);
       const input = c.req.valid("json");
-      await c.get("deps").db.tenant(p.orgId, (tx) =>
-        tx
+      const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+        const cur = toApi(await loadPrefs(tx, p.userId));
+        const next = { ...cur, ...input };
+        const row = {
+          email: next.email,
+          push: next.push,
+          timezone: next.timezone,
+          quiet_enabled: next.quiet_hours.enabled,
+          quiet_start: next.quiet_hours.start,
+          quiet_end: next.quiet_hours.end,
+          digest_enabled: next.digest.enabled,
+          digest_time: next.digest.time,
+        };
+        await tx
           .insertInto("notification_preferences")
-          .values({ user_id: p.userId, org_id: p.orgId, ...input })
-          .onConflict((oc) => oc.column("user_id").doUpdateSet({ ...input, updated_at: new Date() }))
-          .execute(),
-      );
-      return c.json(input, 200);
+          .values({ user_id: p.userId, org_id: p.orgId, ...row })
+          .onConflict((oc) => oc.column("user_id").doUpdateSet({ ...row, updated_at: new Date() }))
+          .execute();
+        // Anything already held is re-timed under the new settings (the summary re-checks and waits if it should).
+        await sql`UPDATE jobs SET run_at = now() WHERE kind = 'notify.summary' AND status = 'queued' AND dedupe_key LIKE ${`notify.summary:${p.userId}:%`}`.execute(tx);
+        return next;
+      });
+      return c.json(out, 200);
     },
   );
 

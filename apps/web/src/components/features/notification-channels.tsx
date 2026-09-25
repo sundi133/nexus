@@ -1,7 +1,8 @@
 "use client";
 
+import type { Schemas } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Hash } from "lucide-react";
+import { Bell, Hash, Mail, Moon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useStepUp } from "@/components/step-up";
@@ -18,15 +19,26 @@ const LEVELS = [
 ] as const;
 type Level = (typeof LEVELS)[number]["value"];
 
-/** NTF-07: what reaches your phone and inbox. Critical alerts always do. */
+type Prefs = Schemas["NotificationPreferences"];
+const browserZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+};
+
+/** NTF-07: what reaches your phone and inbox, and when. Critical alerts always do, right away. */
 export function NotificationPrefsCard() {
   const qc = useQueryClient();
   const prefs = useQuery({ queryKey: ["notification-prefs"], queryFn: () => unwrap(api.GET("/v1/me/notification-preferences")) });
   const save = useMutation({
-    mutationFn: (body: { email: Level; push: Level }) => unwrap(api.PUT("/v1/me/notification-preferences", { body })),
+    mutationFn: (body: Partial<Prefs>) => unwrap(api.PUT("/v1/me/notification-preferences", { body })),
     onSuccess: (r) => (qc.setQueryData(["notification-prefs"], r), toast.success("Notification settings saved")),
   });
   const p = prefs.data;
+  // Turning on a time-based setting also records where you are, so "22:00" means your 22:00.
+  const zone = (patch: Partial<Prefs>) => save.mutate(p && p.timezone === "UTC" && browserZone() !== "UTC" ? { ...patch, timezone: browserZone() } : patch);
   return (
     <Card>
       <CardHeader
@@ -35,13 +47,13 @@ export function NotificationPrefsCard() {
             <Bell className="size-4 text-fg-muted" /> Notifications
           </span>
         }
-        description="Everything lands in your Nexus inbox. Choose what also reaches your phone (Nexus Mobile) and email. Critical security alerts always do."
+        description="Everything lands in your Nexus inbox. Choose what also reaches your phone (Nexus Mobile) and email, and when. Critical security alerts always do, right away."
       />
       {p ? (
         <div className="grid gap-4 p-4 sm:grid-cols-2">
           {(["push", "email"] as const).map((ch) => (
             <Field key={ch} label={ch === "push" ? "Phone (Nexus Mobile)" : "Email"} htmlFor={`pref-${ch}`}>
-              <Select id={`pref-${ch}`} className="w-full" value={p[ch]} disabled={save.isPending} onChange={(e) => save.mutate({ ...p, [ch]: e.target.value as Level })}>
+              <Select id={`pref-${ch}`} className="w-full" value={p[ch]} disabled={save.isPending} onChange={(e) => save.mutate({ [ch]: e.target.value as Level })}>
                 {LEVELS.map((l) => (
                   <option key={l.value} value={l.value}>
                     {l.label}
@@ -50,13 +62,63 @@ export function NotificationPrefsCard() {
               </Select>
             </Field>
           ))}
+          <div className="space-y-2 rounded-md border border-border p-3 sm:col-span-2">
+            <label className="flex items-center gap-2 text-[13px] font-medium">
+              <input type="checkbox" checked={p.quiet_hours.enabled} disabled={save.isPending} onChange={(e) => zone({ quiet_hours: { ...p.quiet_hours, enabled: e.target.checked } })} />
+              <Moon className="size-3.5 text-fg-muted" /> Quiet hours
+            </label>
+            <div className="flex flex-wrap items-center gap-2 text-[13px] text-fg-muted">
+              From
+              <TimeInput label="Quiet hours start" value={p.quiet_hours.start} disabled={save.isPending || !p.quiet_hours.enabled} onChange={(start) => save.mutate({ quiet_hours: { ...p.quiet_hours, start } })} />
+              to
+              <TimeInput label="Quiet hours end" value={p.quiet_hours.end} disabled={save.isPending || !p.quiet_hours.enabled} onChange={(end) => save.mutate({ quiet_hours: { ...p.quiet_hours, end } })} />
+            </div>
+            <p className="text-xs text-fg-subtle">Other notifications wait, then arrive as one summary when quiet hours end.</p>
+          </div>
+          <div className="space-y-2 rounded-md border border-border p-3 sm:col-span-2">
+            <label className="flex items-center gap-2 text-[13px] font-medium">
+              <input type="checkbox" checked={p.digest.enabled} disabled={save.isPending} onChange={(e) => zone({ digest: { ...p.digest, enabled: e.target.checked } })} />
+              <Mail className="size-3.5 text-fg-muted" /> Daily email digest
+            </label>
+            <div className="flex flex-wrap items-center gap-2 text-[13px] text-fg-muted">
+              One email a day at
+              <TimeInput label="Digest time" value={p.digest.time} disabled={save.isPending || !p.digest.enabled} onChange={(time) => save.mutate({ digest: { ...p.digest, time } })} />
+              instead of one per notification.
+            </div>
+          </div>
           <div className="sm:col-span-2">
             <ErrorBanner error={save.error} />
-            <p className="text-xs text-fg-subtle">Phone notifications never contain details: they say “Security alert” and open the app, which shows the rest after you unlock it.</p>
+            <p className="text-xs text-fg-subtle">
+              Times are in {p.timezone.replace(/_/g, " ")}
+              {p.timezone !== browserZone() ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <button type="button" className="text-primary hover:underline" onClick={() => save.mutate({ timezone: browserZone() })}>
+                    Use {browserZone().replace(/_/g, " ")}
+                  </button>
+                </>
+              ) : null}
+              . Phone notifications never contain details: they say “Security alert” and open the app, which shows the rest after you unlock it.
+            </p>
           </div>
         </div>
       ) : null}
     </Card>
+  );
+}
+
+function TimeInput({ label, value, disabled, onChange }: { label: string; value: string; disabled?: boolean; onChange: (v: string) => void }) {
+  return (
+    <Input
+      type="time"
+      aria-label={label}
+      className="w-36"
+      defaultValue={value}
+      key={value}
+      disabled={disabled}
+      onBlur={(e) => e.target.value && e.target.value !== value && onChange(e.target.value)}
+    />
   );
 }
 
