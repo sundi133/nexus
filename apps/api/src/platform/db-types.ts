@@ -603,6 +603,53 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
   };
+  ai_agents: {
+    id: string;
+    org_id: string;
+    name: string;
+    description: Generated<string>;
+    owner_user_id: string | null;
+    owner_group_id: string | null;
+    environment: Generated<"production" | "staging" | "development">;
+    runtime: Generated<string>;
+    model: Generated<string>;
+    risk_tier: Generated<"low" | "medium" | "high" | "critical">;
+    tags: Generated<string[]>;
+    client_id: string;
+    status: Generated<"active" | "suspended">;
+    status_reason: Generated<string>;
+    token_ttl_minutes: Generated<number>;
+    tokens_valid_after: Generated<Date>;
+    last_token_at: NullableTimestamp;
+    last_seen_at: NullableTimestamp;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  agent_credentials: {
+    id: string;
+    org_id: string;
+    agent_id: string;
+    kind: "secret" | "public_key" | "federated";
+    name: Generated<string>;
+    secret_hash: string | null;
+    hint: Generated<string>;
+    public_jwk: Json | null;
+    key_id: string | null;
+    fed_issuer: string | null;
+    fed_subject: string | null;
+    fed_audience: string | null;
+    expires_at: NullableTimestamp;
+    last_used_at: NullableTimestamp;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    revoked_at: NullableTimestamp;
+  };
+  agent_assertion_jtis: {
+    org_id: string;
+    jti: string;
+    expires_at: Date;
+  };
   directory_links: {
     org_id: string;
     connection_id: string;

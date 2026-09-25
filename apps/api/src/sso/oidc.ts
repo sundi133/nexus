@@ -1,7 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { cors } from "hono/cors";
-import { createLocalJWKSet, jwtVerify } from "jose";
+import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
+import { agentClientCredentials } from "../ai-agents/tokens.js";
 import { sql } from "kysely";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { App, Deps, Env, Principal } from "../context.js";
@@ -26,6 +27,14 @@ import { decideAccess, matchedSummary } from "../access/service.js";
 
 const CODE_TTL_MS = 60_000;
 const TOKEN_TTL_SEC = 3600;
+
+const decodeJwtSafe = (t: string) => {
+  try {
+    return decodeJwt(t);
+  } catch {
+    return null;
+  }
+};
 const SUPPORTED_SCOPES = ["openid", "profile", "email", "groups"];
 
 const b64u = (b: Buffer) => b.toString("base64url");
@@ -261,12 +270,13 @@ export function registerOidcRoutes(app: App) {
       jwks_uri: `${issuer}/jwks`,
       response_types_supported: ["code"],
       response_modes_supported: ["query"],
-      grant_types_supported: ["authorization_code"],
+      grant_types_supported: ["authorization_code", "client_credentials"],
       subject_types_supported: ["public"],
       id_token_signing_alg_values_supported: ["RS256"],
-      token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post", "none"],
+      token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post", "private_key_jwt", "none"],
+      token_endpoint_auth_signing_alg_values_supported: ["ES256", "ES384", "EdDSA", "RS256", "PS256"],
       code_challenge_methods_supported: ["S256"],
-      scopes_supported: SUPPORTED_SCOPES,
+      scopes_supported: [...SUPPORTED_SCOPES, "mcp"],
       claims_supported: ["sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "amr", "email", "email_verified", "name", "given_name", "family_name", "preferred_username", "groups"],
       prompt_values_supported: ["none", "login"],
       authorization_response_iss_parameter_supported: true,
@@ -290,6 +300,20 @@ export function registerOidcRoutes(app: App) {
     const org = await orgBySlug(deps, slug);
     if (!org) return oauthError(c, 400, "invalid_request", "Unknown issuer");
     const form = Object.fromEntries(Object.entries(await c.req.parseBody()).map(([k, v]) => [k, String(v)]));
+    if (form.grant_type === "client_credentials") {
+      // AI agents (AGT-02): a secret, a private_key_jwt, or a workload identity token.
+      const basic = clientAuth(c, form);
+      let clientId = basic?.id ?? form.client_id;
+      if (!clientId && form.client_assertion) clientId = String(decodeJwtSafe(form.client_assertion)?.iss ?? "");
+      if (!clientId?.startsWith("agt_")) return oauthError(c, 401, "invalid_client", "client_credentials is for registered agents");
+      const r = await deps.db.tenant(org.org_id, (tx) =>
+        agentClientCredentials(tx, deps, { orgId: org.org_id, slug, issuer: issuerFor(deps, slug), form, clientId, secret: basic?.secret ?? null, meta: c.get("meta") }),
+      );
+      if (!r.ok) return oauthError(c, r.e.status, r.e.error, r.e.description);
+      c.header("Cache-Control", "no-store");
+      c.header("Pragma", "no-cache");
+      return c.json(r.body);
+    }
     if (form.grant_type !== "authorization_code") return oauthError(c, 400, "unsupported_grant_type", "Only authorization_code is supported");
     const auth = clientAuth(c, form);
     if (!auth) return oauthError(c, 401, "invalid_client", "Client authentication is required");

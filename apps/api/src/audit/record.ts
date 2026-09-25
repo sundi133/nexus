@@ -8,7 +8,7 @@ export type AuditInput = {
   target?: { type: string; id: string | null; display?: string };
   details?: Record<string, unknown>;
   /** Override the actor (e.g. during login, before a principal exists). */
-  actor?: { type: "user" | "system" | "api_key"; id: string | null; display?: string };
+  actor?: { type: "user" | "system" | "api_key" | "agent"; id: string | null; display?: string };
   sessionId?: string | null;
 };
 

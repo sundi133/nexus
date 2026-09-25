@@ -20,6 +20,7 @@ import { registerCommandRoutes } from "./devices/commands.js";
 import { registerAccessRequestRoutes } from "./governance/routes.js";
 import { scheduleAccessExpiry } from "./governance/requests.js";
 import { registerAccessReviewRoutes, scheduleAccessReviews } from "./governance/reviews.js";
+import { registerAiAgentRoutes } from "./ai-agents/routes.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
@@ -158,6 +159,7 @@ export function createApp(deps: Deps) {
   registerCommandRoutes(app);
   registerAccessRequestRoutes(app);
   registerAccessReviewRoutes(app);
+  registerAiAgentRoutes(app);
   registerPasskeyRoutes(app);
   registerPushRoutes(app);
   registerImportRoutes(app);

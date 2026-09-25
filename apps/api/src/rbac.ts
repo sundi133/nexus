@@ -28,16 +28,20 @@ export const PERMISSIONS = [
   "api_keys:manage", // create and revoke API keys
   "integrations:manage", // webhooks and SIEM streaming (they export the audit log)
   "access:manage", // what can be requested and how it's approved; see and revoke all grants
+  "agents:read",
+  "agents:manage", // register AI agents and their credentials
+  "agents:suspend", // the kill switch (incident response)
+  "mcp:manage", // MCP servers, tool approval and tool permissions
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-const READ: Permission[] = ["users:read", "groups:read", "audit:read", "apps:read", "devices:read"];
+const READ: Permission[] = ["users:read", "groups:read", "audit:read", "apps:read", "devices:read", "agents:read"];
 
 const GRANTS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
   admin: PERMISSIONS.filter((p) => p !== "admins:manage"),
   helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign", "devices:write", "devices:actions"],
-  security_analyst: [...READ, "users:lifecycle", "devices:actions"],
+  security_analyst: [...READ, "users:lifecycle", "devices:actions", "agents:suspend"],
   readonly: READ,
 };
 

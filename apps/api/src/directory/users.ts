@@ -1,5 +1,6 @@
 import { touchUsers } from "../provisioning/service.js";
 import { scheduleDynamicEvaluation } from "./dynamic-groups-schedule.js";
+import { suspendOwnedAgents } from "../ai-agents/lifecycle.js";
 import { assertEmailAllowed } from "../org/domains.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
@@ -380,7 +381,11 @@ export function registerUserRoutes(app: App) {
   action("contain", "Contain a possibly compromised user: suspend and revoke everything, in one step", async (tx, who, user) => {
     await assertNotSelfOrLastOwner(tx, who, user);
     await tx.updateTable("users").set({ status: "suspended", updated_at: new Date() }).where("id", "=", user.id).execute();
-    const effects = { suspended: true, sessions_revoked: await revokeUserSessions(tx, user.id) };
+    const effects = {
+      suspended: true,
+      sessions_revoked: await revokeUserSessions(tx, user.id),
+      agents_suspended: await suspendOwnedAgents(tx, who.principal.orgId, user.id, `Owner ${user.email} was contained`, who),
+    };
     await notifyRoles(tx, who.principal.orgId, ["owner", "admin", "security_analyst"], {
       category: "security.alert",
       severity: "critical",

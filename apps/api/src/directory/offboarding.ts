@@ -11,6 +11,7 @@ import { enqueue, registerJobHandler } from "../platform/jobs.js";
 import { can } from "../rbac.js";
 import { bearer, body, Id, iso, json, problemResponses } from "../schemas.js";
 import { touchGroups, touchUsers } from "../provisioning/service.js";
+import { suspendOwnedAgents } from "../ai-agents/lifecycle.js";
 import { revokeUserSessions } from "./users.js";
 
 /**
@@ -27,6 +28,7 @@ const Preview = z
     groups: z.array(z.object({ id: Id, name: z.string() })),
     apps: z.array(z.object({ id: Id, name: z.string(), provisioned: z.boolean(), action: z.enum(["deactivate", "delete", "sign_in_only"]) })),
     devices: z.array(z.object({ id: Id, hostname: z.string() })),
+    agents: z.array(z.object({ id: Id, name: z.string() })).openapi({ description: "Active AI agents they own: suspended until given a new owner" }),
     factors: z.number().int(),
     scheduled: z.object({ at: z.string(), reason: z.string() }).nullable(),
   })
@@ -56,6 +58,7 @@ async function preview(tx: Tx, userId: string): Promise<z.infer<typeof Preview>>
   const sessions = await tx.selectFrom("sessions").select((eb) => eb.fn.countAll<number>().as("n")).where("user_id", "=", userId).where("revoked_at", "is", null).where("expires_at", ">", new Date()).executeTakeFirstOrThrow();
   const factors = await tx.selectFrom("auth_factors").select((eb) => eb.fn.countAll<number>().as("n")).where("user_id", "=", userId).executeTakeFirstOrThrow();
   const roles = await tx.selectFrom("user_roles").select("role").where("user_id", "=", userId).execute();
+  const agents = await tx.selectFrom("ai_agents").select(["id", "name"]).where("owner_user_id", "=", userId).where("status", "=", "active").orderBy("name").execute();
   const devices = await tx.selectFrom("devices").select(["id", "hostname"]).where("primary_user_id", "=", userId).where("status", "=", "active").execute();
   const job = await tx.selectFrom("jobs").select(["run_at", "payload"]).where("kind", "=", "user.offboard").where("dedupe_key", "=", dedupe(userId)).where("status", "=", "queued").executeTakeFirst();
   const managed = await tx.selectFrom("directory_links").select("local_id").where("kind", "=", "user").where("local_id", "=", userId).executeTakeFirst();
@@ -71,6 +74,7 @@ async function preview(tx: Tx, userId: string): Promise<z.infer<typeof Preview>>
       action: a.enabled && a.state ? (a.on_unassign === "delete" ? ("delete" as const) : ("deactivate" as const)) : ("sign_in_only" as const),
     })),
     devices,
+    agents,
     factors: Number(factors.n),
     scheduled: job ? { at: iso(job.run_at), reason: String((job.payload as unknown as { reason?: string }).reason ?? "") } : null,
   };
@@ -94,7 +98,9 @@ export async function offboard(tx: Tx, orgId: string, userId: string, who: { pri
   await touchUsers(tx, orgId, [userId]);
   await touchGroups(tx, orgId, before.groups.map((g) => g.id));
 
+  const agentsSuspended = await suspendOwnedAgents(tx, orgId, userId, `Owner ${before.user.email} was offboarded`, { ...who, actor: who.principal ? undefined : { type: "system", id: null, display: who.actor ?? "Scheduled offboarding" } });
   const effects = {
+    agents_suspended: agentsSuspended,
     sessions_revoked: sessions,
     admin_roles_removed: before.admin_roles,
     groups_removed: before.groups.map((g) => g.name),
