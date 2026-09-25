@@ -23,7 +23,7 @@ afterAll(async () => {
 });
 
 describe("tenant isolation in the database", () => {
-  it("enforces row-level security on every table (except migration bookkeeping)", async () => {
+  it("enforces row-level security on every table (except migration bookkeeping and rate-limit counters)", async () => {
     const tables = (
       await owner.query(`
         SELECT c.relname AS name, c.relrowsecurity AS rls,
@@ -32,7 +32,9 @@ describe("tenant isolation in the database", () => {
         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public' AND c.relkind = 'r'`)
     ).rows as { name: string; rls: boolean; policies: number; tenant: boolean }[];
-    const exempt = new Set(["schema_migrations"]);
+    // rate_limits holds no tenant data: namespaced counters (e.g. "login:<email>|<ip>") shared by replicas.
+    const exempt = new Set(["schema_migrations", "rate_limits"]);
+    expect(tables.find((t) => t.name === "rate_limits")?.tenant).toBe(false);
     const unprotected = tables.filter((t) => !exempt.has(t.name) && (!t.rls || t.policies === 0)).map((t) => t.name);
     expect(unprotected).toEqual([]);
     expect(tables.length).toBeGreaterThan(40);
@@ -109,5 +111,20 @@ describe("authentication on every endpoint", () => {
     for (const token of ["nxs_forged", "nxk_forged", "Bearer", "not-a-token"]) {
       expect((await h.call("GET", "/v1/users", { token })).status).toBe(401);
     }
+  });
+});
+
+describe("request size", () => {
+  it("refuses bodies over 1 MB before reading them, except where more is needed", async () => {
+    const h = await bootApp();
+    const big = JSON.stringify({ email: `${"a".repeat(2 * 1024 * 1024)}@example.test`, password: "x" });
+    const r = await h.app.request("/v1/auth/login", { method: "POST", headers: { "content-type": "application/json", "content-length": String(big.length) }, body: big });
+    expect(r.status).toBe(413);
+    expect(((await r.json()) as { code: string }).code).toBe("too_large");
+    // A 2 MB CSV import is fine (it's then checked for authentication like anything else).
+    const csv = JSON.stringify({ csv: "a".repeat(2 * 1024 * 1024) });
+    const i = await h.app.request("/v1/users/import", { method: "POST", headers: { "content-type": "application/json", "content-length": String(csv.length) }, body: csv });
+    expect(i.status).toBe(401);
+    await h.close();
   });
 });

@@ -33,7 +33,7 @@ const PAIRING_TTL_MS = 10 * 60_000;
 const CHALLENGE_TTL_MS = 2 * 60_000;
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 
-const pushLimiter = new RateLimiter(5, 10 * 60_000); // per user: blunts MFA-fatigue spamming
+const pushLimiter = new RateLimiter(5, 10 * 60_000, "push"); // per user: blunts MFA-fatigue spamming
 
 export const signedMessage = (challengeId: string, decision: "approve" | "deny", choice: number | null) =>
   `nexus-push-v1\n${challengeId}\n${decision}\n${choice ?? ""}`;
@@ -275,7 +275,7 @@ export function registerPushRoutes(app: App) {
       const p = requireSession(c, { allowPendingMfa: true });
       const deps = c.get("deps");
       const meta = c.get("meta");
-      if (!pushLimiter.take(p.userId)) {
+      if (!(await pushLimiter.take(p.userId))) {
         throw new ApiError(429, "rate_limited", "Too many push requests. Wait a few minutes or use another method.");
       }
       const { number, choices } = numberChoices();

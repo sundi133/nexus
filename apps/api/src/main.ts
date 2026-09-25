@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createApp, registerSchedules } from "./app.js";
+import { useSharedRateLimits } from "./auth/ratelimit.js";
 import { loadConfig, validateProd } from "./config.js";
 import { Db } from "./platform/db.js";
 import { JobRunner } from "./platform/jobs.js";
@@ -40,6 +41,8 @@ const runsWorker = cfg.role === "all" || cfg.role === "worker";
 
 // Workers serve only health and metrics over HTTP; API nodes serve everything.
 if (runsApi) await realtime.start();
+// Rate limits count across every replica (login, MFA, API keys, MCP gateway...).
+useSharedRateLimits(deps.db);
 const app = createApp(deps);
 const jobs = runsWorker ? new JobRunner(deps) : null;
 if (jobs) {

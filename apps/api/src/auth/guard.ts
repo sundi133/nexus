@@ -8,7 +8,7 @@ import { hashToken } from "./tokens.js";
 import { RateLimiter } from "./ratelimit.js";
 
 // Per API key: generous for automation, bounded so a runaway script can't swamp a tenant.
-const keyLimiter = new RateLimiter(600, 60_000);
+const keyLimiter = new RateLimiter(600, 60_000, "api-key");
 import type { SessionState } from "../platform/db-types.js";
 
 type SessionLookup = {
@@ -38,7 +38,7 @@ export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
       return r.rows[0];
     });
     if (key) {
-      if (!keyLimiter.take(key.id)) throw new ApiError(429, "rate_limited", "This API key is sending too many requests. Slow down and retry.");
+      if (!(await keyLimiter.take(key.id))) throw new ApiError(429, "rate_limited", "This API key is sending too many requests. Slow down and retry.");
       if (!key.last_used_at || Date.now() - key.last_used_at.getTime() > 60_000) {
         const ip = c.get("meta").ip;
         await db.tenant(key.org_id, (tx) => tx.updateTable("api_keys").set({ last_used_at: new Date(), last_used_ip: ip }).where("id", "=", key.id).execute());

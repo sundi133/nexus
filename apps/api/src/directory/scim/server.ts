@@ -47,7 +47,7 @@ type ScimEnv = { Variables: Env["Variables"] & { conn: Conn } };
 type C = Context<ScimEnv>;
 
 const CONTENT_TYPE = "application/scim+json";
-const limiter = new RateLimiter(1200, 60_000); // per connection
+const limiter = new RateLimiter(1200, 60_000, "scim"); // per connection
 const lastSeen = new Map<string, number>();
 const MAX_PAGE = 200;
 
@@ -275,7 +275,7 @@ export function registerScimServer(app: App) {
       : undefined;
     if (!found) throw new ScimError(401, "A valid SCIM bearer token is required");
     if (!found.enabled) throw new ScimError(403, "This SCIM connection is turned off in Nexus");
-    if (!limiter.take(found.connection_id)) throw new ScimError(429, "Too many requests. Slow down and retry.");
+    if (!(await limiter.take(found.connection_id))) throw new ScimError(429, "Too many requests. Slow down and retry.");
     const conn = await deps.db.tenant(found.org_id, (tx) =>
       tx.selectFrom("directory_connections").select(["id", "org_id", "name", "deprovision", "invite_new_users", "deactivations_allowed_until"]).where("id", "=", found.connection_id).executeTakeFirstOrThrow(),
     );

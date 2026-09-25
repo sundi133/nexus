@@ -2,6 +2,7 @@ import type { JobRunner } from "./platform/jobs.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { cors } from "hono/cors";
+import { bodyLimit } from "hono/body-limit";
 import { randomUUID } from "node:crypto";
 import type { Deps, Env } from "./context.js";
 import { registerAuditRoutes } from "./audit/routes.js";
@@ -120,6 +121,22 @@ export function createApp(deps: Deps) {
       console.log(deps.cfg.logFormat === "json" ? JSON.stringify(line) : `${line.method} ${route} ${status} ${line.ms}ms`);
     }
   });
+
+  // Request bodies are capped before anything reads them: 1 MB, with room for the few
+  // endpoints that legitimately take more (CSV imports, device inventory, config as code).
+  const LARGE: [RegExp, number][] = [
+    [/^\/v1\/users\/import$/, 6 * 1024 * 1024],
+    [/^\/v1\/agent\/(checkin|enroll)$/, 8 * 1024 * 1024],
+    [/^\/v1\/config\/(plan|apply)$/, 4 * 1024 * 1024],
+    [/^\/scim\/v2\//, 4 * 1024 * 1024],
+  ];
+  const limits = new Map<number, ReturnType<typeof bodyLimit>>();
+  const limitFor = (max: number) => {
+    let l = limits.get(max);
+    if (!l) limits.set(max, (l = bodyLimit({ maxSize: max, onError: (c) => problem(c, new ApiError(413, "too_large", `The request body is larger than ${Math.round(max / 1024 / 1024)} MB`)) })));
+    return l;
+  };
+  app.use("*", (c, next) => limitFor(LARGE.find(([re]) => re.test(c.req.path))?.[1] ?? 1024 * 1024)(c, next));
 
   app.use("/v1/*", cors({ origin: deps.cfg.publicUrl, credentials: false, maxAge: 600 }));
   app.use("/v1/*", loadPrincipal);

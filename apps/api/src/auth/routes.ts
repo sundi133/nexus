@@ -36,8 +36,8 @@ import { hashToken, newSessionToken } from "./tokens.js";
 import { refuseIfFederationRequired } from "../federation/enforce.js";
 import { directoryPasswordCheck } from "../directory/sync/ldap.js";
 
-const loginLimiter = new RateLimiter(10, 5 * 60_000); // per email+IP
-const mfaLimiter = new RateLimiter(5, 5 * 60_000); // per session
+const loginLimiter = new RateLimiter(10, 5 * 60_000, "login"); // per email+IP
+const mfaLimiter = new RateLimiter(5, 5 * 60_000, "mfa"); // per session
 
 const Client = z.enum(["web", "mobile", "cli"]).default("web");
 const SessionStateSchema = z.enum(["pending_mfa", "enroll_mfa", "active"]).openapi("SessionState");
@@ -302,7 +302,7 @@ export function registerAuthRoutes(app: App) {
       const meta = c.get("meta");
       const email = input.email.toLowerCase();
 
-      if (!loginLimiter.take(`${email}|${meta.ip}`)) {
+      if (!(await loginLimiter.take(`${email}|${meta.ip}`))) {
         throw new ApiError(429, "rate_limited", "Too many sign-in attempts. Try again in a few minutes.");
       }
 
@@ -409,7 +409,7 @@ export function registerAuthRoutes(app: App) {
       const p = requireSession(c, { allowPendingMfa: true });
       const deps = c.get("deps");
       const meta = c.get("meta");
-      if (!mfaLimiter.take(p.sessionId)) throw new ApiError(429, "rate_limited", "Too many attempts");
+      if (!(await mfaLimiter.take(p.sessionId))) throw new ApiError(429, "rate_limited", "Too many attempts");
       const { code } = c.req.valid("json");
 
       const out = await deps.db.tenant(p.orgId, async (tx) => {

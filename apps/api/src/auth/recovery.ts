@@ -55,10 +55,10 @@ export async function recoveryCodesLeft(tx: Tx, userId: string) {
 
 // ---- limits ---------------------------------------------------------------------------
 
-const codeLimiter = new RateLimiter(5, 5 * 60_000); // recovery code attempts per session
-const resetLimiter = new RateLimiter(3, 60 * 60_000); // reset emails per address per hour
-const resetIpLimiter = new RateLimiter(20, 60 * 60_000); // …and per IP
-const helpLimiter = new RateLimiter(1, 60 * 60_000); // "I lost my factors" per user per hour
+const codeLimiter = new RateLimiter(5, 5 * 60_000, "recovery-code"); // recovery code attempts per session
+const resetLimiter = new RateLimiter(3, 60 * 60_000, "reset-email"); // reset emails per address per hour
+const resetIpLimiter = new RateLimiter(20, 60 * 60_000, "reset-ip"); // …and per IP
+const helpLimiter = new RateLimiter(1, 60 * 60_000, "mfa-help"); // "I lost my factors" per user per hour
 const RESET_TTL_MS = 30 * 60_000;
 
 async function passwordChangedEmail(deps: Deps, email: string, how: string) {
@@ -130,7 +130,7 @@ export function registerRecoveryRoutes(app: App) {
     }),
     async (c) => {
       const p = requireSession(c, { allowPendingMfa: true });
-      if (!codeLimiter.take(p.sessionId)) throw new ApiError(429, "rate_limited", "Too many attempts");
+      if (!(await codeLimiter.take(p.sessionId))) throw new ApiError(429, "rate_limited", "Too many attempts");
       const deps = c.get("deps");
       const meta = c.get("meta");
       const out = await deps.db.tenant(p.orgId, async (tx) => {
@@ -183,7 +183,7 @@ export function registerRecoveryRoutes(app: App) {
     }),
     async (c) => {
       const p = requireSession(c, { allowPendingMfa: true });
-      if (!helpLimiter.take(p.userId)) return c.body(null, 202); // already asked recently
+      if (!(await helpLimiter.take(p.userId))) return c.body(null, 202); // already asked recently
       await c.get("deps").db.tenant(p.orgId, async (tx) => {
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, { type: "auth.mfa_help_requested", target: { type: "user", id: p.userId, display: p.email } });
         await notifyRoles(tx, p.orgId, ["owner", "admin", "helpdesk"], {
@@ -215,7 +215,7 @@ export function registerRecoveryRoutes(app: App) {
       const deps = c.get("deps");
       const meta = c.get("meta");
       const email = c.req.valid("json").email.toLowerCase();
-      if (!resetLimiter.take(email) || !resetIpLimiter.take(meta.ip)) return c.body(null, 202);
+      if (!(await resetLimiter.take(email)) || !(await resetIpLimiter.take(meta.ip))) return c.body(null, 202);
       const found = await deps.db.unscoped(async (tx) => (await sql<{ user_id: string; org_id: string; status: string }>`SELECT * FROM nexus_auth_find_user(${email})`.execute(tx)).rows[0]);
       if (!found || found.status !== "active") return c.body(null, 202);
       if (await federationRequiredFor(deps, email, found)) return c.body(null, 202); // they sign in with their IdP; there's no Nexus password to reset

@@ -32,7 +32,7 @@ const metadataUrl = (deps: Deps, slug: string, server: string) => `${deps.cfg.ap
 const limiters = new Map<number, RateLimiter>();
 const limiter = (perMinute: number) => {
   let l = limiters.get(perMinute);
-  if (!l) limiters.set(perMinute, (l = new RateLimiter(perMinute, 60_000)));
+  if (!l) limiters.set(perMinute, (l = new RateLimiter(perMinute, 60_000, `mcp-${perMinute}`)));
   return l;
 };
 const rateNoted = new Map<string, number>();
@@ -195,7 +195,7 @@ async function callTool(deps: Deps, orgId: string, meta: Env["Variables"]["meta"
   if (!tool) return rpcError(msg.id, -32602, `Unknown tool: ${name}`);
 
   // Rate limit per agent and server (MCP-07). The first refusal in a minute is traced, not every one.
-  if (!limiter(server.calls_per_minute).take(`${server.id}:${who.agentId}`)) {
+  if (!(await limiter(server.calls_per_minute).take(`${server.id}:${who.agentId}`))) {
     const key = `${server.id}:${who.agentId}`;
     if (Date.now() - (rateNoted.get(key) ?? 0) > 60_000) {
       rateNoted.set(key, Date.now());

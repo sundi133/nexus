@@ -30,7 +30,7 @@ import { refuseIfFederationRequired } from "../federation/enforce.js";
  */
 
 const CHALLENGE_TTL_MS = 5 * 60_000;
-const passkeyLimiter = new RateLimiter(20, 5 * 60_000);
+const passkeyLimiter = new RateLimiter(20, 5 * 60_000, "passkey");
 
 const Options = z.record(z.string(), z.unknown()).openapi({ description: "Pass to @simplewebauthn/browser (startRegistration / startAuthentication)" });
 const Ceremony = z.object({ challenge_id: Id, options: Options }).openapi("WebAuthnCeremony");
@@ -274,7 +274,7 @@ export function registerPasskeyRoutes(app: App) {
     async (c) => {
       const { email } = c.req.valid("json");
       const deps = c.get("deps");
-      if (!passkeyLimiter.take(`${email.toLowerCase()}|${c.get("meta").ip}`)) throw new ApiError(429, "rate_limited", "Too many attempts");
+      if (!(await passkeyLimiter.take(`${email.toLowerCase()}|${c.get("meta").ip}`))) throw new ApiError(429, "rate_limited", "Too many attempts");
       const user = await findActiveUser(deps, email);
       await refuseIfFederationRequired(deps, email, user ?? undefined);
       if (user) {

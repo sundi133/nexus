@@ -17,8 +17,8 @@ import { parseIdpMetadata, spMetadata } from "./saml-sp.js";
 import { idpForEmail } from "./enforce.js";
 import { completeFederation, secretAad, spEndpoints, startFederation } from "./service.js";
 
-const completeLimiter = new RateLimiter(30, 5 * 60_000); // per IP
-const discoverLimiter = new RateLimiter(60, 5 * 60_000); // per IP
+const completeLimiter = new RateLimiter(30, 5 * 60_000, "federation-complete"); // per IP
+const discoverLimiter = new RateLimiter(60, 5 * 60_000, "federation-discover"); // per IP
 
 const Mfa = z.enum(["when_signalled", "always", "never"]).openapi({
   description: "when_signalled: the IdP's MFA counts when it says MFA was used (amr / AuthnContext); always: every sign-in through it counts as MFA; never: Nexus MFA always applies",
@@ -147,7 +147,7 @@ export function registerFederationRoutes(app: App) {
       },
     }),
     async (c) => {
-      if (!discoverLimiter.take(c.get("meta").ip)) throw new ApiError(429, "rate_limited", "Too many requests. Try again in a few minutes.");
+      if (!(await discoverLimiter.take(c.get("meta").ip))) throw new ApiError(429, "rate_limited", "Too many requests. Try again in a few minutes.");
       const idp = await idpForEmail(c.get("deps"), c.req.valid("json").email);
       return c.json({ federated: !!idp, provider: idp ? { name: idp.name } : null, required: !!idp?.required }, 200);
     },
@@ -205,7 +205,7 @@ export function registerFederationRoutes(app: App) {
     }),
     async (c) => {
       const meta = c.get("meta");
-      if (!completeLimiter.take(meta.ip)) throw new ApiError(429, "rate_limited", "Too many sign-in attempts. Try again in a few minutes.");
+      if (!(await completeLimiter.take(meta.ip))) throw new ApiError(429, "rate_limited", "Too many sign-in attempts. Try again in a few minutes.");
       const { client: _client, ...input } = c.req.valid("json");
       let r;
       try {
