@@ -92,6 +92,7 @@ const VERBS: Record<string, string> = {
   "alert.rule_created": "added the alert rule",
   "alert.rule_changed": "changed the alert rule",
   "alert.oncall_connected": "connected on-call paging",
+  "report.generated": "generated a report",
 };
 
 export function describe(e: AuditEvent) {

@@ -4,6 +4,7 @@ import {
   BellRing,
   Bot,
   ClipboardCheck,
+  FileBarChart,
   FileClock,
   FolderSync,
   Home,
@@ -75,6 +76,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "Alerts", href: "/alerts", icon: BellRing },
       { label: "Audit log", href: "/audit", icon: ScrollText, shortcut: "G A" },
+      { label: "Reports", href: "/reports", icon: FileBarChart },
     ],
   },
   {

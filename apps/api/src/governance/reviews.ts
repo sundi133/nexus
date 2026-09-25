@@ -9,6 +9,7 @@ import { notifyUsers } from "../notify/send.js";
 import type { Tx } from "../platform/db.js";
 import { badRequest, conflict, forbidden, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
+import { csvCell } from "../platform/csv.js";
 import { enqueue, registerJobHandler, type JobRunner } from "../platform/jobs.js";
 import { touchGroups, touchUsers } from "../provisioning/service.js";
 import { can } from "../rbac.js";
@@ -289,11 +290,6 @@ async function load(tx: Tx, id: string) {
   return r as Review & { closed_at: Date | null; summary: unknown; created_at: Date };
 }
 
-const csvCell = (v: unknown) => {
-  const s = String(v ?? "");
-  // Neutralise spreadsheet formulas, and quote.
-  return `"${(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
-};
 
 export function registerAccessReviewRoutes(app: App) {
   const idParam = { params: z.object({ id: Id }) };
