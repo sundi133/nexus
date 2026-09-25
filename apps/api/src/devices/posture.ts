@@ -31,15 +31,17 @@ export const PolicyParams = {
   system_integrity: z.object({}),
 } as const;
 
-export type Policy = { key: CheckKey; enabled: boolean; params: Record<string, unknown> };
+export type PolicyMode = "audit" | "enforce";
+export type Policy = { key: CheckKey; enabled: boolean; params: Record<string, unknown>; mode: PolicyMode; grace_hours: number };
 
+const base = { enabled: true, mode: "enforce" as const, grace_hours: 0 };
 export const DEFAULT_POLICIES: Policy[] = [
-  { key: "disk_encryption", enabled: true, params: {} },
-  { key: "firewall", enabled: true, params: {} },
-  { key: "screen_lock", enabled: true, params: { max_delay_minutes: 10 } },
+  { key: "disk_encryption", ...base, params: {} },
+  { key: "firewall", ...base, params: {} },
+  { key: "screen_lock", ...base, params: { max_delay_minutes: 10 } },
   // Empty minimum = not enforced for that platform until an admin sets one.
-  { key: "os_version", enabled: true, params: { minimum: { macos: "14.0", windows: "10.0.19045", linux: "" } } },
-  { key: "system_integrity", enabled: true, params: {} },
+  { key: "os_version", ...base, params: { minimum: { macos: "14.0", windows: "10.0.19045", linux: "" } } },
+  { key: "system_integrity", ...base, params: {} },
 ];
 
 export const CHECK_INFO: Record<CheckKey, { title: string; why: string }> = {
@@ -145,6 +147,32 @@ export function evaluate(device: { platform: DevicePlatform; os_version: string 
     }
   }
   return out;
+}
+
+export type EnforcedCheck = CheckResult & { enforced: boolean; failing_since: Date | null; grace_until: Date | null };
+
+/**
+ * Applies each policy's mode and grace period (DPOL-04). Audited checks are
+ * reported but don't count. An enforced check that fails counts only once it
+ * has been failing for longer than its grace period; until then the device
+ * stays compliant and `grace_until` says by when it must be fixed.
+ */
+export function enforce(results: CheckResult[], policies: Policy[], previous: Map<string, { status: string; failing_since: Date | null }>, now = new Date()) {
+  const checks: EnforcedCheck[] = results.map((r) => {
+    const p = policies.find((x) => x.key === r.key);
+    const enforced = (p?.mode ?? "enforce") === "enforce";
+    const prev = previous.get(r.key);
+    const failing_since = r.status === "fail" ? (prev?.status === "fail" && prev.failing_since ? prev.failing_since : now) : null;
+    let grace_until: Date | null = null;
+    if (failing_since && enforced && p && p.grace_hours > 0) {
+      const due = new Date(failing_since.getTime() + p.grace_hours * 3600_000);
+      if (due > now) grace_until = due;
+    }
+    return { ...r, enforced, failing_since, grace_until };
+  });
+  const counted = checks.filter((c) => c.enforced).map((c) => (c.grace_until ? { ...c, status: "pass" as const } : c));
+  const deadlines = checks.map((c) => c.grace_until).filter((d): d is Date => !!d);
+  return { checks, compliance: aggregate(counted), grace_until: deadlines.length ? new Date(Math.min(...deadlines.map((d) => d.getTime()))) : null };
 }
 
 /** Any failure → non-compliant; otherwise any unknown → unknown; otherwise compliant. */

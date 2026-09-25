@@ -12929,7 +12929,7 @@ export interface paths {
         };
         /**
          * Device compliance policies
-         * @description Audit mode: devices are marked compliant or not and people are told what to fix; enforcement (blocking sign-in) comes from conditional access.
+         * @description Enforced policies decide whether a device is compliant (after an optional grace period); audited ones are only reported. Blocking sign-in from non-compliant devices is configured in conditional access.
          */
         get: {
             parameters: {
@@ -13032,6 +13032,13 @@ export interface paths {
                         params?: {
                             [key: string]: unknown;
                         };
+                        /**
+                         * @description Unchanged when omitted
+                         * @enum {string}
+                         */
+                        mode?: "audit" | "enforce";
+                        /** @description Unchanged when omitted */
+                        grace_hours?: number;
                     };
                 };
             };
@@ -14943,6 +14950,8 @@ export interface components {
             /** @enum {string} */
             compliance: "compliant" | "non_compliant" | "unknown";
             failing_checks: string[];
+            /** @description Enforced checks are failing but within their grace period until then */
+            compliance_grace_until: string | null;
             online: boolean;
             last_seen_at: string | null;
             primary_user: {
@@ -15000,6 +15009,10 @@ export interface components {
             status: "pass" | "fail" | "unknown" | "not_applicable";
             detail: string;
             fix: string | null;
+            /** @description Counts toward compliance (the policy is in enforce mode) */
+            enforced: boolean;
+            /** @description Failing, but not counted until then */
+            grace_until: string | null;
             updated_at: string;
         };
         DevicePolicy: {
@@ -15011,8 +15024,13 @@ export interface components {
             params: {
                 [key: string]: unknown;
             };
-            /** @enum {string} */
-            mode: "audit";
+            /**
+             * @description enforce: counts toward compliance (and so conditional access); audit: reported only
+             * @enum {string}
+             */
+            mode: "audit" | "enforce";
+            /** @description How long an enforced check may fail before it counts (0 = at once) */
+            grace_hours: number;
         };
         DeviceTrustChallenge: {
             /**

@@ -10,7 +10,7 @@ import { Input, Select } from "@/components/ui/input";
 import { Card, PageHeader, Skeleton } from "@/components/ui/misc";
 import { api, unwrap } from "@/lib/api";
 import { useCan } from "@/lib/queries";
-import { pluralize } from "@/lib/utils";
+import { cn, pluralize } from "@/lib/utils";
 
 type Policy = Schemas["DevicePolicy"];
 
@@ -23,7 +23,9 @@ export default function DevicePoliciesPage() {
       <div className="mb-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary-soft px-4 py-3 text-[13px]">
         <Info className="mt-0.5 size-4 shrink-0 text-primary" />
         <p>
-          <span className="font-medium">Audit mode.</span> Non-compliant devices are flagged and their owners are told exactly what to fix. To block sign-in from them, add a conditional access policy that requires a compliant device.
+          <span className="font-medium">Enforced</span> policies decide whether a device is compliant; <span className="font-medium">audited</span> ones are only reported. With a grace period, a device that
+          starts failing stays compliant until the deadline, and its owner is told what to fix and by when. To block sign-in from non-compliant devices, add a conditional access policy that requires a
+          compliant device.
         </p>
       </div>
       {policies.isPending ? (
@@ -43,13 +45,17 @@ function PolicyCard({ policy, editable }: { policy: Policy; editable: boolean })
   const qc = useQueryClient();
   const [enabled, setEnabled] = useState(policy.enabled);
   const [params, setParams] = useState(policy.params as Record<string, unknown>);
+  const [mode, setMode] = useState(policy.mode);
+  const [grace, setGrace] = useState(policy.grace_hours);
   useEffect(() => {
     setEnabled(policy.enabled);
     setParams(policy.params as Record<string, unknown>);
+    setMode(policy.mode);
+    setGrace(policy.grace_hours);
   }, [policy]);
-  const dirty = enabled !== policy.enabled || JSON.stringify(params) !== JSON.stringify(policy.params);
+  const dirty = enabled !== policy.enabled || JSON.stringify(params) !== JSON.stringify(policy.params) || mode !== policy.mode || grace !== policy.grace_hours;
   const save = useMutation({
-    mutationFn: () => unwrap(api.PUT("/v1/device-policies/{key}", { params: { path: { key: policy.key } }, body: { enabled, params } })),
+    mutationFn: () => unwrap(api.PUT("/v1/device-policies/{key}", { params: { path: { key: policy.key } }, body: { enabled, params, mode, grace_hours: grace } })),
     onSuccess: (r) => {
       qc.setQueryData(["device-policies"], { data: r.data });
       qc.invalidateQueries({ queryKey: ["devices"] });
@@ -69,8 +75,44 @@ function PolicyCard({ policy, editable }: { policy: Policy; editable: boolean })
           <span className="relative h-5 w-9 rounded-full bg-border-strong transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-primary peer-checked:after:translate-x-4 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-ring" />
         </label>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold">{policy.title}</p>
+          <p className="flex items-center gap-2 text-[13px] font-semibold">
+            {policy.title}
+            {enabled ? <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-medium", mode === "enforce" ? "bg-primary-soft text-primary" : "bg-bg-muted text-fg-muted")}>{mode === "enforce" ? "Enforced" : "Audit only"}</span> : null}
+          </p>
           <p className="text-[13px] text-fg-muted">{policy.why}</p>
+          {enabled ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
+              <div className="inline-flex rounded-md border border-border p-0.5" role="radiogroup" aria-label={`${policy.title} mode`}>
+                {(["enforce", "audit"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={mode === m}
+                    disabled={!editable}
+                    onClick={() => setMode(m)}
+                    className={cn("rounded px-2.5 py-1 text-xs font-medium", mode === m ? "bg-primary text-white" : "text-fg-muted hover:bg-bg-subtle")}
+                  >
+                    {m === "enforce" ? "Enforce" : "Audit only"}
+                  </button>
+                ))}
+              </div>
+              {mode === "enforce" ? (
+                <>
+                  <span className="text-fg-muted">Grace period</span>
+                  <Select value={String(grace)} disabled={!editable} onChange={(e) => setGrace(Number(e.target.value))} aria-label={`${policy.title} grace period`}>
+                    {[0, 24, 72, 168, 336].map((h) => (
+                      <option key={h} value={h}>
+                        {h === 0 ? "none: counts at once" : h < 168 ? `${h / 24} day${h === 24 ? "" : "s"}` : `${h / 168} week${h === 168 ? "" : "s"}`}
+                      </option>
+                    ))}
+                  </Select>
+                </>
+              ) : (
+                <span className="text-xs text-fg-muted">Reported on each device; doesn&apos;t affect compliance.</span>
+              )}
+            </div>
+          ) : null}
           {enabled && policy.key === "screen_lock" ? (
             <div className="mt-3 flex items-center gap-2 text-[13px]">
               Lock within

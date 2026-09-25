@@ -15,7 +15,8 @@ export function PlatformIcon({ platform, className }: { platform: Device["platfo
   return <Icon className={cn("size-4 text-fg-muted", className)} aria-label={PLATFORM_LABEL[platform]} />;
 }
 
-export function ComplianceBadge({ compliance }: { compliance: Device["compliance"] }) {
+export function ComplianceBadge({ compliance, graceUntil }: { compliance: Device["compliance"]; graceUntil?: string | null }) {
+  if (compliance === "compliant" && graceUntil) return <StatusPill tone="warning">Fix by {new Date(graceUntil).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StatusPill>;
   if (compliance === "compliant") return <StatusPill tone="success">Compliant</StatusPill>;
   if (compliance === "non_compliant") return <StatusPill tone="danger">Not compliant</StatusPill>;
   return <StatusPill tone="warning">Unknown</StatusPill>;
@@ -45,7 +46,13 @@ export function CheckList({ checks }: { checks: Check[] }) {
             <div className="min-w-0 flex-1 text-[13px]">
               <p className="font-medium">
                 {c.title} <span className="font-normal text-fg-muted">· {c.detail}</span>
+                {!c.enforced ? <span className="ml-1.5 rounded bg-bg-muted px-1.5 py-0.5 text-[11px] font-normal text-fg-muted">audit only</span> : null}
               </p>
+              {c.grace_until ? (
+                <p className="mt-0.5 text-xs font-medium text-warning">
+                  Fix by {new Date(c.grace_until).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}: after that this device stops counting as compliant.
+                </p>
+              ) : null}
               {c.status === "fail" || c.status === "unknown" ? <p className="mt-0.5 text-xs text-fg-subtle">{c.why}</p> : null}
               {c.fix ? (
                 <p className="mt-2 flex items-start gap-1.5 rounded-md bg-bg-subtle px-2.5 py-2 text-xs">

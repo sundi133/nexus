@@ -4213,6 +4213,13 @@
               "type": "string"
             }
           },
+          "compliance_grace_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Enforced checks are failing but within their grace period until then"
+          },
           "online": {
             "type": "boolean"
           },
@@ -4260,6 +4267,7 @@
           "serial",
           "compliance",
           "failing_checks",
+          "compliance_grace_until",
           "online",
           "last_seen_at",
           "primary_user",
@@ -4435,6 +4443,17 @@
               "null"
             ]
           },
+          "enforced": {
+            "type": "boolean",
+            "description": "Counts toward compliance (the policy is in enforce mode)"
+          },
+          "grace_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Failing, but not counted until then"
+          },
           "updated_at": {
             "type": "string"
           }
@@ -4446,6 +4465,8 @@
           "status",
           "detail",
           "fix",
+          "enforced",
+          "grace_until",
           "updated_at"
         ]
       },
@@ -4478,8 +4499,14 @@
           "mode": {
             "type": "string",
             "enum": [
-              "audit"
-            ]
+              "audit",
+              "enforce"
+            ],
+            "description": "enforce: counts toward compliance (and so conditional access); audit: reported only"
+          },
+          "grace_hours": {
+            "type": "integer",
+            "description": "How long an enforced check may fail before it counts (0 = at once)"
           }
         },
         "required": [
@@ -4488,7 +4515,8 @@
           "why",
           "enabled",
           "params",
-          "mode"
+          "mode",
+          "grace_hours"
         ]
       },
       "DeviceTrustChallenge": {
@@ -19941,7 +19969,7 @@
           "Devices"
         ],
         "summary": "Device compliance policies",
-        "description": "Audit mode: devices are marked compliant or not and people are told what to fix; enforcement (blocking sign-in) comes from conditional access.",
+        "description": "Enforced policies decide whether a device is compliant (after an optional grace period); audited ones are only reported. Blocking sign-in from non-compliant devices is configured in conditional access.",
         "security": [
           {
             "bearer": []
@@ -20064,6 +20092,20 @@
                     "type": "object",
                     "additionalProperties": {},
                     "default": {}
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "audit",
+                      "enforce"
+                    ],
+                    "description": "Unchanged when omitted"
+                  },
+                  "grace_hours": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 720,
+                    "description": "Unchanged when omitted"
                   }
                 },
                 "required": [

@@ -42,7 +42,7 @@ export default function MyDevicesPage() {
               <CardHeader
                 title={
                   <span className="flex items-center gap-2">
-                    <PlatformIcon platform={d.platform} /> {d.hostname} <ComplianceBadge compliance={d.compliance} />
+                    <PlatformIcon platform={d.platform} /> {d.hostname} <ComplianceBadge compliance={d.compliance} graceUntil={d.compliance_grace_until} />
                   </span>
                 }
                 description={

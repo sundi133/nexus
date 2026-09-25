@@ -28,6 +28,7 @@ const DeviceSummary = z
     serial: z.string(),
     compliance: ComplianceEnum,
     failing_checks: z.array(z.string()),
+    compliance_grace_until: z.string().nullable().openapi({ description: "Enforced checks are failing but within their grace period until then" }),
     online: z.boolean(),
     last_seen_at: z.string().nullable(),
     primary_user: z.object({ id: Id, display_name: z.string(), email: z.string() }).nullable(),
@@ -43,6 +44,8 @@ const DeviceCheck = z
     status: z.enum(["pass", "fail", "unknown", "not_applicable"]),
     detail: z.string(),
     fix: z.string().nullable(),
+    enforced: z.boolean().openapi({ description: "Counts toward compliance (the policy is in enforce mode)" }),
+    grace_until: z.string().nullable().openapi({ description: "Failing, but not counted until then" }),
     updated_at: z.string(),
   })
   .openapi("DeviceCheck");
@@ -86,6 +89,7 @@ function toSummary(d: Row): z.infer<typeof DeviceSummary> {
     serial: d.serial,
     compliance: d.compliance,
     failing_checks: d.failing_checks ?? [],
+    compliance_grace_until: isoOrNull(d.compliance_grace_until),
     online: !!d.last_seen_at && Date.now() - d.last_seen_at.getTime() < ONLINE_WINDOW_MS,
     last_seen_at: isoOrNull(d.last_seen_at),
     primary_user: d.primary_user_id
@@ -119,6 +123,8 @@ async function detail(tx: Tx, id: string): Promise<z.infer<typeof DeviceDetail>>
           status: ch.status,
           detail: ch.detail,
           fix: ch.status === "fail" || ch.status === "unknown" ? fixFor(key, d.platform as DevicePlatform) : null,
+          enforced: ch.enforced,
+          grace_until: isoOrNull(ch.grace_until),
           updated_at: iso(ch.updated_at),
         };
       }),
@@ -430,11 +436,19 @@ export function registerDeviceRoutes(app: App) {
   // ---- Device policies (SPEC DPOL-01..03) ----------------------------------------------
 
   const PolicySchema = z
-    .object({ key: z.enum(CHECK_KEYS), title: z.string(), why: z.string(), enabled: z.boolean(), params: z.record(z.string(), z.unknown()), mode: z.literal("audit") })
+    .object({
+      key: z.enum(CHECK_KEYS),
+      title: z.string(),
+      why: z.string(),
+      enabled: z.boolean(),
+      params: z.record(z.string(), z.unknown()),
+      mode: z.enum(["audit", "enforce"]).openapi({ description: "enforce: counts toward compliance (and so conditional access); audit: reported only" }),
+      grace_hours: z.number().int().openapi({ description: "How long an enforced check may fail before it counts (0 = at once)" }),
+    })
     .openapi("DevicePolicy");
 
   const policiesOut = async (tx: Tx) =>
-    (await getPolicies(tx)).map((p) => ({ key: p.key, title: CHECK_INFO[p.key].title, why: CHECK_INFO[p.key].why, enabled: p.enabled, params: p.params, mode: "audit" as const }));
+    (await getPolicies(tx)).map((p) => ({ key: p.key, title: CHECK_INFO[p.key].title, why: CHECK_INFO[p.key].why, enabled: p.enabled, params: p.params, mode: p.mode, grace_hours: p.grace_hours }));
 
   app.openapi(
     createRoute({
@@ -442,7 +456,7 @@ export function registerDeviceRoutes(app: App) {
       path: "/v1/device-policies",
       tags: ["Devices"],
       summary: "Device compliance policies",
-      description: "Audit mode: devices are marked compliant or not and people are told what to fix; enforcement (blocking sign-in) comes from conditional access.",
+      description: "Enforced policies decide whether a device is compliant (after an optional grace period); audited ones are only reported. Blocking sign-in from non-compliant devices is configured in conditional access.",
       security: bearer,
       responses: { 200: json(z.object({ data: z.array(PolicySchema) })), ...problemResponses },
     }),
@@ -459,7 +473,17 @@ export function registerDeviceRoutes(app: App) {
       tags: ["Devices"],
       summary: "Turn a policy on/off or change its settings; all devices are re-evaluated immediately",
       security: bearer,
-      request: { params: z.object({ key: z.enum(CHECK_KEYS) }), ...body(z.object({ enabled: z.boolean(), params: z.record(z.string(), z.unknown()).default({}) })) },
+      request: {
+        params: z.object({ key: z.enum(CHECK_KEYS) }),
+        ...body(
+          z.object({
+            enabled: z.boolean(),
+            params: z.record(z.string(), z.unknown()).default({}),
+            mode: z.enum(["audit", "enforce"]).optional().openapi({ description: "Unchanged when omitted" }),
+            grace_hours: z.number().int().min(0).max(720).optional().openapi({ description: "Unchanged when omitted" }),
+          }),
+        ),
+      },
       responses: { 200: json(z.object({ data: z.array(PolicySchema), reevaluated: z.object({ devices: z.number().int(), changed: z.number().int() }) })), ...problemResponses },
     }),
     async (c) => {
@@ -471,15 +495,20 @@ export function registerDeviceRoutes(app: App) {
       const meta = c.get("meta");
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         const before = (await getPolicies(tx)).find((x) => x.key === key)!;
+        const row = { enabled: input.enabled, params: JSON.stringify(params.data), mode: input.mode ?? before.mode, grace_hours: input.grace_hours ?? before.grace_hours, updated_at: new Date() };
         await tx
           .insertInto("device_policies")
-          .values({ org_id: p.orgId, check_key: key, enabled: input.enabled, params: JSON.stringify(params.data), updated_at: new Date() })
-          .onConflict((oc) => oc.columns(["org_id", "check_key"]).doUpdateSet({ enabled: input.enabled, params: JSON.stringify(params.data), updated_at: new Date() }))
+          .values({ org_id: p.orgId, check_key: key, ...row })
+          .onConflict((oc) => oc.columns(["org_id", "check_key"]).doUpdateSet(row))
           .execute();
         await audit(tx, p.orgId, { principal: p, meta }, {
           type: "device.policy_updated",
           target: { type: "device_policy", id: null, display: CHECK_INFO[key].title },
-          details: { key, from: { enabled: before.enabled, params: before.params }, to: { enabled: input.enabled, params: params.data } },
+          details: {
+            key,
+            from: { enabled: before.enabled, params: before.params, mode: before.mode, grace_hours: before.grace_hours },
+            to: { enabled: input.enabled, params: params.data, mode: row.mode, grace_hours: row.grace_hours },
+          },
         });
         const reevaluated = await reevaluateAll(tx, { meta });
         return { data: await policiesOut(tx), reevaluated };

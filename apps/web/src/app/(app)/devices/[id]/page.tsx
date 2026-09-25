@@ -51,7 +51,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight">{d.hostname}</h1>
-            <ComplianceBadge compliance={d.compliance} />
+            <ComplianceBadge compliance={d.compliance} graceUntil={d.compliance_grace_until} />
           </div>
           <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-fg-muted">
             <OnlineDot online={d.online} /> {d.online ? "Online" : `Last seen ${timeAgo(d.last_seen_at)}`} · {d.model || PLATFORM_LABEL[d.platform]} · {PLATFORM_LABEL[d.platform]} {d.os_version}

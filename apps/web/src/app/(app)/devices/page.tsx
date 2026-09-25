@@ -124,7 +124,7 @@ function DevicesView() {
                         </Link>
                       </TD>
                       <TD>
-                        <ComplianceBadge compliance={d.compliance} />
+                        <ComplianceBadge compliance={d.compliance} graceUntil={d.compliance_grace_until} />
                         {d.failing_checks.length ? <p className="mt-0.5 text-xs text-fg-muted">{d.failing_checks.map(checkTitle).join(", ")}</p> : null}
                       </TD>
                       <TD className="hidden md:table-cell">{d.primary_user ? d.primary_user.display_name : <span className="text-fg-subtle">Unassigned</span>}</TD>

@@ -212,6 +212,7 @@ export interface Database {
     status: Generated<"active" | "removed">;
     compliance: Generated<Compliance>;
     compliance_changed_at: NullableTimestamp;
+    compliance_grace_until: NullableTimestamp;
     inventory: Json;
     posture: Json;
     enrolled_at: Generated<Date>;
@@ -227,12 +228,17 @@ export interface Database {
     status: CheckStatus;
     detail: string;
     updated_at: Timestamp;
+    enforced: Generated<boolean>;
+    failing_since: NullableTimestamp;
+    grace_until: NullableTimestamp;
   };
   device_policies: {
     org_id: string;
     check_key: string;
     enabled: boolean;
     params: Json;
+    mode: Generated<"audit" | "enforce">;
+    grace_hours: Generated<number>;
     updated_at: Timestamp;
   };
   agent_nonces: {
