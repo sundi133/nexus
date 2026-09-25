@@ -1,6 +1,6 @@
 # Piloting Votal Nexus in your enterprise
 
-This guide takes you from a fresh server to a working pilot that uses your own identity provider, directory, devices and AI agents. Plan for about half a day, most of it spent in your IdP and MDM consoles. Read [Known limits](#known-limits) before you start, so the pilot has the right scope.
+This guide takes you from a fresh server to a working pilot that uses your own identity provider, directory, devices and AI agents. Plan for about half a day, most of it spent in your IdP and MDM consoles. Read [Known limits](#known-limits) before you start, so the pilot has the right scope, and run the [live vendor check](LIVE-CHECK.md) against your tenants first. It finds most vendor quirks in minutes.
 
 ## 1. What you need
 
@@ -141,6 +141,6 @@ Tick these off with your pilot group; each item is a real enterprise scenario.
 
 - **Not externally audited:** no penetration test or SOC 2 yet. An internal adversarial review found and fixed privilege-escalation paths (IdP swap, SCIM on owners, help desk on admins, MCP condition bypass, DNS rebinding), but treat this as pre-audit software: keep the pilot group small and don't make Nexus the only gate on crown-jewel systems yet.
 - **Agent signing needs your certificates:** the pipeline is built and verified, but builds are unsigned until you add an Apple Developer ID and a Windows signing identity ([SIGNING.md](SIGNING.md)).
-- **Untested against real vendors:** Entra ID, Okta, AD, Intune, Jamf, PagerDuty, Opsgenie and Sentinel are covered by protocol tests and local fakes, not by live tenants. Expect to find vendor quirks in the pilot, and please report them.
+- **Barely tested against real vendors:** Entra ID, Okta, AD, Intune, Jamf, PagerDuty, Opsgenie and Sentinel are covered by protocol tests and local fakes. Only the public Entra ID, Okta and Google sign-in metadata has been checked live. Before the pilot, run the [live vendor check](LIVE-CHECK.md) against your tenants and send the report back.
 - **Single host:** Postgres runs on the same VM (see [OPERATIONS.md](OPERATIONS.md) for a managed database), and audit data stays in Postgres. That's fine for a pilot of hundreds of users.
 - **Not built yet:** organization data export and deletion (use `down -v`), a Terraform provider, MCP resources and prompts, content guardrails, and letting people connect their own MCP clients (agents only).

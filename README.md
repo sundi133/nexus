@@ -63,4 +63,4 @@ Release A1 in progress. Built:
 
 Next up: conditional access with device trust, then signed agent installers.
 
-**Trying it in your enterprise?** Start with the [pilot guide](docs/PILOT.md).
+**Trying it in your enterprise?** Start with the [pilot guide](docs/PILOT.md). Then run the [live vendor check](docs/LIVE-CHECK.md) against your tenants, and read [signing the agent](docs/SIGNING.md) for MDM rollout.

@@ -27,7 +27,7 @@ const GoogleCreds = z.object({
 const EntraCreds = z.object({
   provider: z.literal("entra"),
   tenant_id: z.string().max(255),
-  client_id: z.uuid(),
+  client_id: z.guid(),
   client_secret: z.string().min(1).max(1000),
 });
 const LdapCreds = LdapConfigSchema.extend({

@@ -32,7 +32,7 @@ const Config = z.object({
   access_key_id: z.string().max(200).optional(),
   // Microsoft Sentinel (Azure Monitor Logs Ingestion API)
   tenant_id: z.string().uuid().optional(),
-  client_id: z.string().uuid().optional(),
+  client_id: z.guid().optional(),
   dcr_id: z.string().regex(/^dcr-[0-9a-f]{32}$/, "The data collection rule's immutable ID (dcr-…)").optional(),
   stream: z.string().regex(/^Custom-[A-Za-z0-9_]{1,200}$/, "The stream name from the rule, like Custom-VotalNexus_CL").optional(),
 });

@@ -16,3 +16,7 @@ dist/
 .env.local
 .DS_Store
 agent/packaging/linux/.nfpm-*.yaml
+
+# Live vendor check credentials and reports (docs/LIVE-CHECK.md)
+live-check.env
+live-check-*.json

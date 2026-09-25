@@ -37,6 +37,19 @@ async function getJson(url: string): Promise<unknown> {
   });
 }
 
+/** Explains the issuer mix-ups admins make most, which the vendors' own documents don't. */
+export function issuerMismatch(asked: string, said: string) {
+  const entra = /^https:\/\/login\.microsoftonline\.com\//i.test(asked);
+  if (entra && said.includes("{tenantid}"))
+    return "That's Entra ID's multi-tenant endpoint (common, organizations or consumers). Use your tenant's issuer: https://login.microsoftonline.com/<tenant ID>/v2.0";
+  if (entra && /^https:\/\/sts\.windows\.net\//i.test(said)) {
+    const tenant = said.split("/")[3];
+    return `That's Entra ID's v1 endpoint. Use the v2.0 issuer: https://login.microsoftonline.com/${tenant}/v2.0`;
+  }
+  if (said.replace(/\/+$/, "") === asked.replace(/\/+$/, "")) return `The issuer must match the IdP's exactly, including the trailing slash: "${said}"`;
+  return `The IdP says its issuer is "${said}", not "${asked}"`;
+}
+
 /** The IdP's endpoints, from /.well-known/openid-configuration (cached for an hour). */
 export async function discover(issuer: string, allowPrivate: boolean, fresh = false): Promise<Discovery> {
   const hit = discoveries.get(issuer);
@@ -45,7 +58,7 @@ export async function discover(issuer: string, allowPrivate: boolean, fresh = fa
   await assertSafeUrl(url, { allowPrivate });
   const doc = (await getJson(url)) as Partial<Discovery>;
   // OpenID Connect Discovery §4.3: the issuer in the document must be exactly the one we asked about.
-  if (doc.issuer !== issuer) throw new FederationError("idp_misconfigured", `The IdP says its issuer is "${doc.issuer}", not "${issuer}"`);
+  if (doc.issuer !== issuer) throw new FederationError("idp_misconfigured", issuerMismatch(issuer, String(doc.issuer ?? "")));
   for (const k of ["authorization_endpoint", "token_endpoint", "jwks_uri"] as const) {
     if (typeof doc[k] !== "string") throw new FederationError("idp_misconfigured", `The IdP's configuration has no ${k}`);
     await assertSafeUrl(doc[k]!, { allowPrivate });

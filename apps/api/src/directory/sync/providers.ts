@@ -150,7 +150,7 @@ export async function fetchGoogle(ep: Endpoints, rawCfg: unknown, secret: string
 
 export const EntraConfig = z.object({
   tenant_id: z.string().regex(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/i, "A tenant ID (GUID) or primary domain"),
-  client_id: z.uuid(),
+  client_id: z.guid(),
 });
 
 export async function entraToken(ep: Endpoints, cfg: z.infer<typeof EntraConfig>, secret: string) {

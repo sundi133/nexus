@@ -11,7 +11,8 @@
     "migrate": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts",
     "spec": "tsx --conditions=development src/cli/spec.ts > openapi.json",
     "reseal": "tsx --env-file-if-exists=../../.env src/cli/reseal.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "live-check": "tsx --conditions=development --env-file-if-exists=../../live-check.env --disable-warning=ExperimentalWarning src/cli/live-check.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

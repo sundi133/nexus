@@ -31,7 +31,7 @@ export type MdmDevice = {
 
 export const IntuneConfig = z.object({
   tenant_id: z.string().regex(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/i, "A tenant ID (GUID) or primary domain"),
-  client_id: z.uuid(),
+  client_id: z.guid(),
 });
 export const JamfConfig = z.object({
   base_url: z.string().url().max(300).openapi({ example: "https://acme.jamfcloud.com" }),
