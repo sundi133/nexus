@@ -29,6 +29,8 @@ import {
 import { requireRecentMfa, requireSession } from "./guard.js";
 import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "./passwords.js";
 import { assertNotBreached, recoveryCodesLeft } from "./recovery.js";
+import { domainOf } from "../org/domains.js";
+import { alertIfBreakGlass } from "../directory/break-glass.js";
 import { RateLimiter } from "./ratelimit.js";
 import { hashToken, newSessionToken } from "./tokens.js";
 
@@ -101,7 +103,7 @@ export async function createSession(
   tx: Tx,
   deps: Deps,
   meta: RequestMeta,
-  a: { orgId: string; userId: string; state: SessionState; client: string; activeTtlMs: number; mfa?: boolean },
+  a: { orgId: string; userId: string; state: SessionState; client: string; activeTtlMs: number; mfaMethod?: MfaMethod },
 ) {
   const token = newSessionToken();
   const ttl = a.state === "active" ? a.activeTtlMs : a.state === "enroll_mfa" ? ENROLL_TTL_MS : deps.cfg.pendingMfaTtlMs;
@@ -114,7 +116,8 @@ export async function createSession(
     client: a.client,
     ip: meta.ip,
     user_agent: meta.userAgent.slice(0, 512),
-    mfa_at: a.mfa ? new Date() : null,
+    mfa_at: a.mfaMethod ? new Date() : null,
+    mfa_method: a.mfaMethod ?? null,
     last_seen_at: new Date(),
     expires_at: new Date(Date.now() + ttl),
   };
@@ -163,17 +166,19 @@ async function verifyUserTotp(tx: Tx, deps: Deps, userId: string, code: string) 
  * Proving possession of a factor counts as fresh MFA for this session. If the
  * session was waiting on mandatory enrollment, it becomes fully active.
  */
-export async function markFreshMfa(tx: Tx, p: { orgId: string; sessionId: string; sessionState: SessionState }) {
+export type MfaMethod = "totp" | "push" | "webauthn" | "recovery_code";
+
+export async function markFreshMfa(tx: Tx, p: { orgId: string; sessionId: string; sessionState: SessionState }, method: MfaMethod) {
   const now = new Date();
   if (p.sessionState === "enroll_mfa") {
     const settings = await getSettings(tx, p.orgId);
     await tx
       .updateTable("sessions")
-      .set({ state: "active", mfa_at: now, expires_at: new Date(Date.now() + settings.session_ttl_hours * 3600_000) })
+      .set({ state: "active", mfa_at: now, mfa_method: method, expires_at: new Date(Date.now() + settings.session_ttl_hours * 3600_000) })
       .where("id", "=", p.sessionId)
       .execute();
   } else {
-    await tx.updateTable("sessions").set({ mfa_at: now }).where("id", "=", p.sessionId).execute();
+    await tx.updateTable("sessions").set({ mfa_at: now, mfa_method: method }).where("id", "=", p.sessionId).execute();
   }
 }
 
@@ -206,6 +211,10 @@ export function registerAuthRoutes(app: App) {
       const { emailTaken, slug } = await db.unscoped(async (tx) => {
         const emailTaken = (await sql<{ t: boolean }>`SELECT nexus_email_taken(${input.email}) AS t`.execute(tx))
           .rows[0]!.t;
+        const domainClaimed = (await sql<{ o: string | null }>`SELECT nexus_domain_claimed_by(${domainOf(input.email)}) AS o`.execute(tx)).rows[0]!.o;
+        if (domainClaimed) {
+          throw conflict("domain_claimed", `${domainOf(input.email)} is managed by an existing Nexus organization. Ask its administrators to invite you.`);
+        }
         let slug = slugify(input.organization_name);
         for (let i = 2; (await sql<{ t: boolean }>`SELECT nexus_org_slug_taken(${slug}) AS t`.execute(tx)).rows[0]!.t; i++) {
           slug = `${slugify(input.organization_name)}-${i}`;
@@ -329,6 +338,7 @@ export function registerAuthRoutes(app: App) {
         if (state === "active") {
           await tx.updateTable("users").set({ last_login_at: new Date() }).where("id", "=", found.user_id).execute();
         }
+        await alertIfBreakGlass(tx, found.org_id, found.user_id, meta, "its password");
         await audit(tx, found.org_id, who, {
           type: "auth.login",
           actor,
@@ -381,7 +391,7 @@ export function registerAuthRoutes(app: App) {
         const expires = p.sessionState === "pending_mfa" ? new Date(Date.now() + settings.session_ttl_hours * 3600_000) : undefined;
         const s = await tx
           .updateTable("sessions")
-          .set({ state: "active", mfa_at: now, ...(expires ? { expires_at: expires } : {}) })
+          .set({ state: "active", mfa_at: now, mfa_method: "totp", ...(expires ? { expires_at: expires } : {}) })
           .where("id", "=", p.sessionId)
           .returning(["id", "expires_at"])
           .executeTakeFirstOrThrow();
@@ -593,7 +603,7 @@ export function registerAuthRoutes(app: App) {
           .where("id", "=", id)
           .returningAll()
           .executeTakeFirstOrThrow();
-        await markFreshMfa(tx, p);
+        await markFreshMfa(tx, p, "totp");
         const meta = c.get("meta");
         await audit(tx, p.orgId, { principal: p, meta }, { type: "user.mfa_enrolled", target: { type: "user", id: p.userId }, details: { factor: "totp", factor_id: id } });
         await notifyUsers(tx, p.orgId, [p.userId], {
@@ -627,7 +637,7 @@ export function registerAuthRoutes(app: App) {
       const meta = c.get("meta");
       await c.get("deps").db.tenant(p.orgId, async (tx) => {
         const factors = await verifiedFactorTypes(tx, p.userId);
-        requireRecentMfa(c, p, factors.length > 0);
+        requireRecentMfa(c, p, factors.length > 0, { personal: true });
         const del = await tx.deleteFrom("auth_factors").where("id", "=", id).where("user_id", "=", p.userId).returning("type").executeTakeFirst();
         if (!del) throw notFound("Factor");
         await audit(tx, p.orgId, { principal: p, meta }, { type: "user.mfa_removed", target: { type: "user", id: p.userId }, details: { factor: del.type, factor_id: id } });

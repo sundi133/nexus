@@ -23,15 +23,17 @@ export const useStepUp = () => useContext(Ctx);
 
 export function StepUpProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [passkeyOnly, setPasskeyOnly] = useState(false);
   const pending = useRef<{ resolve: () => void; reject: (e: unknown) => void } | null>(null);
 
   const run: Run = useCallback(async (fn) => {
     try {
       return await fn();
     } catch (err) {
-      if (!(err instanceof ApiProblem && err.code === "step_up_required")) throw err;
+      if (!(err instanceof ApiProblem && (err.code === "step_up_required" || err.code === "passkey_required"))) throw err;
       await new Promise<void>((resolve, reject) => {
         pending.current = { resolve, reject };
+        setPasskeyOnly(err.code === "passkey_required");
         setOpen(true);
       });
       return fn();
@@ -48,12 +50,12 @@ export function StepUpProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={run}>
       {children}
-      <StepUpDialog open={open} onDone={finish} />
+      <StepUpDialog open={open} passkeyOnly={passkeyOnly} onDone={finish} />
     </Ctx.Provider>
   );
 }
 
-function StepUpDialog({ open, onDone }: { open: boolean; onDone: (ok: boolean) => void }) {
+function StepUpDialog({ open, passkeyOnly, onDone }: { open: boolean; passkeyOnly: boolean; onDone: (ok: boolean) => void }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -77,10 +79,26 @@ function StepUpDialog({ open, onDone }: { open: boolean; onDone: (ok: boolean) =
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onDone(false)}>
-      <DialogContent title="Confirm it's you" description="This is a sensitive action. Verify with MFA to continue. You won't be asked again for 10 minutes.">
+      <DialogContent
+        title="Confirm it's you"
+        description={
+          passkeyOnly
+            ? "Your organization requires owners to confirm admin actions with a passkey, which can't be phished."
+            : "This is a sensitive action. Verify with MFA to continue. You won't be asked again for 10 minutes."
+        }
+      >
         <div className="space-y-3">
           <ErrorBanner error={error} />
-          {types.has("push") ? (
+          {passkeyOnly && factors.data && !types.has("webauthn") ? (
+            <p className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-[13px]">
+              You don&apos;t have a passkey yet. Add one in{" "}
+              <a href="/settings/security" className="font-medium text-primary hover:underline">
+                My security
+              </a>{" "}
+              (Touch ID, Windows Hello or a security key), then try again.
+            </p>
+          ) : null}
+          {types.has("push") && !passkeyOnly ? (
             <PushApproval
               onApproved={() => {
                 setCode("");
@@ -93,7 +111,7 @@ function StepUpDialog({ open, onDone }: { open: boolean; onDone: (ok: boolean) =
               <Fingerprint /> Use your passkey
             </Button>
           ) : null}
-          {types.has("totp") ? (
+          {types.has("totp") && !passkeyOnly ? (
             <form
               className="flex gap-2"
               onSubmit={(e) => {

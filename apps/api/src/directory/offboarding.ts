@@ -129,6 +129,8 @@ registerJobHandler("user.offboard", async (deps, job) => {
 
 async function guard(c: Context<Env>, tx: Tx, p: Principal, userId: string) {
   if (userId === p.userId) throw badRequest("cannot_target_self", "You can't offboard yourself");
+  const bg = await tx.selectFrom("users").select("break_glass").where("id", "=", userId).executeTakeFirst();
+  if (bg?.break_glass) throw badRequest("break_glass", "This is a break-glass account. Remove the designation first (owners only).");
   const roles = (await tx.selectFrom("user_roles").select("role").where("user_id", "=", userId).execute()).map((r) => r.role);
   if (roles.includes("owner")) {
     if (!can(p.roles, "admins:manage")) throw forbidden("Only owners can offboard another owner");

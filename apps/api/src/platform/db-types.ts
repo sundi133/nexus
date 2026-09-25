@@ -32,6 +32,7 @@ export interface Database {
     status: Generated<UserStatus>;
     password_hash: string | null;
     attributes: Json;
+    break_glass: Generated<boolean>;
     last_login_at: NullableTimestamp;
     created_at: Generated<Date>;
     updated_at: Timestamp;
@@ -66,6 +67,7 @@ export interface Database {
     ip: string;
     user_agent: string;
     mfa_at: NullableTimestamp;
+    mfa_method: "totp" | "push" | "webauthn" | "recovery_code" | null;
     created_at: Generated<Date>;
     last_seen_at: Timestamp;
     expires_at: Timestamp;
@@ -249,6 +251,19 @@ export interface Database {
     conditions: Json;
     created_at: Generated<Date>;
     updated_at: Timestamp;
+  };
+  org_domains: {
+    id: string;
+    org_id: string;
+    domain: string;
+    token: string;
+    status: Generated<"pending" | "verified" | "failing">;
+    verified_at: NullableTimestamp;
+    last_checked_at: NullableTimestamp;
+    failing_since: NullableTimestamp;
+    last_error: Generated<string>;
+    created_by: string | null;
+    created_at: Generated<Date>;
   };
   notification_preferences: {
     user_id: string;

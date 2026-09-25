@@ -60,6 +60,9 @@ export async function subjectFor(tx: Tx, p: Principal, appId: string): Promise<S
  * results, so admins can see a policy's impact before enforcing it.
  */
 export async function decideAccess(tx: Tx, p: Principal, app: { id: string; name: string }, meta: RequestMeta): Promise<Decision> {
+  // Break-glass accounts are exempt: conditional access must never lock out the way back in.
+  const bg = await tx.selectFrom("users").select("break_glass").where("id", "=", p.userId).executeTakeFirst();
+  if (bg?.break_glass) return { outcome: "allow", reason: "Break-glass account: access policies don't apply", results: [] };
   const decision = evaluate(await loadPolicies(tx), await subjectFor(tx, p, app.id));
   for (const r of decision.results) {
     if (r.matched && r.satisfied === false && r.mode === "report_only") {

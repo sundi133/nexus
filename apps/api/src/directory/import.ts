@@ -1,4 +1,5 @@
 import { touchUsers } from "../provisioning/service.js";
+import { emailAdmission } from "../org/domains.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
 import type { App } from "../context.js";
@@ -160,6 +161,11 @@ export function registerImportRoutes(app: App) {
           }
           if (takenElsewhere.has(email)) {
             rows.push({ ...base, action: "error", message: "This email is already used by another Nexus account" });
+            continue;
+          }
+          const refused = await emailAdmission(tx, p.orgId, email);
+          if (refused) {
+            rows.push({ ...base, action: "error", message: refused });
             continue;
           }
           seen.add(email);

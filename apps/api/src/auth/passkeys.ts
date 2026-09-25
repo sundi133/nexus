@@ -1,3 +1,4 @@
+import { alertIfBreakGlass } from "../directory/break-glass.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   generateAuthenticationOptions,
@@ -188,7 +189,7 @@ export function registerPasskeyRoutes(app: App) {
           })
           .returningAll()
           .executeTakeFirstOrThrow();
-        await markFreshMfa(tx, p);
+        await markFreshMfa(tx, p, "webauthn");
         await audit(tx, p.orgId, { principal: p, meta }, {
           type: "user.mfa_enrolled",
           target: { type: "user", id: p.userId },
@@ -327,9 +328,10 @@ export function registerPasskeyRoutes(app: App) {
           state: "active",
           client: input.client,
           activeTtlMs: settings.session_ttl_hours * 3600_000,
-          mfa: true,
+          mfaMethod: "webauthn",
         });
         await tx.updateTable("users").set({ last_login_at: new Date() }).where("id", "=", user.user_id).execute();
+        await alertIfBreakGlass(tx, user.org_id, user.user_id, meta, "a passkey");
         await audit(tx, user.org_id, { meta }, {
           type: "auth.login",
           actor,
@@ -368,6 +370,7 @@ async function completeMfa(tx: Tx, p: Principal, meta: Parameters<typeof audit>[
     .set({
       state: "active",
       mfa_at: now,
+      mfa_method: "webauthn",
       ...(p.sessionState === "pending_mfa" ? { expires_at: new Date(Date.now() + settings.session_ttl_hours * 3600_000) } : {}),
     })
     .where("id", "=", p.sessionId)

@@ -8,13 +8,15 @@ export const OrgSettings = z
       .enum(["off", "admins", "everyone"])
       .openapi({ description: "Who must enroll MFA. Users without a factor are asked to set one up at their next sign-in." }),
     session_ttl_hours: z.number().int().min(1).max(168).openapi({ description: "How long a sign-in lasts before re-authentication" }),
+    restrict_to_verified_domains: z.boolean().openapi({ description: "Only people with emails in your verified domains can be added" }),
+    owners_require_passkey: z.boolean().openapi({ description: "Owners confirm admin actions with a passkey (phishing-resistant); other methods aren't accepted for them" }),
   })
   .openapi("OrgSettings");
 
 export type OrgSettings = z.infer<typeof OrgSettings>;
 
 // Secure by default: admins must use MFA from day one.
-export const DEFAULT_SETTINGS: OrgSettings = { mfa_policy: "admins", session_ttl_hours: 12 };
+export const DEFAULT_SETTINGS: OrgSettings = { mfa_policy: "admins", session_ttl_hours: 12, restrict_to_verified_domains: false, owners_require_passkey: false };
 
 export async function getSettings(tx: Tx, orgId: string): Promise<OrgSettings> {
   const row = await tx.selectFrom("organizations").select("settings").where("id", "=", orgId).executeTakeFirstOrThrow();

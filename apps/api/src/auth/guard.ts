@@ -17,6 +17,7 @@ type SessionLookup = {
   state: SessionState;
   client: string;
   mfa_at: Date | null;
+  mfa_method: "totp" | "push" | "webauthn" | "recovery_code" | null;
   expires_at: Date;
   user_status: string;
 };
@@ -60,9 +61,10 @@ export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
       return r.rows[0];
     });
     if (found && found.user_status === "active") {
-      const { roles, email } = await db.tenant(found.org_id, async (tx) => {
+      const { roles, email, ownerPasskeyRequired } = await db.tenant(found.org_id, async (tx) => {
         const rows = await tx.selectFrom("user_roles").select("role").where("user_id", "=", found.user_id).execute();
         const user = await tx.selectFrom("users").select("email").where("id", "=", found.user_id).executeTakeFirstOrThrow();
+        const org = await tx.selectFrom("organizations").select("settings").where("id", "=", found.org_id).executeTakeFirstOrThrow();
         // Touch last_seen at most once a minute to keep writes cheap.
         await tx
           .updateTable("sessions")
@@ -70,7 +72,7 @@ export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
           .where("id", "=", found.session_id)
           .where("last_seen_at", "<", new Date(Date.now() - 60_000))
           .execute();
-        return { roles: rows.map((r) => r.role as Role), email: user.email };
+        return { roles: rows.map((r) => r.role as Role), email: user.email, ownerPasskeyRequired: (org.settings as { owners_require_passkey?: boolean }).owners_require_passkey === true };
       });
       c.set("principal", {
         orgId: found.org_id,
@@ -80,6 +82,8 @@ export const loadPrincipal: MiddlewareHandler<Env> = async (c, next) => {
         sessionState: found.state,
         client: found.client,
         mfaAt: found.mfa_at,
+        mfaMethod: found.mfa_method,
+        ownerPasskeyRequired,
         roles,
       });
     }
@@ -118,9 +122,14 @@ const STEP_UP_WINDOW_MS = 10 * 60 * 1000;
  * with no factor enrolled yet pass, so first-time setup is possible; the
  * "Needs attention" queue pushes them to enroll.
  */
-export function requireRecentMfa(c: Context<Env>, p: Principal, hasFactors: boolean) {
-  if (!hasFactors) return;
-  if (p.mfaAt && Date.now() - p.mfaAt.getTime() < STEP_UP_WINDOW_MS) return;
+export function requireRecentMfa(c: Context<Env>, p: Principal, hasFactors: boolean, opts: { personal?: boolean } = {}) {
+  if (!hasFactors || p.apiKey) return;
+  // Owners confirm admin actions with a passkey when the org requires it (RBAC-04). Personal
+  // actions (like adding that first passkey) accept any method, so nobody gets stuck.
+  const needsPasskey = !opts.personal && !!p.ownerPasskeyRequired && p.roles.includes("owner");
+  const recent = !!p.mfaAt && Date.now() - p.mfaAt.getTime() < STEP_UP_WINDOW_MS;
+  if (recent && (!needsPasskey || p.mfaMethod === "webauthn")) return;
   c.header("WWW-Authenticate", 'Bearer error="insufficient_user_authentication", max_age=600');
+  if (needsPasskey) throw new ApiError(401, "passkey_required", "Owners confirm admin actions with a passkey in this organization");
   throw new ApiError(401, "step_up_required", "Re-verify with MFA to perform this action");
 }

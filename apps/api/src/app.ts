@@ -29,6 +29,8 @@ import { registerOffboardingRoutes } from "./directory/offboarding.js";
 import { registerApiKeyRoutes } from "./auth/api-keys.js";
 import { registerRecoveryRoutes } from "./auth/recovery.js";
 import { registerChannelRoutes } from "./notify/channels.js";
+import { registerDomainRoutes, scheduleDomainRechecks } from "./org/domains.js";
+import { registerBreakGlassRoutes } from "./directory/break-glass.js";
 import { registerEventDestinationRoutes } from "./integrations/routes.js";
 import { scheduleEventDelivery } from "./integrations/stream.js";
 import { scheduleProvisioningReconcile } from "./provisioning/service.js";
@@ -113,6 +115,8 @@ export function createApp(deps: Deps) {
   registerApiKeyRoutes(app);
   registerRecoveryRoutes(app);
   registerChannelRoutes(app);
+  registerDomainRoutes(app);
+  registerBreakGlassRoutes(app);
   registerEventDestinationRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
@@ -133,4 +137,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleDirectorySyncs(jobs, deps);
   scheduleProvisioningReconcile(jobs, deps);
   scheduleEventDelivery(jobs, deps);
+  scheduleDomainRechecks(jobs, deps);
 }

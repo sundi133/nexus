@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertChannelsCard } from "@/components/features/notification-channels";
+import { DomainsCard } from "@/components/features/domains-card";
 import type { Schemas } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, CircleAlert, ShieldCheck } from "lucide-react";
@@ -66,6 +67,16 @@ export default function OrganizationSettingsPage() {
       refresh();
       toast.success(r.applied.length ? "Secure baseline applied" : "Already at baseline");
     },
+  });
+
+  const undo = useMutation({
+    mutationFn: (eventId: string) => withStepUp(() => unwrap(api.POST("/v1/org/settings/revert", { body: { event_id: eventId } }))),
+    onSuccess: (s) => {
+      setDraft(s);
+      refresh();
+      toast.success("Change undone");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Couldn't undo that change"),
   });
 
   const dirty = draft && settings.data && JSON.stringify(draft) !== JSON.stringify(settings.data);
@@ -163,6 +174,32 @@ export default function OrganizationSettingsPage() {
                   ))}
                 </Select>
               </div>
+              <label className="flex items-start gap-2 text-[13px]">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  disabled={!editable}
+                  checked={draft.owners_require_passkey}
+                  onChange={(e) => setDraft({ ...draft, owners_require_passkey: e.target.checked })}
+                />
+                <span>
+                  Owners confirm admin actions with a passkey
+                  <span className="block text-xs text-fg-muted">Passkeys can&apos;t be phished. Owners without one are asked to add one before their next admin action.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-[13px]">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  disabled={!editable}
+                  checked={draft.restrict_to_verified_domains}
+                  onChange={(e) => setDraft({ ...draft, restrict_to_verified_domains: e.target.checked })}
+                />
+                <span>
+                  Only people from our verified domains
+                  <span className="block text-xs text-fg-muted">Adding, inviting, importing or syncing anyone else is refused.</span>
+                </span>
+              </label>
               {editable ? (
                 <div className="flex justify-end gap-2 border-t border-border pt-4">
                   <Button onClick={() => setDraft(settings.data!)} disabled={!dirty}>
@@ -180,6 +217,8 @@ export default function OrganizationSettingsPage() {
             <Skeleton className="m-4 h-32" />
           )}
         </Card>
+
+        <DomainsCard editable={editable} />
 
         <SigningKeysCard />
 
@@ -199,6 +238,12 @@ export default function OrganizationSettingsPage() {
                       </span>
                     ))}
                     {e.details.via === "secure_baseline" ? <span className="text-primary">via secure baseline</span> : null}
+                    {typeof e.details.via === "string" && e.details.via.startsWith("undo:") ? <span className="text-fg-subtle">(reverted an earlier change)</span> : null}
+                    {editable && !(typeof e.details.via === "string" && e.details.via.startsWith("undo:")) ? (
+                      <button type="button" className="ml-2 font-medium text-primary hover:underline disabled:opacity-50" disabled={undo.isPending} onClick={() => undo.mutate(e.id)}>
+                        Undo
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               ))}

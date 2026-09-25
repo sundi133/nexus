@@ -194,13 +194,13 @@ export function registerPushRoutes(app: App) {
           state: "active",
           client: "mobile",
           activeTtlMs: 30 * 24 * 3600_000, // mobile stays signed in; revocable from the console at any time
-          mfa: true,
+          mfaMethod: "push",
         });
         await tx.updateTable("sessions").set({ factor_id: factorId }).where("id", "=", s.session.id).execute();
         // If the console was waiting on mandatory MFA enrollment, pairing completes it.
         if (pairing.session_id) {
           const web = await tx.selectFrom("sessions").select(["id", "state"]).where("id", "=", pairing.session_id).where("revoked_at", "is", null).executeTakeFirst();
-          if (web) await markFreshMfa(tx, { orgId: pairing.org_id, sessionId: web.id, sessionState: web.state });
+          if (web) await markFreshMfa(tx, { orgId: pairing.org_id, sessionId: web.id, sessionState: web.state }, "push");
         }
         const user = await tx.selectFrom("users").select(["id", "email", "given_name", "family_name"]).where("id", "=", pairing.user_id).executeTakeFirstOrThrow();
         const org = await tx.selectFrom("organizations").select(["id", "name"]).where("id", "=", pairing.org_id).executeTakeFirstOrThrow();
@@ -472,6 +472,7 @@ async function completeSession(tx: Tx, orgId: string, sessionId: string, state: 
     .set({
       state: "active",
       mfa_at: new Date(),
+      mfa_method: "push",
       ...(state !== "active" ? { expires_at: new Date(Date.now() + settings.session_ttl_hours * 3600_000) } : {}),
     })
     .where("id", "=", sessionId)

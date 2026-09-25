@@ -17,6 +17,10 @@ export type Principal = {
   sessionState: SessionState;
   client: string;
   mfaAt: Date | null;
+  /** How the session last proved MFA. */
+  mfaMethod?: "totp" | "push" | "webauthn" | "recovery_code" | null;
+  /** The org requires owners to step up with a passkey (RBAC-04). */
+  ownerPasskeyRequired?: boolean;
   roles: Role[];
   /** Set when the caller is an API key: its scopes replace roles, and it can't use personal (/v1/me) endpoints. */
   apiKey?: { id: string; name: string; scopes: ReadonlySet<Permission> };
@@ -24,7 +28,16 @@ export type Principal = {
 
 export type RequestMeta = { ip: string; userAgent: string; requestId: string };
 
-export type Deps = { cfg: Config; db: Db; sealer: Sealer; realtime: Realtime; mailer: Mailer; push: PushSender };
+export type Deps = {
+  cfg: Config;
+  db: Db;
+  sealer: Sealer;
+  realtime: Realtime;
+  mailer: Mailer;
+  push: PushSender;
+  /** TXT lookups for domain verification (injectable for tests). Defaults to the system resolver. */
+  resolveTxt?: (name: string) => Promise<string[][]>;
+};
 
 export type Env = {
   Variables: {

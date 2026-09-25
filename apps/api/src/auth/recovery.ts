@@ -107,7 +107,7 @@ export function registerRecoveryRoutes(app: App) {
       await c.get("deps").db.tenant(p.orgId, async (tx) => {
         const factors = await verifiedFactorTypes(tx, p.userId);
         if (!factors.length) throw badRequest("no_factor", "Set up an MFA method first; recovery codes back it up");
-        requireRecentMfa(c, p, true);
+        requireRecentMfa(c, p, true, { personal: true });
         await tx.deleteFrom("recovery_codes").where("user_id", "=", p.userId).execute();
         await tx.insertInto("recovery_codes").values(codes.map((code) => ({ id: newId(), org_id: p.orgId, user_id: p.userId, code_hash: codeHash(code) }))).execute();
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, { type: "auth.recovery_codes_generated", target: { type: "user", id: p.userId, display: p.email } });
@@ -148,7 +148,7 @@ export function registerRecoveryRoutes(app: App) {
         const now = new Date();
         await tx
           .updateTable("sessions")
-          .set({ state: "active", mfa_at: now, ...(p.sessionState === "pending_mfa" ? { expires_at: new Date(Date.now() + settings.session_ttl_hours * 3600_000) } : {}) })
+          .set({ state: "active", mfa_at: now, mfa_method: "recovery_code", ...(p.sessionState === "pending_mfa" ? { expires_at: new Date(Date.now() + settings.session_ttl_hours * 3600_000) } : {}) })
           .where("id", "=", p.sessionId)
           .execute();
         if (p.sessionState === "pending_mfa") await tx.updateTable("users").set({ last_login_at: now }).where("id", "=", p.userId).execute();
@@ -286,7 +286,7 @@ export function registerRecoveryRoutes(app: App) {
       const deps = c.get("deps");
       const { current_password, new_password } = c.req.valid("json");
       const user = await deps.db.tenant(p.orgId, async (tx) => {
-        requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0);
+        requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0, { personal: true });
         return tx.selectFrom("users").select(["password_hash", "email"]).where("id", "=", p.userId).executeTakeFirstOrThrow();
       });
       if (!(await verifyPassword(user.password_hash, current_password))) {

@@ -30,7 +30,12 @@ export const initials = (name: string) =>
     .map((s) => s[0]!.toUpperCase())
     .join("");
 
-export const pluralize = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+const IRREGULAR: Record<string, string> = { person: "people" };
+export const pluralize = (n: number, word: string) => {
+  const last = word.split(" ").pop()!;
+  const plural = IRREGULAR[last] ? word.slice(0, -last.length) + IRREGULAR[last] : `${word}s`;
+  return `${n.toLocaleString()} ${n === 1 ? word : plural}`;
+};
 
 export const ROLE_LABELS: Record<string, string> = {
   owner: "Owner",

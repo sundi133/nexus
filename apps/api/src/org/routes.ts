@@ -1,3 +1,4 @@
+import { conflict, notFound } from "../platform/errors.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
 import type { App, Principal } from "../context.js";
@@ -6,7 +7,7 @@ import { requirePermission, requireRecentMfa } from "../auth/guard.js";
 import { verifiedFactorTypes } from "../auth/routes.js";
 import { notifyRoles } from "../notify/send.js";
 import type { Tx } from "../platform/db.js";
-import { bearer, body, json, problemResponses } from "../schemas.js";
+import { Id, bearer, body, json, problemResponses } from "../schemas.js";
 import { diff, getSettings, OrgSettings, saveSettings, type OrgSettings as Settings } from "./settings.js";
 
 const BaselineItem = z
@@ -26,7 +27,7 @@ const Baseline = z
   .object({ score: z.number().openapi({ description: "Share of baseline items met, 0..1" }), items: z.array(BaselineItem) })
   .openapi("SecureBaseline");
 
-const RECOMMENDED: Settings = { mfa_policy: "everyone", session_ttl_hours: 12 };
+const RECOMMENDED: Pick<Settings, "mfa_policy" | "session_ttl_hours"> = { mfa_policy: "everyone", session_ttl_hours: 12 };
 
 async function mfaImpact(tx: Tx, policy: Settings["mfa_policy"]) {
   // Active users without a verified factor who would be asked to enroll under `policy`.
@@ -48,6 +49,11 @@ async function baseline(tx: Tx, orgId: string) {
   const owners = await sql<{ n: number }>`
     SELECT count(*)::int AS n FROM user_roles r JOIN users u ON u.id = r.user_id WHERE r.role = 'owner' AND u.status = 'active'`.execute(tx);
   const enrollNow = await mfaImpact(tx, "everyone");
+  const ownersWithoutPasskey = await sql<{ n: number }>`
+    SELECT count(*)::int AS n FROM user_roles r JOIN users u ON u.id = r.user_id
+    WHERE r.role = 'owner' AND u.status = 'active'
+      AND NOT EXISTS (SELECT 1 FROM auth_factors f WHERE f.user_id = u.id AND f.type = 'webauthn' AND f.verified_at IS NOT NULL)`.execute(tx);
+  const breakGlass = await sql<{ n: number }>`SELECT count(*)::int AS n FROM users WHERE break_glass AND status = 'active'`.execute(tx);
   const items: z.infer<typeof BaselineItem>[] = [
     {
       id: "mfa_everyone",
@@ -79,6 +85,28 @@ async function baseline(tx: Tx, orgId: string) {
       current: `${owners.rows[0]!.n} owner${owners.rows[0]!.n === 1 ? "" : "s"}`,
       recommended: "2 or more",
       impact: "Promote a trusted admin to owner from their user page.",
+      auto_apply: false,
+    },
+    {
+      id: "owner_passkeys",
+      title: "Owners confirm admin actions with a passkey",
+      description: "Passkeys can't be phished, so a stolen password plus a tricked code can't take over your organization.",
+      compliant: s.owners_require_passkey,
+      current: s.owners_require_passkey ? "Required" : "Any MFA method",
+      recommended: "Required",
+      impact: ownersWithoutPasskey.rows[0]!.n
+        ? `${ownersWithoutPasskey.rows[0]!.n} owner${ownersWithoutPasskey.rows[0]!.n === 1 ? " has" : "s have"} no passkey yet and will be asked to add one (in My security) before their next admin action.`
+        : "Every owner already has a passkey.",
+      auto_apply: true,
+    },
+    {
+      id: "break_glass",
+      title: "A break-glass account",
+      description: "An emergency owner account, kept offline, for when SSO, your directory or everyone's MFA fails. Every use alerts all admins.",
+      compliant: breakGlass.rows[0]!.n >= 1,
+      current: breakGlass.rows[0]!.n ? `${breakGlass.rows[0]!.n} configured` : "None",
+      recommended: "1",
+      impact: "Create an owner such as emergency@yourcompany.com, designate it as break-glass on its user page, then print and seal its emergency password.",
       auto_apply: false,
     },
   ];
@@ -170,6 +198,37 @@ export function registerOrgRoutes(app: App) {
 
   app.openapi(
     createRoute({
+      method: "post",
+      path: "/v1/org/settings/revert",
+      tags: ["Organization"],
+      summary: "Undo one settings change from the history (requires recent MFA)",
+      description: "Restores the previous values of that change. Refused if any of those settings has changed again since; undo the later change first.",
+      security: bearer,
+      request: body(z.object({ event_id: Id })),
+      responses: { 200: json(OrgSettings), ...problemResponses },
+    }),
+    async (c) => {
+      const p = requirePermission(c, "org:manage");
+      const { event_id } = c.req.valid("json");
+      const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+        await assertStepUp(c, tx, p);
+        const ev = await tx.selectFrom("audit_events").select(["type", "details"]).where("id", "=", event_id).executeTakeFirst();
+        if (!ev || ev.type !== "org.settings_updated") throw notFound("Settings change");
+        const changes = (ev.details as { changes?: Record<string, { from: unknown; to: unknown }> }).changes ?? {};
+        const before = await getSettings(tx, p.orgId);
+        const moved = Object.entries(changes).filter(([k, v]) => (before as Record<string, unknown>)[k] !== v.to).map(([k]) => k);
+        if (moved.length) throw conflict("changed_since", `${moved.join(", ")} changed again after this; undo the later change first`);
+        const restored = OrgSettings.partial().parse(Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.from])));
+        const after = { ...before, ...restored };
+        await applySettings(tx, p, c.get("meta"), before, after, `undo:${event_id}`);
+        return after;
+      });
+      return c.json(out, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "get",
       path: "/v1/org/baseline",
       tags: ["Organization"],
@@ -205,6 +264,7 @@ export function registerOrgRoutes(app: App) {
           ...settings,
           mfa_policy: RECOMMENDED.mfa_policy,
           session_ttl_hours: Math.min(settings.session_ttl_hours, RECOMMENDED.session_ttl_hours),
+          owners_require_passkey: true,
         };
         const changes = await applySettings(tx, p, c.get("meta"), settings, after, "secure_baseline");
         return { applied: Object.keys(changes), baseline: (await baseline(tx, p.orgId)).result };

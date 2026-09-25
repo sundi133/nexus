@@ -39,7 +39,7 @@ describe("MFA policy and secure baseline", () => {
 
     const applied = await h.call("POST", "/v1/org/baseline/apply", { token: ownerToken });
     expect(applied.status).toBe(200);
-    expect(applied.body.applied).toEqual(["mfa_policy"]);
+    expect(applied.body.applied).toEqual(["mfa_policy", "owners_require_passkey"]);
     expect((await h.call("GET", "/v1/org/settings", { token: ownerToken })).body.mfa_policy).toBe("everyone");
 
     const audit = await h.call("GET", "/v1/audit/events?type=org.settings_updated", { token: ownerToken });
@@ -49,6 +49,8 @@ describe("MFA policy and secure baseline", () => {
   });
 
   it("requires recent MFA (step-up) for security settings once you have a factor", async () => {
+    // This org opts out of owner passkeys (admin-safety tests cover them), so any factor steps up.
+    await owner.query("UPDATE organizations SET settings = settings || '{\"owners_require_passkey\": false}' WHERE id = (SELECT org_id FROM users WHERE email = $1)", [ownerEmail]);
     const start = await h.call("POST", "/v1/me/factors/totp", { token: ownerToken, body: {} });
     ownerTotp = start.body.secret;
     await h.call("POST", `/v1/me/factors/${start.body.id}/verify`, { token: ownerToken, body: { code: totpCode(ownerTotp) } });

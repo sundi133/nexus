@@ -1,4 +1,5 @@
 import { touchUsers } from "../provisioning/service.js";
+import { assertEmailAllowed } from "../org/domains.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
 import type { App, Principal, RequestMeta } from "../context.js";
@@ -195,6 +196,7 @@ export function registerUserRoutes(app: App) {
       let invite: PendingInvite | null = null;
       try {
         const user = await c.get("deps").db.tenant(p.orgId, async (tx) => {
+          await assertEmailAllowed(tx, p.orgId, input.email);
           await tx
             .insertInto("users")
             .values({

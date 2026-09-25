@@ -8,6 +8,7 @@ import { enqueue, registerJobHandler, type JobRunner } from "../../platform/jobs
 import { issueInvitation, sendInvite, type PendingInvite } from "../invitations.js";
 import { revokeUserSessions } from "../users.js";
 import { touchGroups, touchUsers } from "../../provisioning/service.js";
+import { emailAdmission } from "../../org/domains.js";
 import { plan, PROVIDER_NAME, summarize, type Local, type Plan, type Remote } from "./plan.js";
 import { fetchDirectory, ProviderError } from "./providers.js";
 
@@ -41,7 +42,10 @@ export function remoteFor(deps: Deps, conn: Pick<Conn, "id" | "provider" | "conf
 export async function loadLocal(tx: Tx, connectionId: string): Promise<Local> {
   const links = await tx.selectFrom("directory_links").select(["connection_id", "kind", "external_id", "local_id", "suspended_by_sync"]).execute();
   const foreign = new Set(links.filter((l) => l.connection_id !== connectionId).map((l) => `${l.kind}:${l.local_id}`));
-  const users = (await tx.selectFrom("users").select(["id", "email", "given_name", "family_name", "title", "department", "status"]).execute()).filter((u) => !foreign.has(`user:${u.id}`));
+  // Break-glass accounts are never managed by a directory: a bad sync must not lock the org out.
+  const users = (await tx.selectFrom("users").select(["id", "email", "given_name", "family_name", "title", "department", "status", "break_glass"]).execute())
+    .filter((u) => !foreign.has(`user:${u.id}`) && !u.break_glass)
+    .map(({ break_glass: _b, ...u }) => u);
   const members = await tx.selectFrom("group_members").select(["group_id", "user_id"]).execute();
   const groups = (await tx.selectFrom("groups").select(["id", "name", "description"]).execute())
     .filter((g) => !foreign.has(`group:${g.id}`))
@@ -76,6 +80,11 @@ export async function applyPlan(tx: Tx, conn: Conn, p: Plan, meta: RequestMeta) 
       skipped.push({ email: r.email, reason: "This email is already used by another Nexus organization" });
       continue;
     }
+    const refused = await emailAdmission(tx, conn.org_id, r.email);
+    if (refused) {
+      skipped.push({ email: r.email, reason: refused });
+      continue;
+    }
     const id = newId();
     await tx
       .insertInto("users")
@@ -92,6 +101,11 @@ export async function applyPlan(tx: Tx, conn: Conn, p: Plan, meta: RequestMeta) 
     for (const [f, ch] of Object.entries(u.changes)) set[f] = ch.to;
     if (set.email && (await emailTaken(set.email))) {
       skipped.push({ email: u.email, reason: `Can't change email to ${set.email}: it's already in use` });
+      delete set.email;
+    }
+    const refused = set.email ? await emailAdmission(tx, conn.org_id, set.email) : null;
+    if (refused) {
+      skipped.push({ email: u.email, reason: `Can't change email to ${set.email}: ${refused}` });
       delete set.email;
     }
     if (Object.keys(set).length) await tx.updateTable("users").set({ ...set, updated_at: new Date() }).where("id", "=", u.local_id).execute();

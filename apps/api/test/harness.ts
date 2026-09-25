@@ -11,7 +11,7 @@ import { MemoryMailer } from "../src/platform/mailer.js";
 import { RecordingPushSender, type PushSender } from "../src/platform/push.js";
 
 /** Boots the real app against the nexus_test database. Tests talk HTTP to it via app.request(). */
-export async function bootApp(overrides: Partial<Config> = {}, opts: { push?: PushSender } = {}) {
+export async function bootApp(overrides: Partial<Config> = {}, opts: { push?: PushSender; resolveTxt?: (name: string) => Promise<string[][]> } = {}) {
   const cfg = { ...loadConfig(), ...overrides };
   await migrate(cfg.databaseOwnerUrl);
   const db = new Db(cfg.databaseUrl);
@@ -20,7 +20,7 @@ export async function bootApp(overrides: Partial<Config> = {}, opts: { push?: Pu
   const mailer = new MemoryMailer();
   const recorder = new RecordingPushSender();
   const push = opts.push ?? recorder;
-  const deps = { cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push };
+  const deps = { cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push, resolveTxt: opts.resolveTxt };
   const app = createApp(deps);
   // Tests drive background work explicitly: jobs.runOnce({ orgId }).
   const jobs = new JobRunner(deps);

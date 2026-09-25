@@ -2,17 +2,18 @@
 
 import type { Role, UserDetail } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, ChevronLeft, KeyRound, LogOut, Mail, MoreHorizontal, Pencil, ShieldOff, Siren, UserCheck, UserMinus, UserX } from "lucide-react";
+import { CalendarClock, ChevronLeft, KeyRound, LogOut, Mail, MoreHorizontal, Pencil, ShieldAlert, ShieldOff, Siren, UserCheck, UserMinus, UserX } from "lucide-react";
 import Link from "next/link";
 import { use, useState } from "react";
 import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { ConfirmAction } from "@/components/features/confirm-action";
 import { OffboardDialog, offboardingKey, useOffboarding } from "@/components/features/offboard-dialog";
+import { useBreakGlass } from "@/components/features/break-glass";
 import { MfaBadge, RoleBadges, UserStatusPill } from "@/components/features/user-bits";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
-import { Avatar, Card, CardHeader, EmptyState, ErrorBanner, KeyValue, Skeleton } from "@/components/ui/misc";
+import { Avatar, Card, CardHeader, EmptyState, ErrorBanner, KeyValue, Skeleton, StatusPill } from "@/components/ui/misc";
 import { Dialog, DialogContent, Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, Tabs, TabsContent, TabsList } from "@/components/ui/overlay";
 import { SessionsTable } from "@/components/features/sessions-table";
 import { api, unwrap } from "@/lib/api";
@@ -30,6 +31,10 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
   const [editing, setEditing] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
   const [offboarding, setOffboarding] = useState(false);
+  const breakGlass = useBreakGlass(id, () => {
+    qc.invalidateQueries({ queryKey: qk.user(id) });
+    qc.invalidateQueries({ queryKey: ["audit"] });
+  });
 
   const user = useQuery({ queryKey: qk.user(id), queryFn: () => unwrap(api.GET("/v1/users/{id}", { params: { path: { id } } })) });
   const activity = useQuery({
@@ -89,6 +94,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight">{u.display_name}</h1>
             <UserStatusPill status={u.status} />
+            {u.break_glass ? <StatusPill tone="danger">Break-glass</StatusPill> : null}
             {isSelf ? <span className="text-xs text-fg-subtle">(you)</span> : null}
           </div>
           <p className="mt-0.5 text-[13px] text-fg-muted">
@@ -138,6 +144,18 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
                     <KeyRound /> Admin roles…
                   </MenuItem>
                 ) : null}
+                {can("admins:manage") && (u.roles.includes("owner") || u.break_glass) ? (
+                  <>
+                    <MenuItem onSelect={() => breakGlass.designate.mutate(!u.break_glass)}>
+                      <ShieldAlert /> {u.break_glass ? "Remove break-glass designation" : "Designate as break-glass"}
+                    </MenuItem>
+                    {u.break_glass ? (
+                      <MenuItem onSelect={() => breakGlass.generate.mutate()}>
+                        <KeyRound /> Generate emergency password…
+                      </MenuItem>
+                    ) : null}
+                  </>
+                ) : null}
                 <MenuSeparator />
                 <MenuItem danger onSelect={() => setPending("contain")} disabled={u.status !== "active" && !sessions}>
                   <Siren /> Contain…
@@ -153,6 +171,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
         </div>
       </div>
 
+      {breakGlass.dialog}
       <ScheduledOffboarding userId={id} enabled={can("users:lifecycle") && u.status !== "deprovisioned"} onChange={refresh} />
       {offboarding ? <OffboardDialog userId={id} onClose={() => setOffboarding(false)} onDone={refresh} /> : null}
 
