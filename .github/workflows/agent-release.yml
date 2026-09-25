@@ -114,6 +114,9 @@ jobs:
         with: { name: release, path: "agent/dist/releases/${{ steps.v.outputs.version }}" }
       - uses: actions/upload-artifact@v4
         with: { name: installers, path: agent/dist/installers }
+      - name: osquery for the Windows installers (checked against osquery.lock by release.sh)
+        uses: actions/upload-artifact@v4
+        with: { name: osquery-windows, path: "agent/dist/osquery/windows-*\nagent/dist/osquery/LICENSE-osquery.txt\nagent/dist/osquery/VERSION" }
       - name: Remove the keychain
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
@@ -126,11 +129,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { name: release, path: rel }
+      - uses: actions/download-artifact@v4
+        with: { name: osquery-windows, path: osq }
       - name: WiX Toolset
         run: dotnet tool install --global wix --version 5.0.2
       - name: Build the .msi (the binaries inside are already signed)
         shell: pwsh
-        run: agent/packaging/windows/build-msi.ps1 -Version ${{ needs.build.outputs.version }} -ReleaseDir rel -OutDir msi
+        run: agent/packaging/windows/build-msi.ps1 -Version ${{ needs.build.outputs.version }} -ReleaseDir rel -OutDir msi -OsqueryDir osq
       - uses: actions/upload-artifact@v4
         with: { name: msi-unsigned, path: msi }
 
@@ -193,5 +198,9 @@ jobs:
           $s2 = Get-AuthenticodeSignature $exe
           Write-Host "Installed binary: $($s2.Status)"
           if ($sig.Status -eq "Valid" -and $s2.Status -ne "Valid") { throw "the installed binary isn't validly signed" }
+          $o = Get-AuthenticodeSignature "C:\Program Files\Nexus\osquery\osqueryd.exe"
+          if ($o.Status -ne "Valid" -or $o.SignerCertificate.Subject -notmatch "OSQUERY") { throw "bundled osquery: $($o.Status)" }
+          & $exe query "SELECT version FROM osquery_info"
+          if ($LASTEXITCODE) { throw "bundled osquery didn't answer" }
           $p = Start-Process msiexec -ArgumentList "/x `"$($msi.FullName)`" /qn" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "uninstall failed ($($p.ExitCode))" }

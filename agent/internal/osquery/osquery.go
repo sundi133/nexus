@@ -34,12 +34,34 @@ func candidates(goos string) []string {
 	return []string{"/usr/bin/osqueryi", "/opt/osquery/bin/osqueryi", "/usr/local/bin/osqueryi", "/opt/osquery/bin/osqueryd", "/usr/bin/osqueryd"}
 }
 
-// Locate returns the osquery binary to use, or "" when osquery isn't installed.
+// bundled lists where Nexus's own installers put osquery, next to the agent binary:
+// macOS …/Nexus/osquery/osquery.app, Windows …\Nexus\osquery\osqueryd.exe, Linux /opt/nexus/osquery/osqueryd.
+func bundled(goos, exe string) []string {
+	dir := filepath.Dir(exe)
+	switch goos {
+	case "darwin":
+		return []string{filepath.Join(dir, "..", "osquery", "osquery.app", "Contents", "MacOS", "osqueryd"), "/Library/Application Support/Nexus/osquery/osquery.app/Contents/MacOS/osqueryd"}
+	case "windows":
+		return []string{filepath.Join(dir, "osquery", "osqueryd.exe")}
+	}
+	return []string{filepath.Join(dir, "..", "osquery", "osqueryd"), "/opt/nexus/osquery/osqueryd"}
+}
+
+// Locate returns the osquery binary to use, or "" when osquery isn't installed:
+// NEXUS_OSQUERY_PATH, then the copy Nexus installed (a version Nexus tested), then a system install.
 func Locate() string {
 	if p := os.Getenv("NEXUS_OSQUERY_PATH"); p != "" {
 		return p
 	}
-	for _, p := range candidates(runtime.GOOS) {
+	exe, _ := os.Executable()
+	if real, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = real // /usr/bin/nexus-agent → /opt/nexus/bin/nexus-agent
+	}
+	return first(append(bundled(runtime.GOOS, exe), candidates(runtime.GOOS)...))
+}
+
+func first(paths []string) string {
+	for _, p := range paths {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
 			return p
 		}

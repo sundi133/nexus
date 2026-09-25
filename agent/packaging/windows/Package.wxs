@@ -60,6 +60,15 @@
           <!-- [CommonAppDataFolder]Nexus, not [STATEFOLDER]: that ends in a backslash, which would escape the closing quote. -->
           <ServiceControl Id="AgentServiceControl" Name="NexusAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
         </Component>
+        <?ifdef OsqueryDir?>
+        <!-- osquery, as osquery signed it (build-msi.ps1 -OsqueryDir). The agent finds it next to itself. -->
+        <Directory Id="OSQUERYFOLDER" Name="osquery">
+          <Component Id="Osquery">
+            <File Id="OsquerydExe" Source="$(OsqueryDir)\osqueryd.exe" KeyPath="yes" />
+            <File Id="OsqueryLicense" Source="$(OsqueryDir)\LICENSE-osquery.txt" />
+          </Component>
+        </Directory>
+        <?endif?>
       </Directory>
     </StandardDirectory>
 

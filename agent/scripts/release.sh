@@ -17,6 +17,8 @@
 #                             …or an App Store Connect API key (.p8 path, key ID, issuer ID), for CI
 #   Windows Authenticode signing: see agent/scripts/sign-windows.sh (Azure Trusted Signing,
 #                             DigiCert KeyLocker or a .pfx)
+#   NEXUS_BUNDLE_OSQUERY      1 (default): ship osquery (pinned in packaging/osquery/osquery.lock) in the
+#                             installers; 0: agent only
 #   NEXUS_TARGETS             default: "darwin/arm64 darwin/amd64 windows/amd64 windows/arm64 linux/amd64 linux/arm64"
 #   NEXUS_TEST_BREAK          test only: "selftest" or "checkin" builds a deliberately broken release
 set -euo pipefail
@@ -62,6 +64,12 @@ win=("$out"/nexus-agent-windows-*.exe)
 
 # Sign last: the release signature covers the exact (codesigned) bytes agents download.
 (cd "$agent" && go run ./cmd/nexus-release sign --key "$key" --version "$version" --dir "$out" --notes "$notes")
+
+# osquery for the installers (not the self-update release: agents update themselves, osquery comes with installers).
+if [[ "${NEXUS_BUNDLE_OSQUERY:-1}" == 1 ]]; then
+  "$agent/packaging/osquery/fetch.sh" "$dist/osquery"
+  export NEXUS_OSQUERY_DIR="$dist/osquery"
+fi
 
 if command -v pkgbuild >/dev/null && [[ -f "$out/nexus-agent-darwin-arm64" && -f "$out/nexus-agent-darwin-amd64" ]]; then
   "$agent/packaging/macos/build-pkg.sh" "$version" "$out" "$dist/installers"

@@ -27,6 +27,7 @@ contents:
   - src: /opt/nexus/bin/nexus-agent
     dst: /usr/bin/nexus-agent
     type: symlink
+#OSQUERY# osquery (packaging/osquery), added by build-packages.sh when bundled
 scripts:
   postinstall: ./postinstall.sh
   preremove: ./preremove.sh

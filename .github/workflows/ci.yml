@@ -102,7 +102,8 @@ jobs:
         run: |
           mkdir -p rel pkg
           for a in amd64 arm64; do (cd agent && CGO_ENABLED=0 GOOS=linux GOARCH=$a go build -trimpath -ldflags "-X main.version=0.3.0" -o ../rel/nexus-agent-linux-$a ./cmd/nexus-agent); done
-          agent/packaging/linux/build-packages.sh 0.3.0 rel pkg
+          agent/packaging/osquery/fetch.sh osq linux     # pinned and checked against osquery.lock
+          NEXUS_OSQUERY_DIR=osq agent/packaging/linux/build-packages.sh 0.3.0 rel pkg
       - name: Install the .deb on this runner (real systemd), then remove it
         run: |
           sudo dpkg -i pkg/nexus-agent_0.3.0_amd64.deb
@@ -110,6 +111,9 @@ jobs:
           systemctl is-active nexus-agent          # running, waiting to be enrolled
           sudo journalctl -u nexus-agent --no-pager | grep -q "not enrolled yet"
           [ "$(sudo stat -c %a /var/lib/nexus-agent)" = "700" ]
+          # The bundled osquery: found by the agent, and it answers.
+          sudo nexus-agent query "SELECT version FROM osquery_info" | grep -q "\"$(cat osq/VERSION)\""
+          sudo nexus-agent query "SELECT name FROM deb_packages WHERE name = 'nexus-agent'" | grep -q nexus-agent
           # Configuration management drops enroll.conf; the service tries to enroll (the server here is unreachable) and keeps running.
           printf 'server=https://127.0.0.1:9\ntoken=nxe_ci\n' | sudo tee /var/lib/nexus-agent/enroll.conf >/dev/null
           sleep 45
@@ -118,8 +122,9 @@ jobs:
           sudo dpkg -r nexus-agent
           if systemctl is-active --quiet nexus-agent; then echo "still running after removal"; exit 1; fi
           test ! -e /opt/nexus/bin/nexus-agent
+          test ! -e /opt/nexus/osquery/osqueryd
       - name: Install the .rpm in Fedora
-        run: docker run --rm -v "$PWD/pkg:/pkg:ro" fedora:41 sh -c 'rpm -i /pkg/nexus-agent-0.3.0-1.x86_64.rpm && [ "$(nexus-agent version)" = "0.3.0" ] && rpm -e nexus-agent'
+        run: docker run --rm -v "$PWD/pkg:/pkg:ro" fedora:41 sh -c 'rpm -i /pkg/nexus-agent-0.3.0-1.x86_64.rpm && [ "$(nexus-agent version)" = "0.3.0" ] && nexus-agent query "SELECT name FROM rpm_packages WHERE name = '"'"'nexus-agent'"'"'" | grep -q nexus-agent && rpm -e nexus-agent && [ ! -e /opt/nexus/osquery/osqueryd ]'
       - uses: actions/upload-artifact@v4
         with: { name: linux-packages, path: pkg/* }
 
@@ -137,13 +142,15 @@ jobs:
       - name: Build the agent and the MSI (two versions, for the upgrade test)
         run: |
           dotnet tool install --global wix --version 5.0.2
+          bash agent/packaging/osquery/fetch.sh osq windows   # pinned and checked against osquery.lock
+          if ($LASTEXITCODE) { throw "osquery fetch failed" }
           foreach ($v in "0.1.0", "0.1.1") {
             New-Item -ItemType Directory -Force dist/$v | Out-Null
             Push-Location agent
             go build -trimpath -ldflags "-X main.version=$v" -o ../dist/$v/nexus-agent-windows-amd64.exe ./cmd/nexus-agent
             if ($LASTEXITCODE) { throw "go build failed" }
             Pop-Location
-            ./agent/packaging/windows/build-msi.ps1 -Version $v -ReleaseDir dist/$v -OutDir dist/$v -Arch x64
+            ./agent/packaging/windows/build-msi.ps1 -Version $v -ReleaseDir dist/$v -OutDir dist/$v -Arch x64 -OsqueryDir osq
           }
       - name: Install, check, upgrade, uninstall
         run: |
@@ -162,6 +169,14 @@ jobs:
           $svc = Get-Service NexusAgent
           if ($svc.Status -ne "Running" -or $svc.StartType -ne "Automatic") { throw "service: $($svc.Status) $($svc.StartType)" }
           if (-not (Test-Path "C:\Program Files\Nexus\nexus-agent.exe")) { throw "binary missing" }
+          # The bundled osquery: signed by osquery, found by the agent, and it answers.
+          $osqd = "C:\Program Files\Nexus\osquery\osqueryd.exe"
+          $sig = Get-AuthenticodeSignature $osqd
+          if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "OSQUERY") { throw "osqueryd.exe signature: $($sig.Status) $($sig.SignerCertificate.Subject)" }
+          $q = & "C:\Program Files\Nexus\nexus-agent.exe" query "SELECT version FROM osquery_info" | Out-String
+          if ($q -notmatch (Get-Content osq/VERSION)) { throw "bundled osquery didn't answer: $q" }
+          $q = & "C:\Program Files\Nexus\nexus-agent.exe" query "SELECT name FROM programs WHERE name LIKE 'Votal Nexus%'" | Out-String
+          if ($q -notmatch "Votal Nexus agent") { throw "programs table: $q" }
           $cmd = (Get-CimInstance Win32_Service -Filter "Name='NexusAgent'").PathName
           if ($cmd -notmatch 'run --state-dir "C:\\ProgramData\\Nexus"$') { throw "service command line: $cmd" }
           if (-not ((sc.exe qfailure NexusAgent) -match "RESTART")) { throw "no restart-on-failure" }

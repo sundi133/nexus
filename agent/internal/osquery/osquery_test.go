@@ -152,3 +152,29 @@ func TestRealOsquery(t *testing.T) {
 		t.Errorf("error = %v", err)
 	}
 }
+
+func TestLocatePrefersTheBundledCopy(t *testing.T) {
+	root := t.TempDir()
+	exe := filepath.Join(root, "Nexus", "bin", "nexus-agent")
+	app := filepath.Join(root, "Nexus", "osquery", "osquery.app", "Contents", "MacOS", "osqueryd")
+	system := filepath.Join(root, "usr", "local", "bin", "osqueryi")
+	for _, p := range []string{exe, system} {
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, nil, 0o755)
+	}
+	paths := func() []string { return append(bundled("darwin", exe), system) }
+	if got := first(paths()); got != system {
+		t.Fatalf("without a bundled copy: %s", got)
+	}
+	os.MkdirAll(filepath.Dir(app), 0o755)
+	os.WriteFile(app, nil, 0o755)
+	if got := first(paths()); got != filepath.Clean(app) {
+		t.Fatalf("with a bundled copy: %s", got)
+	}
+	if got := bundled("windows", `C:\Program Files\Nexus\nexus-agent.exe`)[0]; !strings.HasSuffix(got, filepath.Join("osquery", "osqueryd.exe")) {
+		t.Errorf("windows: %s", got)
+	}
+	if got := bundled("linux", "/opt/nexus/bin/nexus-agent")[0]; got != "/opt/nexus/osquery/osqueryd" {
+		t.Errorf("linux: %s", got)
+	}
+}

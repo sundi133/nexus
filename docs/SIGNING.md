@@ -115,6 +115,8 @@ To check a build yourself: `agent/scripts/verify-signatures.sh agent/dist/releas
 2. **Package:** upload `nexus-agent-<version>.pkg` and add it to the same policy.
 3. **Background item notice** (macOS 13+): deploy a *Managed Login Items* (`com.apple.servicemanagement`) configuration profile with a rule of type **Team Identifier** set to your `APPLE_TEAM_ID`. Users then don't see "Background item added", and can't switch the agent off in System Settings.
 
+**osquery:** the `.pkg` includes osquery as osquery signed it; Apple notarization accepts it as a nested, already-notarized app. Optionally, grant the agent Full Disk Access in the same PPPC profile (path `/Library/Application Support/Nexus/bin/nexus-agent`) so osquery can read macOS-protected tables ([OSQUERY.md](OSQUERY.md)).
+
 ### Intune (macOS)
 **Apps → macOS → Add → macOS app (PKG)**, upload the `.pkg`. Deliver `enroll.conf` first with a **shell script** (Devices → macOS → Scripts) like the one above, running as root, with the token inline. Intune scripts aren't parameterised, so limit the script's assignment to the pilot group, and use a short-lived token. Add the same Managed Login Items rule as a **Settings catalog** profile.
 

@@ -37,7 +37,7 @@ Use `--state-dir` to keep state somewhere other than the system default (`/Libra
 | Screen lock | `sysadminctl -screenLock status` | Machine inactivity limit policy | unknown (per-user desktop setting) |
 | System integrity | `csrutil status` (SIP) | `Confirm-SecureBootUEFI` | `mokutil --sb-state` |
 | OS, model, serial | `sw_vers`, `sysctl`, `ioreg` | registry, CIM | `/etc/os-release`, DMI |
-| Software, listening ports, USB, browser extensions, startup items | osquery, if installed ([docs/OSQUERY.md](../docs/OSQUERY.md)) | same | same |
+| Software, listening ports, USB, browser extensions, startup items | osquery, bundled with the installers ([docs/OSQUERY.md](../docs/OSQUERY.md)) | same | same |
 | AI tools and MCP servers | Known AI clients' config files in each account's home, and installed AI apps, CLIs and extensions. Names and targets only, never secret values: see [AI on devices](../docs/AI-ON-DEVICES.md) | same | same |
 
 ## Installing (DEV-01)

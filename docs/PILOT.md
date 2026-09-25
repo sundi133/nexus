@@ -88,7 +88,7 @@ For silent MDM rollout (Jamf, Intune), the agent must be signed with your Apple 
 Then:
 1. Set **Device policies** to *audit* mode first and look at what would fail.
 2. Connect **Intune or Jamf** under **Device management** so their compliance verdicts count.
-3. Install osquery next to the agent on a few machines ([OSQUERY.md](OSQUERY.md)): **Software** shows what's installed across the fleet, and **Live query** answers ad-hoc questions in about a minute.
+3. osquery comes with the agent ([OSQUERY.md](OSQUERY.md)): **Software** shows what's installed across the fleet, and **Live query** answers ad-hoc questions in about a minute.
 4. Add a **Conditional access** policy in *report-only* mode ("require a compliant device for app X") and read its 7-day impact before you enforce it.
 
 ## 6. Apps

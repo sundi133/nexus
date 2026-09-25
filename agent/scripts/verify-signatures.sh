@@ -30,6 +30,15 @@ if [[ $mac == 1 ]]; then
     pkgutil --check-signature "$p" | grep -q "Developer ID Installer" && ok "$(basename "$p"): Developer ID Installer" || bad "$(basename "$p"): not signed with a Developer ID Installer certificate"
     xcrun stapler validate "$p" >/dev/null 2>&1 && ok "$(basename "$p"): notarization ticket stapled" || bad "$(basename "$p"): not notarized/stapled"
     spctl --assess --type install --verbose=2 "$p" 2>&1 | grep -q "accepted" && ok "$(basename "$p"): Gatekeeper accepts it" || bad "$(basename "$p"): Gatekeeper rejects it"
+    # Bundled osquery: still exactly as osquery signed it.
+    if pkgutil --payload-files "$p" 2>/dev/null | grep -q "osquery.app/Contents/MacOS/osqueryd"; then
+      x="$(mktemp -d)"
+      pkgutil --expand-full "$p" "$x/pkg" >/dev/null 2>&1
+      app="$(find "$x/pkg" -type d -name osquery.app | head -1)"
+      info="$(codesign -dv "$app" 2>&1 || true)"
+      codesign --verify --strict --deep "$app" 2>/dev/null && grep -q "TeamIdentifier=3522FA9PXF" <<<"$info" && ok "$(basename "$p"): bundled osquery signed by osquery" || bad "$(basename "$p"): bundled osquery.app signature is broken"
+      rm -rf "$x"
+    fi
   done
 fi
 

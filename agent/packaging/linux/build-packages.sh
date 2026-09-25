@@ -13,7 +13,12 @@ for arch in $arches; do
   [[ -f "$bin" ]] || { echo "skipping $arch: $bin not found" >&2; continue; }
   # nfpm doesn't expand variables in content paths: render the config.
   cfg="$(mktemp "$here/.nfpm-XXXXXX.yaml")"
-  sed -e "s|\${NEXUS_VERSION}|$version|g" -e "s|\${NEXUS_ARCH}|$arch|g" -e "s|\${NEXUS_BIN}|$bin|g" "$here/nfpm.yaml" > "$cfg"
+  osq=""
+  if [[ -n "${NEXUS_OSQUERY_DIR:-}" && -f "$NEXUS_OSQUERY_DIR/linux-$arch/osqueryd" ]]; then
+    d="$(cd "$NEXUS_OSQUERY_DIR" && pwd)"
+    osq="  - { src: $d/linux-$arch/osqueryd, dst: /opt/nexus/osquery/osqueryd, file_info: { mode: 0755 } }\n  - { src: $d/LICENSE-osquery.txt, dst: /opt/nexus/osquery/LICENSE-osquery.txt, file_info: { mode: 0644 } }"
+  fi
+  sed -e "s|\${NEXUS_VERSION}|$version|g" -e "s|\${NEXUS_ARCH}|$arch|g" -e "s|\${NEXUS_BIN}|$bin|g" -e "s|^#OSQUERY#.*|$osq|" "$here/nfpm.yaml" > "$cfg"
   for fmt in deb rpm; do
     echo "==> $fmt $arch"
     (cd "$here" && "${nfpm[@]}" package --config "$cfg" --packager "$fmt" --target "$outdir/")

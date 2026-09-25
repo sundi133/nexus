@@ -10,7 +10,9 @@ param(
   [Parameter(Mandatory)] [string] $Version,
   [Parameter(Mandatory)] [string] $ReleaseDir,
   [Parameter(Mandatory)] [string] $OutDir,
-  [string[]] $Arch = @("x64", "arm64")
+  [string[]] $Arch = @("x64", "arm64"),
+  # From agent/packaging/osquery/fetch.sh: bundles OsqueryDir\windows-<arch>\osqueryd.exe when present.
+  [string] $OsqueryDir = ""
 )
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -46,7 +48,14 @@ try {
 
     $msi = Join-Path $OutDir "nexus-agent-$Version-$a.msi"
     Write-Host "==> wix build $msi"
-    & wix build (Join-Path $here "Package.wxs") -arch $a -d "Version=$msiVersion" -d "BinDir=$bin" -o $msi
+    $defs = @("-d", "Version=$msiVersion", "-d", "BinDir=$bin")
+    $osq = if ($OsqueryDir) { Join-Path $OsqueryDir "windows-$goarch" } else { "" }
+    if ($osq -and (Test-Path (Join-Path $osq "osqueryd.exe"))) {
+      Copy-Item (Join-Path $OsqueryDir "LICENSE-osquery.txt") $osq -Force
+      $defs += @("-d", "OsqueryDir=$((Resolve-Path $osq).Path)")
+      Write-Host "==> bundling osquery $(Get-Content (Join-Path $OsqueryDir 'VERSION')) ($a)"
+    }
+    & wix build (Join-Path $here "Package.wxs") -arch $a @defs -o $msi
     if ($LASTEXITCODE) { throw "wix build failed for $a" }
     Sign $msi
     if (-not $pfx) { Write-Host "note: $msi is not signed here (sign it with agent/scripts/sign-windows.sh; see docs/SIGNING.md)" }

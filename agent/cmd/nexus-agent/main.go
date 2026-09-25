@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -95,6 +96,27 @@ func main() {
 		if errors.Is(err, update.ErrRestart) {
 			err = restart(log)
 		}
+	case "query":
+		// Local troubleshooting: the same osquery and the same SQL rules as a live query.
+		_ = fs.Parse(args)
+		bin := osquery.Locate()
+		if bin == "" {
+			err = errors.New("osquery isn't installed (Nexus installers bundle it; or set NEXUS_OSQUERY_PATH)")
+			break
+		}
+		if fs.NArg() != 1 {
+			err = errors.New(`usage: nexus-agent query "SELECT …"`)
+			break
+		}
+		r := osquery.Runner{Bin: bin}
+		fmt.Fprintf(os.Stderr, "osquery %s at %s\n", r.Version(ctx), bin)
+		rows, _, qerr := r.Query(ctx, fs.Arg(0), 0)
+		if qerr != nil {
+			err = qerr
+			break
+		}
+		out, _ := json.MarshalIndent(rows, "", "  ")
+		fmt.Println(string(out))
 	case "posture":
 		_ = fs.Parse(args)
 		out, _ := json.MarshalIndent(collect.Collect(ctx), "", "  ")
@@ -132,7 +154,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: nexus-agent <enroll|run|posture|status|version> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: nexus-agent <enroll|run|posture|query|status|version> [flags]")
 }
 
 func enroll(ctx context.Context, store state.Store, server, token string) error {
@@ -376,6 +398,12 @@ func uninstall(store state.Store, purge bool) error {
 	bin := filepath.Join(service.InstallDir, service.BinName)
 	for _, p := range []string{bin, bin + ".previous", bin + ".failed"} {
 		_ = os.Remove(p)
+	}
+	// macOS packages have no uninstaller: remove the osquery the .pkg bundled, and the receipt.
+	// (Linux and Windows packages own their files; the package manager removes them.)
+	if runtime.GOOS == "darwin" {
+		_ = os.RemoveAll(filepath.Join(filepath.Dir(service.InstallDir), "osquery"))
+		_ = exec.Command("pkgutil", "--forget", "ai.votal.nexus-agent").Run()
 	}
 	if purge {
 		if err := os.RemoveAll(store.Dir); err != nil {

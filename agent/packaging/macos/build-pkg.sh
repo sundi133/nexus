@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Builds the macOS installer package: a universal binary plus a LaunchDaemon.
+# Builds the macOS installer package: a universal binary plus a LaunchDaemon, and osquery when
+# NEXUS_OSQUERY_DIR (from agent/packaging/osquery/fetch.sh) is set.
 #   build-pkg.sh VERSION RELEASE_DIR OUT_DIR
 set -euo pipefail
 version="$1"; rel="$2"; outdir="$3"
 here="$(cd "$(dirname "$0")" && pwd)"
-root="$(mktemp -d)"; trap 'rm -rf "$root"' EXIT
+root="$(mktemp -d)"; trap 'rm -rf "$root" "$root.plist"' EXIT
 bindir="$root/Library/Application Support/Nexus/bin"
 mkdir -p "$bindir" "$outdir"
 
@@ -14,11 +15,29 @@ if [[ -n "${NEXUS_CODESIGN_IDENTITY:-}" ]]; then
   codesign --force --timestamp --options runtime --sign "$NEXUS_CODESIGN_IDENTITY" "$bindir/nexus-agent"
 fi
 
+# osquery.app goes in as osquery signed it (its Endpoint Security entitlement lives in that signature).
+component=()
+if [[ -n "${NEXUS_OSQUERY_DIR:-}" && -d "$NEXUS_OSQUERY_DIR/darwin/osquery.app" ]]; then
+  osqdir="$root/Library/Application Support/Nexus/osquery"
+  mkdir -p "$osqdir"
+  ditto "$NEXUS_OSQUERY_DIR/darwin/osquery.app" "$osqdir/osquery.app"
+  cp "$NEXUS_OSQUERY_DIR/LICENSE-osquery.txt" "$osqdir/LICENSE-osquery.txt"
+  codesign --verify --strict --deep "$osqdir/osquery.app"
+  # Not relocatable: otherwise Installer would update an osquery.app found elsewhere (an MDM's) instead of ours.
+  pkgbuild --analyze --root "$root" "$root.plist" >/dev/null
+  n="$(/usr/libexec/PlistBuddy -c "Print" "$root.plist" | grep -c "RootRelativeBundlePath" || true)"
+  for ((i = 0; i < n; i++)); do
+    /usr/libexec/PlistBuddy -c "Set :$i:BundleIsRelocatable false" -c "Set :$i:BundleIsVersionChecked false" "$root.plist"
+  done
+  component=(--component-plist "$root.plist")
+  echo "==> bundling osquery $(cat "$NEXUS_OSQUERY_DIR/VERSION")"
+fi
+
 pkg="$outdir/nexus-agent-$version.pkg"
 sign=(); [[ -n "${NEXUS_INSTALLER_IDENTITY:-}" ]] && sign=(--sign "$NEXUS_INSTALLER_IDENTITY" --timestamp)
 echo "==> pkgbuild $pkg"
 pkgbuild --root "$root" --scripts "$here/scripts" --identifier ai.votal.nexus-agent --version "$version" \
-  --install-location / ${sign[@]+"${sign[@]}"} "$pkg"
+  --install-location / ${component[@]+"${component[@]}"} ${sign[@]+"${sign[@]}"} "$pkg"
 
 notary=()
 if [[ -n "${NEXUS_NOTARY_KEY:-}" ]]; then
