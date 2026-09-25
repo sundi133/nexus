@@ -51,6 +51,16 @@ const VERBS: Record<string, string> = {
   "user.invited": "sent an invitation to",
   "user.invitation_accepted": "accepted their invitation",
   "user.imported": "imported users from CSV",
+  "user.suspended": "suspended",
+  "user.activated": "reactivated",
+  "user.offboarded": "offboarded",
+  "directory.connection_created": "connected directory",
+  "directory.scim_token_rotated": "replaced the SCIM token for",
+  "directory.mass_change_approved": "approved held changes from",
+  "federation.idp_created": "connected identity provider",
+  "federation.idp_updated": "changed identity provider",
+  "federation.idp_deleted": "disconnected identity provider",
+  "federation.tested": "ran a test sign-in with",
 };
 
 export function describe(e: AuditEvent) {
@@ -58,6 +68,7 @@ export function describe(e: AuditEvent) {
     const reason = String(e.details.reason ?? "");
     return reason === "bad_password" ? "failed to sign in (wrong password)" : `was denied sign-in (${reason.replace(/_/g, " ")})`;
   }
+  if (e.type === "auth.login" && e.details.method === "federation") return `signed in with ${String(e.details.idp)}`;
   if (e.type === "device.compliance_changed") return `reports ${e.target.display} is ${String(e.details.to).replace("_", "-")} (was ${String(e.details.from).replace("_", "-")}):`;
   if (e.type === "sso.login" && e.outcome === "denied") return "was blocked from (not assigned)";
   if (e.type === "auth.mfa" && e.outcome === "denied" && e.details.reason === "not_me") return "reported a sign-in they didn't start (blocked)";

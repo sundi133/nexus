@@ -52,6 +52,7 @@ Every organization's data is separated in two independent layers.
   - Each sign-in is tied to the browser that started it by a short-lived cookie, which prevents login CSRF, and the state can be used only once.
   - The IdP's MFA counts only when the IdP reports it (`amr` or AuthnContext), unless an admin chooses otherwise.
   - Making an IdP *required* disables Nexus passwords, passkey sign-in and password resets for its domains. It needs a successful test sign-in since the last connection change. Break-glass accounts are exempt.
+- **Inbound SCIM:** each SCIM connection has its own bearer token (stored as a SHA-256 hash, shown once, rotatable) that works only inside its organization. SCIM can't see or change break-glass accounts. Deactivations follow the connection's setting, and a burst of them (more than max(5, 10%) of people per hour) is paused until an admin approves. Every change is audited with the connection as the actor.
 - **Break-glass accounts:** designated owners, exempt from directory sync and conditional access, so an SSO or directory outage can't lock everyone out. Every use alerts all admins with a critical alert and is audited.
 
 ## Secrets at rest

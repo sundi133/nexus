@@ -189,3 +189,15 @@ export const toUser = (u: UserRow): z.infer<typeof User> => ({
 });
 
 export { iso, isoOrNull };
+
+type NoDefault<T> = T extends z.ZodDefault<infer I> ? I : T;
+
+/**
+ * A PATCH body: every field optional, and no defaults. (Zod 4's `.partial()`
+ * keeps `.default()`s, so a PATCH naming one field would reset all the others.)
+ */
+export function patchOf<S extends z.ZodRawShape>(o: z.ZodObject<S>): z.ZodObject<{ [K in keyof S]: z.ZodOptional<NoDefault<S[K]>> }> {
+  const shape: Record<string, z.ZodType> = {};
+  for (const [k, v] of Object.entries(o.shape)) shape[k] = (v instanceof z.ZodDefault ? (v.unwrap() as z.ZodType) : (v as z.ZodType)).optional();
+  return z.object(shape) as never;
+}

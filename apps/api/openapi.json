@@ -1160,18 +1160,15 @@
           },
           "family_name": {
             "type": "string",
-            "maxLength": 100,
-            "default": ""
+            "maxLength": 100
           },
           "title": {
             "type": "string",
-            "maxLength": 100,
-            "default": ""
+            "maxLength": 100
           },
           "department": {
             "type": "string",
-            "maxLength": 100,
-            "default": ""
+            "maxLength": 100
           }
         }
       },
@@ -3003,44 +3000,6 @@
           "platforms"
         ]
       },
-      "DirectoryProbe": {
-        "type": "object",
-        "properties": {
-          "users": {
-            "type": "integer"
-          },
-          "active_users": {
-            "type": "integer"
-          },
-          "groups": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "members": {
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "members"
-              ]
-            }
-          }
-        },
-        "required": [
-          "users",
-          "active_users",
-          "groups"
-        ]
-      },
       "DirectoryConnection": {
         "type": "object",
         "properties": {
@@ -3053,7 +3012,8 @@
             "type": "string",
             "enum": [
               "google",
-              "entra"
+              "entra",
+              "scim"
             ]
           },
           "provider_name": {
@@ -3138,6 +3098,39 @@
           "linked_groups": {
             "type": "integer"
           },
+          "scim": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "base_url": {
+                "type": "string"
+              },
+              "token_hint": {
+                "type": "string"
+              },
+              "last_request_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deactivations_allowed_until": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "base_url",
+              "token_hint",
+              "last_request_at",
+              "deactivations_allowed_until"
+            ],
+            "description": "For SCIM connections: where the IdP sends changes"
+          },
           "created_at": {
             "type": "string"
           }
@@ -3157,7 +3150,62 @@
           "syncing",
           "linked_users",
           "linked_groups",
+          "scim",
           "created_at"
+        ]
+      },
+      "ScimCredentials": {
+        "type": "object",
+        "properties": {
+          "base_url": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "description": "Shown once. Paste it into your IdP as the bearer token."
+          }
+        },
+        "required": [
+          "base_url",
+          "token"
+        ]
+      },
+      "DirectoryProbe": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "integer"
+          },
+          "active_users": {
+            "type": "integer"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "members": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "members"
+              ]
+            }
+          }
+        },
+        "required": [
+          "users",
+          "active_users",
+          "groups"
         ]
       },
       "DirectoryPlan": {
@@ -10153,8 +10201,7 @@
                   },
                   "description": {
                     "type": "string",
-                    "maxLength": 500,
-                    "default": ""
+                    "maxLength": 500
                   }
                 }
               }
@@ -14133,6 +14180,219 @@
         }
       }
     },
+    "/v1/directory/scim": {
+      "post": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Let your IdP push users and groups with SCIM (requires recent MFA)",
+        "description": "For Okta, Microsoft Entra ID, JumpCloud, OneLogin and others. Returns the SCIM base URL and a bearer token, shown once.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "deprovision": {
+                    "type": "string",
+                    "enum": [
+                      "suspend",
+                      "none"
+                    ],
+                    "default": "suspend",
+                    "description": "What deactivating someone at the IdP does in Nexus"
+                  },
+                  "invite_new_users": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Email new people an invitation (skipped when your IdP signs them in)"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DirectoryConnection"
+                      }
+                    },
+                    "scim": {
+                      "$ref": "#/components/schemas/ScimCredentials"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "scim"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/directory/connections/{id}/scim-token": {
+      "post": {
+        "tags": [
+          "Directory sync"
+        ],
+        "summary": "Replace a SCIM connection's bearer token (requires recent MFA)",
+        "description": "The old token stops working immediately. Update it in your IdP.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimCredentials"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/directory/test": {
       "post": {
         "tags": [
@@ -14605,13 +14865,10 @@
                 "type": "object",
                 "properties": {
                   "enabled": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Scheduled syncs. New connections start off so you can preview first."
+                    "type": "boolean"
                   },
                   "sync_groups": {
-                    "type": "boolean",
-                    "default": true
+                    "type": "boolean"
                   },
                   "group_filter": {
                     "type": "array",
@@ -14619,27 +14876,22 @@
                       "type": "string",
                       "maxLength": 200
                     },
-                    "maxItems": 100,
-                    "default": [],
-                    "description": "Remote group IDs to sync; empty = whole directory"
+                    "maxItems": 100
                   },
                   "deprovision": {
                     "type": "string",
                     "enum": [
                       "suspend",
                       "none"
-                    ],
-                    "default": "suspend"
+                    ]
                   },
                   "invite_new_users": {
-                    "type": "boolean",
-                    "default": true
+                    "type": "boolean"
                   },
                   "interval_minutes": {
                     "type": "integer",
                     "minimum": 15,
-                    "maximum": 1440,
-                    "default": 60
+                    "maximum": 1440
                   },
                   "name": {
                     "type": "string",

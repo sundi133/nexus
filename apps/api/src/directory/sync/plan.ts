@@ -21,7 +21,7 @@ export type LocalGroup = { id: string; name: string; description: string; member
 export type Link = { kind: "user" | "group"; external_id: string; local_id: string; suspended_by_sync: boolean };
 export type Local = { users: LocalUser[]; groups: LocalGroup[]; links: Link[] };
 
-export type Settings = { provider: "google" | "entra"; deprovision: "suspend" | "none"; sync_groups: boolean; group_filter: string[] };
+export type Settings = { provider: keyof typeof PROVIDER_NAME; deprovision: "suspend" | "none"; sync_groups: boolean; group_filter: string[] };
 
 const FIELDS = ["email", "given_name", "family_name", "title", "department"] as const;
 type Changes = Partial<Record<(typeof FIELDS)[number], { from: string; to: string }>>;
@@ -41,7 +41,7 @@ export type Plan = {
   guard: { tripped: boolean; suspensions: number; threshold: number };
 };
 
-export const PROVIDER_NAME = { google: "Google Workspace", entra: "Microsoft Entra ID" } as const;
+export const PROVIDER_NAME = { google: "Google Workspace", entra: "Microsoft Entra ID", scim: "SCIM" } as const;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const norm = (e: string) => e.trim().toLowerCase();

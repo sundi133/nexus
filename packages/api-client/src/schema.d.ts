@@ -4743,7 +4743,6 @@ export interface paths {
                 content: {
                     "application/json": {
                         name?: string;
-                        /** @default  */
                         description?: string;
                     };
                 };
@@ -8206,6 +8205,196 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/directory/scim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Let your IdP push users and groups with SCIM (requires recent MFA)
+         * @description For Okta, Microsoft Entra ID, JumpCloud, OneLogin and others. Returns the SCIM base URL and a bearer token, shown once.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /**
+                         * @description What deactivating someone at the IdP does in Nexus
+                         * @default suspend
+                         * @enum {string}
+                         */
+                        deprovision?: "suspend" | "none";
+                        /**
+                         * @description Email new people an invitation (skipped when your IdP signs them in)
+                         * @default true
+                         */
+                        invite_new_users?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["DirectoryConnection"][];
+                            scim: components["schemas"]["ScimCredentials"];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/directory/connections/{id}/scim-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace a SCIM connection's bearer token (requires recent MFA)
+         * @description The old token stops working immediately. Update it in your IdP.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ScimCredentials"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/directory/test": {
         parameters: {
             query?: never;
@@ -8595,26 +8784,12 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /**
-                         * @description Scheduled syncs. New connections start off so you can preview first.
-                         * @default false
-                         */
                         enabled?: boolean;
-                        /** @default true */
                         sync_groups?: boolean;
-                        /**
-                         * @description Remote group IDs to sync; empty = whole directory
-                         * @default []
-                         */
                         group_filter?: string[];
-                        /**
-                         * @default suspend
-                         * @enum {string}
-                         */
+                        /** @enum {string} */
                         deprovision?: "suspend" | "none";
-                        /** @default true */
                         invite_new_users?: boolean;
-                        /** @default 60 */
                         interval_minutes?: number;
                         name?: string;
                         credentials?: {
@@ -13919,12 +14094,9 @@ export interface components {
         };
         UserPatch: {
             given_name?: string;
-            /** @default  */
-            family_name: string;
-            /** @default  */
-            title: string;
-            /** @default  */
-            department: string;
+            family_name?: string;
+            title?: string;
+            department?: string;
         };
         InvitationSent: {
             sent_to: string;
@@ -14428,15 +14600,6 @@ export interface components {
              */
             platforms: string[];
         };
-        DirectoryProbe: {
-            users: number;
-            active_users: number;
-            groups: {
-                id: string;
-                name: string;
-                members: number;
-            }[];
-        };
         DirectoryConnection: {
             /**
              * Format: uuid
@@ -14444,7 +14607,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            provider: "google" | "entra";
+            provider: "google" | "entra" | "scim";
             provider_name: string;
             name: string;
             /** @description Admin email (Google) or tenant (Entra) the connection reads */
@@ -14477,7 +14640,28 @@ export interface components {
             syncing: boolean;
             linked_users: number;
             linked_groups: number;
+            /** @description For SCIM connections: where the IdP sends changes */
+            scim: {
+                base_url: string;
+                token_hint: string;
+                last_request_at: string | null;
+                deactivations_allowed_until: string | null;
+            } | null;
             created_at: string;
+        };
+        ScimCredentials: {
+            base_url: string;
+            /** @description Shown once. Paste it into your IdP as the bearer token. */
+            token: string;
+        };
+        DirectoryProbe: {
+            users: number;
+            active_users: number;
+            groups: {
+                id: string;
+                name: string;
+                members: number;
+            }[];
         };
         DirectoryPlan: {
             summary: {

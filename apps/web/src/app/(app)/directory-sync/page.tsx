@@ -2,11 +2,12 @@
 
 import type { paths, Schemas } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Eye, FolderSync, MoreHorizontal, Plus, RefreshCw, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, FolderSync, KeyRound, MoreHorizontal, Plus, RefreshCw, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
+import { CopyField } from "@/components/ui/copy";
 import { Field, Input, Select } from "@/components/ui/input";
 import { Card, EmptyState, ErrorBanner, PageHeader, Skeleton, StatusPill, type Tone } from "@/components/ui/misc";
 import { Dialog, DialogContent, Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/overlay";
@@ -36,18 +37,24 @@ export default function DirectorySyncPage() {
   const can = useCan();
   const editable = can("directory:sync");
   const [connecting, setConnecting] = useState(false);
+  const [scimSetup, setScimSetup] = useState(false);
   const [preview, setPreview] = useState<Conn | null>(null);
 
   return (
     <>
       <PageHeader
         title="Directory sync"
-        description="Keep people and groups in step with Google Workspace or Microsoft Entra ID: joiners get accounts, leavers are suspended."
+        description="Keep people and groups in step with your directory: Nexus reads Google Workspace or Microsoft Entra ID, or your IdP (Okta, Entra ID, JumpCloud…) pushes changes over SCIM. Joiners get accounts, leavers are suspended."
         actions={
           editable ? (
-            <Button variant="primary" onClick={() => setConnecting(true)}>
-              <Plus /> Connect a directory
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => setScimSetup(true)}>
+                <KeyRound /> Set up SCIM
+              </Button>
+              <Button variant="primary" onClick={() => setConnecting(true)}>
+                <Plus /> Connect a directory
+              </Button>
+            </>
           ) : null
         }
       />
@@ -55,9 +62,9 @@ export default function DirectorySyncPage() {
         <Skeleton className="h-48" />
       ) : conns.data?.data.length ? (
         <div className="space-y-4">
-          {conns.data.data.map((c) => (
-            <ConnectionCard key={c.id} conn={c} editable={editable} onPreview={() => setPreview(c)} />
-          ))}
+          {conns.data.data.map((c) =>
+            c.provider === "scim" ? <ScimCard key={c.id} conn={c} editable={editable} /> : <ConnectionCard key={c.id} conn={c} editable={editable} onPreview={() => setPreview(c)} />,
+          )}
         </div>
       ) : (
         <Card>
@@ -75,6 +82,7 @@ export default function DirectorySyncPage() {
           />
         </Card>
       )}
+      {scimSetup ? <ScimSetupDialog onClose={() => setScimSetup(false)} /> : null}
       {connecting ? <ConnectDialog onClose={() => setConnecting(false)} onSaved={(c) => (setConnecting(false), setPreview(c))} /> : null}
       {preview ? <PreviewDialog conn={preview} onClose={() => setPreview(null)} /> : null}
     </>
@@ -244,9 +252,220 @@ function Stat({ n, label, tone }: { n: number | undefined; label: string; tone?:
 
 function ProviderMark({ provider }: { provider: Conn["provider"] }) {
   return (
-    <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white", provider === "google" ? "bg-[#1a73e8]" : "bg-[#0078d4]")} aria-hidden>
-      {provider === "google" ? "G" : "E"}
+    <div
+      className={cn("flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white", provider === "google" ? "bg-[#1a73e8]" : provider === "entra" ? "bg-[#0078d4]" : "bg-fg-muted")}
+      aria-hidden
+    >
+      {provider === "google" ? "G" : provider === "entra" ? "E" : "S"}
     </div>
+  );
+}
+
+// ---- SCIM -------------------------------------------------------------------------
+
+const SCIM_STEPS = {
+  okta: [
+    "Okta admin → Applications → your Nexus app (or a new SCIM 2.0 app) → General → App settings: enable SCIM provisioning.",
+    "Provisioning → Integration: paste the base URL, choose HTTP Header authentication, and paste the token. Unique identifier field: userName.",
+    "Provisioning → To App: enable Create Users, Update User Attributes and Deactivate Users. Assign people and push groups.",
+  ],
+  entra: [
+    "Entra admin center → Enterprise applications → your Nexus app → Provisioning → Automatic.",
+    "Tenant URL: the base URL. Secret token: the token. Test connection, then save.",
+    "Under Mappings, keep userPrincipalName → userName (or mail), and start provisioning.",
+  ],
+};
+
+function ScimCredentialsView({ scim }: { scim: { base_url: string; token: string } }) {
+  const [vendor, setVendor] = useState<"okta" | "entra">("okta");
+  return (
+    <div className="space-y-4">
+      <Field label="SCIM base URL" htmlFor="scim-url">
+        <CopyField value={scim.base_url} />
+      </Field>
+      <Field label="Bearer token" htmlFor="scim-token" hint="Copy it now: it won't be shown again.">
+        <CopyField value={scim.token} />
+      </Field>
+      <div className="rounded-md border border-border p-3">
+        <div className="mb-2 flex gap-1.5">
+          {(["okta", "entra"] as const).map((v) => (
+            <button key={v} type="button" onClick={() => setVendor(v)} className={cn("rounded px-2 py-1 text-xs font-medium", vendor === v ? "bg-primary-soft text-primary" : "text-fg-muted hover:bg-bg-subtle")}>
+              {v === "okta" ? "Okta" : "Microsoft Entra ID"}
+            </button>
+          ))}
+        </div>
+        <ol className="list-decimal space-y-1 pl-5 text-xs text-fg-muted">
+          {SCIM_STEPS[vendor].map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function ScimSetupDialog({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const withStepUp = useStepUp();
+  const [name, setName] = useState("Okta");
+  const [deprovision, setDeprovision] = useState<"suspend" | "none">("suspend");
+  const [invite, setInvite] = useState(true);
+  const create = useMutation({
+    mutationFn: () => withStepUp(() => unwrap(api.POST("/v1/directory/scim", { body: { name: name.trim(), deprovision, invite_new_users: invite } }))),
+    onSuccess: (r) => qc.setQueryData(KEY, { data: r.data }),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        title={create.data ? `Connect ${name.trim()} to Nexus` : "Set up SCIM provisioning"}
+        description={create.data ? undefined : "Your IdP pushes new people, changes, deactivations and groups to Nexus as they happen."}
+        className="max-w-xl"
+      >
+        {create.data ? (
+          <>
+            <ScimCredentialsView scim={create.data.scim} />
+            <div className="mt-4 flex justify-end">
+              <Button variant="primary" onClick={onClose}>
+                Done
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-4">
+            <Field label="Name" htmlFor="scim-name" hint="Usually your IdP's name. Shown in the audit log as the actor.">
+              <Input id="scim-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
+            </Field>
+            <Field label="When someone is deactivated or deleted at the IdP" htmlFor="scim-deprovision">
+              <Select id="scim-deprovision" className="w-full" value={deprovision} onChange={(e) => setDeprovision(e.target.value as "suspend" | "none")}>
+                <option value="suspend">Suspend them in Nexus (deleted: offboard)</option>
+                <option value="none">Leave them as they are</option>
+              </Select>
+            </Field>
+            <label className="flex items-start gap-2 text-[13px]">
+              <input type="checkbox" className="mt-0.5" checked={invite} onChange={(e) => setInvite(e.target.checked)} />
+              <span>
+                Email new people an invitation
+                <span className="block text-xs text-fg-muted">Skipped for people whose domain signs in through your IdP (Single sign-on).</span>
+              </span>
+            </label>
+            <p className="rounded-md bg-bg-subtle px-3 py-2 text-xs text-fg-muted">
+              Safety: if the IdP deactivates more than 10% of your people (at least 5) within an hour, Nexus pauses further deactivations until you approve them.
+            </p>
+            <ErrorBanner error={create.error} />
+            <div className="flex justify-end gap-2 border-t border-border pt-4">
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button variant="primary" loading={create.isPending} disabled={!name.trim()} onClick={() => create.mutate()}>
+                Create
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ScimCard({ conn: c, editable }: { conn: Conn; editable: boolean }) {
+  const qc = useQueryClient();
+  const withStepUp = useStepUp();
+  const patch = usePatch(c);
+  const approve = useSync(c);
+  const [creds, setCreds] = useState<{ base_url: string; token: string } | null>(null);
+  const rotate = useMutation({
+    mutationFn: () => withStepUp(() => unwrap(api.POST("/v1/directory/connections/{id}/scim-token", { params: { path: { id: c.id } } }))),
+    onSuccess: (r) => setCreds(r),
+  });
+  const remove = useMutation({
+    mutationFn: () => withStepUp(() => unwrap(api.DELETE("/v1/directory/connections/{id}", { params: { path: { id: c.id } } }))),
+    onSuccess: (r) => (qc.setQueryData(KEY, r), toast.success(`Disconnected ${c.name}`, { description: "People and groups stay; the token stops working." })),
+  });
+  const scim = c.scim!;
+  return (
+    <Card>
+      <div className="flex flex-wrap items-start gap-3 border-b border-border px-4 py-3">
+        <ProviderMark provider="scim" />
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold">
+            {c.name}
+            {!c.enabled ? <StatusPill>Off</StatusPill> : c.last_status === "needs_approval" ? <StatusPill tone="warning">Deactivations paused</StatusPill> : <StatusPill tone="success">Receiving</StatusPill>}
+          </p>
+          <p className="text-xs text-fg-muted">
+            SCIM · {people(c.linked_users)} and {pluralize(c.linked_groups, "group")} managed · token …{scim.token_hint}
+          </p>
+          <p className="text-xs text-fg-subtle">
+            {scim.last_request_at ? `Last change from ${c.name} ${timeAgo(scim.last_request_at)}` : `Waiting for ${c.name} to connect`} ·{" "}
+            {c.deprovision === "suspend" ? "deactivation suspends in Nexus" : "deactivation leaves people as they are"}
+          </p>
+        </div>
+        {editable ? (
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="secondary" loading={rotate.isPending} onClick={() => rotate.mutate()}>
+              <KeyRound /> New token
+            </Button>
+            <Menu>
+              <MenuTrigger asChild>
+                <Button size="sm" variant="ghost" aria-label={`Actions for ${c.name}`}>
+                  <MoreHorizontal />
+                </Button>
+              </MenuTrigger>
+              <MenuContent>
+                <MenuItem onSelect={() => patch.mutate({ enabled: !c.enabled }, { onSuccess: () => toast.success(c.enabled ? `Nexus now refuses changes from ${c.name}` : `Receiving changes from ${c.name}`) })}>
+                  {c.enabled ? "Stop accepting changes" : "Accept changes again"}
+                </MenuItem>
+                <MenuItem
+                  onSelect={() =>
+                    patch.mutate({ deprovision: c.deprovision === "suspend" ? "none" : "suspend" }, { onSuccess: () => toast.success("Deprovisioning setting saved") })
+                  }
+                >
+                  {c.deprovision === "suspend" ? "Don't suspend on deactivation" : "Suspend on deactivation"}
+                </MenuItem>
+                <MenuItem onSelect={() => patch.mutate({ invite_new_users: !c.invite_new_users }, { onSuccess: () => toast.success("Invitation setting saved") })}>
+                  {c.invite_new_users ? "Stop inviting new people" : "Invite new people"}
+                </MenuItem>
+                <MenuSeparator />
+                <MenuItem danger onSelect={() => remove.mutate()}>
+                  Disconnect
+                </MenuItem>
+              </MenuContent>
+            </Menu>
+          </div>
+        ) : null}
+      </div>
+      <div className="space-y-3 p-4 empty:hidden">
+        <ErrorBanner error={patch.error ?? rotate.error ?? remove.error ?? approve.error} />
+        {c.last_status === "needs_approval" ? (
+          <div className="rounded-md border border-warning/40 bg-warning-soft px-3 py-3 text-[13px]">
+            <p className="flex items-center gap-2 font-medium">
+              <ShieldAlert className="size-4 text-warning" /> {c.last_error}
+            </p>
+            <p className="mt-1 text-fg-muted">
+              {c.name} keeps retrying, so nothing is lost. If this is a mistake upstream (a removed assignment, a wrong group), fix it there. If the deactivations are real, let them through for the next hour.
+            </p>
+            {editable ? (
+              <Button size="sm" variant="primary" className="mt-3" loading={approve.isPending} onClick={() => approve.mutate(100_000)}>
+                Allow deactivations for an hour
+              </Button>
+            ) : null}
+          </div>
+        ) : scim.deactivations_allowed_until ? (
+          <p className="text-xs text-fg-muted">Deactivations allowed until {new Date(scim.deactivations_allowed_until).toLocaleTimeString()}.</p>
+        ) : null}
+      </div>
+      {creds ? (
+        <Dialog open onOpenChange={(o) => !o && setCreds(null)}>
+          <DialogContent title={`New token for ${c.name}`} description="The old token stopped working. Paste this one into your IdP." className="max-w-xl">
+            <ScimCredentialsView scim={creds} />
+            <div className="mt-4 flex justify-end">
+              <Button variant="primary" onClick={() => setCreds(null)}>
+                Done
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </Card>
   );
 }
 

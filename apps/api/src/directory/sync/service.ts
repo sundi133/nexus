@@ -3,6 +3,7 @@ import type { Deps, RequestMeta } from "../../context.js";
 import { audit } from "../../audit/record.js";
 import { notifyRoles } from "../../notify/send.js";
 import type { Tx } from "../../platform/db.js";
+import { badRequest } from "../../platform/errors.js";
 import { newId } from "../../platform/ids.js";
 import { enqueue, registerJobHandler, type JobRunner } from "../../platform/jobs.js";
 import { issueInvitation, sendInvite, type PendingInvite } from "../invitations.js";
@@ -17,10 +18,10 @@ export const secretAad = (connectionId: string) => `directory_connection:${conne
 type Conn = {
   id: string;
   org_id: string;
-  provider: "google" | "entra";
+  provider: "google" | "entra" | "scim";
   name: string;
   config: unknown;
-  secret: Buffer;
+  secret: Buffer | null;
   enabled: boolean;
   sync_groups: boolean;
   group_filter: string[];
@@ -34,6 +35,7 @@ export async function loadConnection(tx: Tx, id: string) {
 }
 
 export function remoteFor(deps: Deps, conn: Pick<Conn, "id" | "provider" | "config" | "secret" | "sync_groups">): Promise<Remote> {
+  if (conn.provider === "scim" || !conn.secret) throw badRequest("scim_push", "A SCIM connection is updated by your identity provider; there's nothing for Nexus to fetch");
   const secret = deps.sealer.open(conn.secret, secretAad(conn.id)).toString();
   return fetchDirectory(deps.cfg, conn.provider, conn.config, secret, { groups: conn.sync_groups });
 }

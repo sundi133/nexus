@@ -16,23 +16,7 @@ import { badRequest, conflict, forbidden, notFound } from "../platform/errors.js
 import { newId } from "../platform/ids.js";
 import { decodeCursor, pageOf } from "../platform/pagination.js";
 import { can, ROLES } from "../rbac.js";
-import {
-  bearer,
-  body,
-  Cursor,
-  displayName,
-  Group,
-  Id,
-  iso,
-  json,
-  page,
-  problemResponses,
-  Role,
-  Session,
-  toUser,
-  User,
-  UserStatus,
-} from "../schemas.js";
+import { bearer, body, Cursor, displayName, Group, Id, iso, json, page, patchOf, problemResponses, Role, Session, toUser, User, UserStatus } from "../schemas.js";
 
 const UserDetail = User.extend({
   groups: z.array(Group.pick({ id: true, name: true })),
@@ -54,9 +38,7 @@ const UserInput = z.object({
   roles: z.array(Role).default([]),
 });
 
-const UserPatch = UserInput.pick({ given_name: true, family_name: true, title: true, department: true })
-  .partial()
-  .openapi("UserPatch");
+const UserPatch = patchOf(UserInput.pick({ given_name: true, family_name: true, title: true, department: true })).openapi("UserPatch");
 
 const userQuery = (tx: Tx) =>
   tx

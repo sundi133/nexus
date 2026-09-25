@@ -8,7 +8,7 @@ import { isUniqueViolation } from "../platform/db.js";
 import { conflict, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { decodeCursor, pageOf } from "../platform/pagination.js";
-import { bearer, body, Cursor, Group, Id, iso, json, page, problemResponses, toUser, User } from "../schemas.js";
+import { bearer, body, Cursor, Group, Id, iso, json, page, patchOf, problemResponses, toUser, User } from "../schemas.js";
 import { sql } from "kysely";
 
 const GroupInput = z.object({
@@ -123,7 +123,7 @@ export function registerGroupRoutes(app: App) {
       tags: ["Groups"],
       summary: "Update a group",
       security: bearer,
-      request: { params: z.object({ id: Id }), ...body(GroupInput.partial()) },
+      request: { params: z.object({ id: Id }), ...body(patchOf(GroupInput)) },
       responses: { 200: json(Group), ...problemResponses },
     }),
     async (c) => {

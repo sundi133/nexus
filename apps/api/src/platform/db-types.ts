@@ -442,10 +442,10 @@ export interface Database {
   directory_connections: {
     id: string;
     org_id: string;
-    provider: "google" | "entra";
+    provider: "google" | "entra" | "scim";
     name: string;
     config: Json;
-    secret: Buffer;
+    secret: Buffer | null;
     enabled: Generated<boolean>;
     sync_groups: Generated<boolean>;
     group_filter: Generated<string[]>;
@@ -456,6 +456,10 @@ export interface Database {
     last_status: Generated<"never" | "ok" | "error" | "needs_approval">;
     last_result: Json;
     last_error: Generated<string>;
+    token_hash: Buffer | null;
+    token_hint: Generated<string>;
+    last_request_at: NullableTimestamp;
+    deactivations_allowed_until: NullableTimestamp;
     created_by: string | null;
     created_at: Generated<Date>;
     updated_at: Generated<Date>;

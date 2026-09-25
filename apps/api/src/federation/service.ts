@@ -162,7 +162,8 @@ export async function completeFederation(deps: Deps, meta: RequestMeta, input: C
       };
       await tx.updateTable("federation_requests").set({ result: JSON.stringify(result) }).where("id", "=", req.id).execute();
       await tx.updateTable("identity_providers").set({ last_test_ok_at: new Date() }).where("id", "=", idp.id).execute();
-      await audit(tx, orgId, { meta }, { type: "federation.tested", actor: req.requested_by ? { type: "user", id: req.requested_by } : undefined, target: { type: "identity_provider", id: idp.id, display: idp.name }, details: { email: claims.email, mfa: claims.mfa } });
+      const tester = req.requested_by ? await tx.selectFrom("users").select("email").where("id", "=", req.requested_by).executeTakeFirst() : undefined;
+      await audit(tx, orgId, { meta }, { type: "federation.tested", actor: req.requested_by ? { type: "user", id: req.requested_by, display: tester?.email } : undefined, target: { type: "identity_provider", id: idp.id, display: idp.name }, details: { email: claims.email, mfa: claims.mfa } });
     });
     return { purpose: "test", idp_id: idp.id, state: req.id };
   }

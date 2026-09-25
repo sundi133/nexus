@@ -77,7 +77,7 @@ async function preview(tx: Tx, userId: string): Promise<z.infer<typeof Preview>>
 }
 
 /** Does it. Shared by the immediate action and the scheduled job. */
-export async function offboard(tx: Tx, orgId: string, userId: string, who: { principal?: Principal; meta: RequestMeta }, reason: string) {
+export async function offboard(tx: Tx, orgId: string, userId: string, who: { principal?: Principal; meta: RequestMeta; actor?: string; details?: Record<string, unknown> }, reason: string) {
   const before = await preview(tx, userId);
   if (before.user.status === "deprovisioned") return { already: true as const, before };
   await tx.updateTable("users").set({ status: "deprovisioned", updated_at: new Date() }).where("id", "=", userId).execute();
@@ -105,9 +105,9 @@ export async function offboard(tx: Tx, orgId: string, userId: string, who: { pri
   };
   await audit(tx, orgId, who, {
     type: "user.offboarded",
-    ...(who.principal ? {} : { actor: { type: "system" as const, id: null, display: "Scheduled offboarding" } }),
+    ...(who.principal ? {} : { actor: { type: "system" as const, id: null, display: who.actor ?? "Scheduled offboarding" } }),
     target: { type: "user", id: userId, display: before.user.email },
-    details: { reason, effects },
+    details: { reason, effects, ...who.details },
   });
   if (before.devices.length) {
     await notifyRoles(tx, orgId, ["owner", "admin", "helpdesk"], {
