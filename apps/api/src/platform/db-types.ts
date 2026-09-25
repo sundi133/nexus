@@ -250,6 +250,24 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Timestamp;
   };
+  recovery_codes: {
+    id: string;
+    org_id: string;
+    user_id: string;
+    code_hash: Buffer;
+    used_at: NullableTimestamp;
+    created_at: Generated<Date>;
+  };
+  password_resets: {
+    id: string;
+    org_id: string;
+    user_id: string;
+    token_hash: Buffer;
+    ip: Generated<string>;
+    created_at: Generated<Date>;
+    expires_at: Timestamp;
+    used_at: NullableTimestamp;
+  };
   event_destinations: {
     id: string;
     org_id: string;

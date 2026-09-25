@@ -1,5 +1,6 @@
 "use client";
 
+import { ChangePasswordCard, RecoveryCodesCard } from "@/components/features/account-recovery";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fingerprint, KeyRound, Plus, Smartphone, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -90,6 +91,9 @@ export default function SecurityPage() {
             <EmptyState title="No sign-in methods yet" description="Passkeys are the most secure option; Nexus Mobile lets you approve sign-ins with a tap." />
           )}
         </Card>
+
+        <RecoveryCodesCard hasFactor={verified.length > 0} />
+        <ChangePasswordCard />
         <Card className="overflow-hidden">
           <CardHeader title="Where you're signed in" description="Web, mobile and CLI sessions." />
           {sessions.data?.data.length ? <SessionsTable sessions={sessions.data.data} onRevoke={(id) => revoke.mutate(id)} /> : null}

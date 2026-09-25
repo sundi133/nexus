@@ -6,6 +6,7 @@ import { audit } from "../audit/record.js";
 import { loadUser, sessionOut } from "../auth/routes.js";
 import { requirePermission } from "../auth/guard.js";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "../auth/passwords.js";
+import { assertNotBreached } from "../auth/recovery.js";
 import { notifyRoles } from "../notify/send.js";
 import { issueInvitation, sendInvite, type PendingInvite } from "./invitations.js";
 import type { Tx } from "../platform/db.js";
@@ -189,6 +190,7 @@ export function registerUserRoutes(app: App) {
       if (input.invite && input.password) throw badRequest("invalid_request", "Choose either an initial password or an invitation, not both");
       const meta = c.get("meta");
       const id = newId();
+      if (input.password) await assertNotBreached(c.get("deps"), input.password);
       const passwordHash = input.password ? await hashPassword(input.password) : null;
       let invite: PendingInvite | null = null;
       try {

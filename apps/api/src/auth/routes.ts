@@ -28,6 +28,7 @@ import {
 } from "../schemas.js";
 import { requireRecentMfa, requireSession } from "./guard.js";
 import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "./passwords.js";
+import { assertNotBreached, recoveryCodesLeft } from "./recovery.js";
 import { RateLimiter } from "./ratelimit.js";
 import { hashToken, newSessionToken } from "./tokens.js";
 
@@ -215,6 +216,7 @@ export function registerAuthRoutes(app: App) {
 
       const orgId = newId();
       const userId = newId();
+      await assertNotBreached(c.get("deps"), input.password);
       const passwordHash = await hashPassword(input.password);
 
       const result = await db.tenant(orgId, async (tx) => {
@@ -434,6 +436,7 @@ export function registerAuthRoutes(app: App) {
               email: z.string(),
               organization_name: z.string(),
               factors: z.array(z.enum(["totp", "push", "webauthn"])),
+              recovery_codes: z.number().int().openapi({ description: "Unused recovery codes (another way to finish MFA)" }),
             })
             .openapi("SessionInfo"),
         ),
@@ -445,8 +448,9 @@ export function registerAuthRoutes(app: App) {
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => ({
         org: await tx.selectFrom("organizations").select("name").where("id", "=", p.orgId).executeTakeFirstOrThrow(),
         factors: await verifiedFactorTypes(tx, p.userId),
+        recovery: await recoveryCodesLeft(tx, p.userId),
       }));
-      return c.json({ state: p.sessionState, email: p.email, organization_name: out.org.name, factors: out.factors }, 200);
+      return c.json({ state: p.sessionState, email: p.email, organization_name: out.org.name, factors: out.factors, recovery_codes: out.recovery }, 200);
     },
   );
 

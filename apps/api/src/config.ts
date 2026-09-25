@@ -27,6 +27,8 @@ export type Config = {
   graphBase: string;
   // Allow outbound calls (SCIM, webhooks) to private/loopback addresses. Dev and test only.
   allowPrivateOutbound: boolean;
+  // Have I Been Pwned range API for breached-password checks ("" = off).
+  hibpBase: string;
 };
 
 export function loadConfig(env = process.env): Config {
@@ -64,6 +66,7 @@ export function loadConfig(env = process.env): Config {
     entraLoginBase: env.NEXUS_ENTRA_LOGIN_BASE ?? "https://login.microsoftonline.com",
     graphBase: env.NEXUS_GRAPH_BASE ?? "https://graph.microsoft.com",
     allowPrivateOutbound: mode !== "prod" && env.NEXUS_ALLOW_PRIVATE_OUTBOUND !== "false",
+    hibpBase: env.NEXUS_HIBP_BASE ?? (mode === "test" ? "" : "https://api.pwnedpasswords.com"),
   };
 }
 

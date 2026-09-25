@@ -80,6 +80,9 @@ function LoginForm() {
       ) : null}
       <Field label="Password" htmlFor="password">
         <Input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Link href={`/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ""}`} className="mt-1 block text-right text-xs text-fg-muted hover:text-fg">
+          Forgot password?
+        </Link>
       </Field>
       <Button type="submit" variant={passkeys ? "secondary" : "primary"} size="lg" className="w-full" loading={busy === "password"} disabled={!password}>
         Continue with password

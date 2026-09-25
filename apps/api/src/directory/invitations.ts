@@ -6,6 +6,7 @@ import type { App, Deps, Principal } from "../context.js";
 import { audit } from "../audit/record.js";
 import { requirePermission } from "../auth/guard.js";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "../auth/passwords.js";
+import { assertNotBreached } from "../auth/recovery.js";
 import { createSession, verifiedFactorTypes } from "../auth/routes.js";
 import { hashToken } from "../auth/tokens.js";
 import { notifyUsers } from "../notify/send.js";
@@ -148,6 +149,7 @@ export function registerInvitationRoutes(app: App) {
       const deps = c.get("deps");
       const meta = c.get("meta");
       const inv = await lookup(deps, input.token);
+      await assertNotBreached(deps, input.password);
       const passwordHash = await hashPassword(input.password);
 
       const out = await deps.db.tenant(inv.org_id, async (tx) => {

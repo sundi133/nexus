@@ -82,8 +82,69 @@ export function MfaVerify({ next, onRestart, subtitle }: { next: string; onResta
           </Button>
         </form>
       ) : null}
+      <RecoveryOptions recoveryCodes={session.data?.recovery_codes ?? 0} onVerified={done} />
       <button type="button" onClick={onRestart} className="block w-full text-center text-[13px] text-fg-muted hover:text-fg">
         Use a different account
+      </button>
+    </div>
+  );
+}
+
+/** Fallbacks when your usual methods aren't available: a recovery code, or asking an admin for help. */
+function RecoveryOptions({ recoveryCodes, onVerified }: { recoveryCodes: number; onVerified: () => void }) {
+  const [mode, setMode] = useState<"closed" | "code" | "asked">("closed");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  if (mode === "asked") {
+    return (
+      <p className="rounded-md border border-border bg-bg-subtle px-3 py-2 text-center text-[13px] text-fg-muted">
+        Your IT team has been told. They'll check it's really you, then reset your MFA so you can set it up again.
+      </p>
+    );
+  }
+  if (mode === "code") {
+    return (
+      <form
+        className="space-y-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setError(null);
+          try {
+            await unwrap(api.POST("/v1/auth/mfa/recovery-code", { body: { code } }));
+            onVerified();
+          } catch (err) {
+            setError(err);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <ErrorBanner error={error} />
+        <Input autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="xxxxx-xxxxx" autoComplete="off" spellCheck={false} className="h-11 text-center font-mono" aria-label="Recovery code" />
+        <Button type="submit" variant="secondary" size="lg" className="w-full" loading={busy} disabled={code.replace(/[^a-z0-9]/gi, "").length < 10}>
+          Use recovery code
+        </Button>
+      </form>
+    );
+  }
+  return (
+    <div className="flex justify-center gap-4 text-[13px]">
+      {recoveryCodes > 0 ? (
+        <button type="button" className="text-primary hover:underline" onClick={() => setMode("code")}>
+          Use a recovery code
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="text-fg-muted hover:text-fg"
+        onClick={async () => {
+          await unwrap(api.POST("/v1/auth/mfa/help", {})).catch(() => undefined);
+          setMode("asked");
+        }}
+      >
+        Can&apos;t use any of these?
       </button>
     </div>
   );

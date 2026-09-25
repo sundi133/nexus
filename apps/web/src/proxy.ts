@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/login", "/signup", "/invite", "/sso/error"];
+const PUBLIC = ["/login", "/signup", "/invite", "/sso/error", "/forgot-password", "/reset-password"];
 
 /** Cheap presence check only: real authentication happens at the API on every call. */
 export function proxy(req: NextRequest) {

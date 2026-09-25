@@ -27,6 +27,7 @@ import { registerDirectorySyncRoutes } from "./directory/sync/routes.js";
 import { registerProvisioningRoutes } from "./provisioning/routes.js";
 import { registerOffboardingRoutes } from "./directory/offboarding.js";
 import { registerApiKeyRoutes } from "./auth/api-keys.js";
+import { registerRecoveryRoutes } from "./auth/recovery.js";
 import { registerEventDestinationRoutes } from "./integrations/routes.js";
 import { scheduleEventDelivery } from "./integrations/stream.js";
 import { scheduleProvisioningReconcile } from "./provisioning/service.js";
@@ -109,6 +110,7 @@ export function createApp(deps: Deps) {
   registerProvisioningRoutes(app);
   registerOffboardingRoutes(app);
   registerApiKeyRoutes(app);
+  registerRecoveryRoutes(app);
   registerEventDestinationRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
