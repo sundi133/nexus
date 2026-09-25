@@ -3660,7 +3660,10 @@
             "enum": [
               "webhook",
               "splunk_hec",
-              "datadog"
+              "datadog",
+              "s3",
+              "gcs",
+              "sentinel"
             ]
           },
           "name": {
@@ -3700,6 +3703,44 @@
               "service": {
                 "type": "string",
                 "maxLength": 100
+              },
+              "bucket": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]$"
+              },
+              "region": {
+                "type": "string",
+                "pattern": "^[a-z]{2}(-[a-z]+)+-\\d$"
+              },
+              "prefix": {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[A-Za-z0-9!_.*'()/=-]*$"
+              },
+              "endpoint": {
+                "type": "string",
+                "maxLength": 500,
+                "description": "S3-compatible storage only (MinIO, Wasabi, …). Leave empty for Amazon S3."
+              },
+              "access_key_id": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "tenant_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "client_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "dcr_id": {
+                "type": "string",
+                "pattern": "^dcr-[0-9a-f]{32}$"
+              },
+              "stream": {
+                "type": "string",
+                "pattern": "^Custom-[A-Za-z0-9_]{1,200}$"
               }
             }
           },
@@ -16546,8 +16587,8 @@
         "tags": [
           "Integrations"
         ],
-        "summary": "Stream audit events to a webhook, Splunk or Datadog (requires recent MFA)",
-        "description": "Webhooks get a generated signing secret, returned once. `start: last_24h` backfills the last day.",
+        "summary": "Stream audit events to a webhook, SIEM or storage bucket (requires recent MFA)",
+        "description": "Webhooks get a generated signing secret, returned once. `start: last_24h` backfills the last day. S3 and GCS archives write gzipped JSON lines, one object per batch of up to 1,000 events (at least every 5 minutes), under `year=/month=/day=` prefixes. For S3 and GCS the URL comes from the bucket.",
         "security": [
           {
             "bearer": []
@@ -16565,7 +16606,10 @@
                     "enum": [
                       "webhook",
                       "splunk_hec",
-                      "datadog"
+                      "datadog",
+                      "s3",
+                      "gcs",
+                      "sentinel"
                     ]
                   },
                   "name": {
@@ -16575,13 +16619,14 @@
                   },
                   "url": {
                     "type": "string",
-                    "maxLength": 1000
+                    "maxLength": 1000,
+                    "description": "Webhook, collector or Sentinel data collection endpoint URL. Not used for S3 and GCS."
                   },
                   "secret": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 1000,
-                    "description": "Splunk HEC token or Datadog API key. Webhooks: leave empty to generate one."
+                    "description": "Splunk HEC token, Datadog API key, S3 secret access key, GCS HMAC secret or Entra client secret. Webhooks: leave empty to generate one."
                   },
                   "format": {
                     "type": "string",
@@ -16618,6 +16663,44 @@
                       "service": {
                         "type": "string",
                         "maxLength": 100
+                      },
+                      "bucket": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]$"
+                      },
+                      "region": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[a-z]+)+-\\d$"
+                      },
+                      "prefix": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "pattern": "^[A-Za-z0-9!_.*'()/=-]*$"
+                      },
+                      "endpoint": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "S3-compatible storage only (MinIO, Wasabi, …). Leave empty for Amazon S3."
+                      },
+                      "access_key_id": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "tenant_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "client_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "dcr_id": {
+                        "type": "string",
+                        "pattern": "^dcr-[0-9a-f]{32}$"
+                      },
+                      "stream": {
+                        "type": "string",
+                        "pattern": "^Custom-[A-Za-z0-9_]{1,200}$"
                       }
                     },
                     "default": {}
@@ -16633,8 +16716,7 @@
                 },
                 "required": [
                   "kind",
-                  "name",
-                  "url"
+                  "name"
                 ]
               }
             }
@@ -16800,6 +16882,44 @@
                       "service": {
                         "type": "string",
                         "maxLength": 100
+                      },
+                      "bucket": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{1,220}[a-z0-9]$"
+                      },
+                      "region": {
+                        "type": "string",
+                        "pattern": "^[a-z]{2}(-[a-z]+)+-\\d$"
+                      },
+                      "prefix": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "pattern": "^[A-Za-z0-9!_.*'()/=-]*$"
+                      },
+                      "endpoint": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "S3-compatible storage only (MinIO, Wasabi, …). Leave empty for Amazon S3."
+                      },
+                      "access_key_id": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "tenant_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "client_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "dcr_id": {
+                        "type": "string",
+                        "pattern": "^dcr-[0-9a-f]{32}$"
+                      },
+                      "stream": {
+                        "type": "string",
+                        "pattern": "^Custom-[A-Za-z0-9_]{1,200}$"
                       }
                     }
                   },

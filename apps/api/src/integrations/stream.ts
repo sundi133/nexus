@@ -5,7 +5,7 @@ import { newId } from "../platform/ids.js";
 import { backoff, enqueue, registerJobHandler, type JobRunner } from "../platform/jobs.js";
 import { assertSafeUrl } from "../platform/outbound.js";
 import { formatEvent, matchesFilter, type AuditRow } from "./formats.js";
-import { BATCH, send } from "./senders.js";
+import { ARCHIVE_FLUSH_MS, BATCH, isArchive, send } from "./senders.js";
 
 /**
  * Streams the audit log to webhooks and SIEMs (INT-03, AUD-04). Each
@@ -50,6 +50,15 @@ export async function deliver(deps: Deps, orgId: string, destinationId: string) 
       batch.push(rows[i]!);
     }
 
+    // Archives wait for a full object's worth of events, or until the oldest has waited long enough.
+    if (batch.length && isArchive(d.kind) && batch.length < BATCH[d.kind] && rows.length < BATCH[d.kind] * 4) {
+      const due = batch[0]!.ts.getTime() + ARCHIVE_FLUSH_MS;
+      if (due > Date.now()) {
+        await deps.db.tenant(orgId, (tx) => tx.updateTable("event_destinations").set({ next_attempt_at: new Date(due) }).where("id", "=", d.id).execute());
+        return;
+      }
+    }
+
     let delivered = 0;
     let result = { delivered: 0, status: 0, error: "" };
     const started = Date.now();
@@ -57,7 +66,7 @@ export async function deliver(deps: Deps, orgId: string, destinationId: string) 
       try {
         await assertSafeUrl(d.url, { allowPrivate: deps.cfg.allowPrivateOutbound }); // DNS can change after setup
         const secret = deps.sealer.open(d.secret, secretAad(d.id)).toString();
-        result = await send(d.kind, d.url, secret, d.config as Record<string, string>, batch.map((e) => ({ id: e.id, type: e.type, time: e.ts, body: formatEvent(d.format, e) })));
+        result = await send(d.kind, d.url, secret, d.config as Record<string, string>, batch.map((e) => ({ id: e.id, type: e.type, time: e.ts, body: formatEvent(d.format, e) })), { entraLoginBase: deps.cfg.entraLoginBase });
       } catch (err) {
         result = { delivered: 0, status: 0, error: (err as Error).message };
       }

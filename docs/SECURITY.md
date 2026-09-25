@@ -67,7 +67,8 @@ Nexus calls customer-configured URLs: webhooks, SIEM endpoints, SCIM apps and Sl
 
 - Every change is written to the audit log in the same database transaction as the change, so there is never a change without its record.
 - Events carry the actor, IP, user agent and request ID.
-- Events stream to SIEMs (Splunk HEC, Datadog, or any HTTPS endpoint, with OCSF 1.3 mapping) with at-least-once delivery. The cursor can't skip events committed out of order.
+- Events stream to SIEMs (Splunk HEC, Datadog, Microsoft Sentinel, or any HTTPS endpoint, with OCSF 1.3 mapping) with at-least-once delivery. The cursor can't skip events committed out of order.
+- For long-term retention, events can also be archived to the customer's own S3 or Google Cloud Storage bucket. Turn on Object Lock or a retention policy there for tamper-proof (WORM) storage. The credentials Nexus needs only allow writing objects.
 - Webhooks are signed with `nexus-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`. Receivers should check the signature and reject timestamps older than 5 minutes.
 
 ## Web and API hardening

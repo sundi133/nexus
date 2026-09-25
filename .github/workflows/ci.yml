@@ -45,7 +45,10 @@ jobs:
           pnpm --filter @nexus/api typecheck
           pnpm --filter @nexus/web exec tsc --noEmit
           pnpm --filter @nexus/mobile exec tsc --noEmit
+      - name: Start MinIO (real S3 for the archive tests)
+        run: docker run -d -p 9010:9000 quay.io/minio/minio server /data
       - name: API tests (incl. security guards)
+        env: { NEXUS_TEST_S3_ENDPOINT: "http://127.0.0.1:9010" }
         run: pnpm --filter @nexus/api test
       - name: Backup and restore test (on the data the tests left behind)
         env: { DATABASE_URL: "postgres://nexus_owner:nexus_owner@localhost:55432/nexus_test" }

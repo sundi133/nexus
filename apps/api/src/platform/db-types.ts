@@ -308,7 +308,7 @@ export interface Database {
   event_destinations: {
     id: string;
     org_id: string;
-    kind: "webhook" | "splunk_hec" | "datadog";
+    kind: "webhook" | "splunk_hec" | "datadog" | "s3" | "gcs" | "sentinel";
     name: string;
     url: string;
     secret: Buffer;

@@ -10597,8 +10597,8 @@ export interface paths {
         };
         put?: never;
         /**
-         * Stream audit events to a webhook, Splunk or Datadog (requires recent MFA)
-         * @description Webhooks get a generated signing secret, returned once. `start: last_24h` backfills the last day.
+         * Stream audit events to a webhook, SIEM or storage bucket (requires recent MFA)
+         * @description Webhooks get a generated signing secret, returned once. `start: last_24h` backfills the last day. S3 and GCS archives write gzipped JSON lines, one object per batch of up to 1,000 events (at least every 5 minutes), under `year=/month=/day=` prefixes. For S3 and GCS the URL comes from the bucket.
          */
         post: {
             parameters: {
@@ -10611,10 +10611,11 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        kind: "webhook" | "splunk_hec" | "datadog";
+                        kind: "webhook" | "splunk_hec" | "datadog" | "s3" | "gcs" | "sentinel";
                         name: string;
-                        url: string;
-                        /** @description Splunk HEC token or Datadog API key. Webhooks: leave empty to generate one. */
+                        /** @description Webhook, collector or Sentinel data collection endpoint URL. Not used for S3 and GCS. */
+                        url?: string;
+                        /** @description Splunk HEC token, Datadog API key, S3 secret access key, GCS HMAC secret or Entra client secret. Webhooks: leave empty to generate one. */
                         secret?: string;
                         /**
                          * @default nexus
@@ -10629,6 +10630,18 @@ export interface paths {
                             sourcetype?: string;
                             tags?: string;
                             service?: string;
+                            bucket?: string;
+                            region?: string;
+                            prefix?: string;
+                            /** @description S3-compatible storage only (MinIO, Wasabi, …). Leave empty for Amazon S3. */
+                            endpoint?: string;
+                            access_key_id?: string;
+                            /** Format: uuid */
+                            tenant_id?: string;
+                            /** Format: uuid */
+                            client_id?: string;
+                            dcr_id?: string;
+                            stream?: string;
                         };
                         /**
                          * @default now
@@ -10813,6 +10826,18 @@ export interface paths {
                             sourcetype?: string;
                             tags?: string;
                             service?: string;
+                            bucket?: string;
+                            region?: string;
+                            prefix?: string;
+                            /** @description S3-compatible storage only (MinIO, Wasabi, …). Leave empty for Amazon S3. */
+                            endpoint?: string;
+                            access_key_id?: string;
+                            /** Format: uuid */
+                            tenant_id?: string;
+                            /** Format: uuid */
+                            client_id?: string;
+                            dcr_id?: string;
+                            stream?: string;
                         };
                         enabled?: boolean;
                     };
@@ -13652,7 +13677,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            kind: "webhook" | "splunk_hec" | "datadog";
+            kind: "webhook" | "splunk_hec" | "datadog" | "s3" | "gcs" | "sentinel";
             name: string;
             url: string;
             /** @enum {string} */
@@ -13663,6 +13688,18 @@ export interface components {
                 sourcetype?: string;
                 tags?: string;
                 service?: string;
+                bucket?: string;
+                region?: string;
+                prefix?: string;
+                /** @description S3-compatible storage only (MinIO, Wasabi, …). Leave empty for Amazon S3. */
+                endpoint?: string;
+                access_key_id?: string;
+                /** Format: uuid */
+                tenant_id?: string;
+                /** Format: uuid */
+                client_id?: string;
+                dcr_id?: string;
+                stream?: string;
             };
             enabled: boolean;
             /** @enum {string} */
