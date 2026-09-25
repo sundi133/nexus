@@ -67,13 +67,13 @@
       <Directory Id="STATEFOLDER" Name="Nexus">
         <!-- SYSTEM and Administrators only, not inherited: ProgramData is readable by every user by default,
              and this folder holds the device key and, briefly, the enrollment token. -->
-        <Component Id="StateFolder" Permanent="yes">
+        <Component Id="StateFolder" Guid="a4e150c9-22c1-4f17-98a4-98964ee0997c" Permanent="yes">
           <CreateFolder>
             <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)" />
           </CreateFolder>
         </Component>
         <!-- Only with TOKEN: the service enrolls from this file, then deletes it. -->
-        <Component Id="EnrollConfig" Condition="TOKEN">
+        <Component Id="EnrollConfig" Guid="1a75bfe4-1144-42e4-9744-d2e11efb0628" Condition="TOKEN">
           <RegistryValue Root="HKLM" Key="SOFTWARE\Votal\Nexus Agent" Name="EnrollConfigWritten" Type="integer" Value="1" KeyPath="yes" />
           <IniFile Id="EnrollServer" Action="addLine" Directory="STATEFOLDER" Name="enroll.conf" Section="Nexus" Key="server" Value="[SERVER]" />
           <IniFile Id="EnrollToken" Action="addLine" Directory="STATEFOLDER" Name="enroll.conf" Section="Nexus" Key="token" Value="[TOKEN]" />

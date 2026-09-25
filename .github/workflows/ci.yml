@@ -50,7 +50,7 @@ jobs:
       - name: Build the nexus CLI
         run: pnpm --filter @nexus/cli build && node packages/cli/dist/nexus.mjs --help
       - name: Start MinIO (real S3 for the archive tests)
-        run: docker run -d -p 9010:9000 quay.io/minio/minio server /data
+        run: docker run -d -p 9010:9000 minio/minio:latest server /data
       - name: Start OpenLDAP (real LDAPS/StartTLS on a private CA for the directory tests)
         run: |
           apps/api/test/fixtures/ldap/make-certs.sh /tmp/ldap-certs
