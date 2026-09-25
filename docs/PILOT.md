@@ -80,10 +80,10 @@ Create an enrollment token under **All devices → Add devices** (or the **Enrol
 
 Build the installers with `pnpm agent:release <version>`; the Windows `.msi` is built on Windows (see [agent/README.md](../agent/README.md#releasing)).
 
-The agent builds aren't code-signed yet (see Known limits):
-- **macOS:** installing from the command line works, but double-clicking is blocked by Gatekeeper, and MDMs won't push an unsigned package silently.
+For silent MDM rollout (Jamf, Intune), the agent must be signed with your Apple Developer ID and a Windows code-signing certificate. [SIGNING.md](SIGNING.md) walks through getting them (a few days of identity checks), the GitHub secrets, and the *Agent release* workflow, which signs, notarizes and verifies every build. Until then:
+- **macOS:** installing from the command line works, but double-clicking is blocked by Gatekeeper, and MDMs won't push the package silently.
 - **Windows:** SmartScreen warns.
-- **Scope:** keep the pilot to hand-installed machines, or sign the builds with your own certificates first (`NEXUS_CODESIGN_IDENTITY`, `NEXUS_WINDOWS_CERT`).
+- **Scope:** keep the pilot to hand-installed machines.
 
 Then:
 1. Set **Device policies** to *audit* mode first and look at what would fail.
@@ -140,7 +140,7 @@ Tick these off with your pilot group; each item is a real enterprise scenario.
 ## Known limits
 
 - **Not externally audited:** no penetration test or SOC 2 yet. An internal adversarial review found and fixed privilege-escalation paths (IdP swap, SCIM on owners, help desk on admins, MCP condition bypass, DNS rebinding), but treat this as pre-audit software: keep the pilot group small and don't make Nexus the only gate on crown-jewel systems yet.
-- **Unsigned agent builds:** see section 5. MDM rollout needs your Apple Developer ID and Windows code-signing certificates.
+- **Agent signing needs your certificates:** the pipeline is built and verified, but builds are unsigned until you add an Apple Developer ID and a Windows signing identity ([SIGNING.md](SIGNING.md)).
 - **Untested against real vendors:** Entra ID, Okta, AD, Intune, Jamf, PagerDuty, Opsgenie and Sentinel are covered by protocol tests and local fakes, not by live tenants. Expect to find vendor quirks in the pilot, and please report them.
 - **Single host:** Postgres runs on the same VM (see [OPERATIONS.md](OPERATIONS.md) for a managed database), and audit data stays in Postgres. That's fine for a pilot of hundreds of users.
 - **Not built yet:** organization data export and deletion (use `down -v`), a Terraform provider, MCP resources and prompts, content guardrails, and letting people connect their own MCP clients (agents only).

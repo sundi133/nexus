@@ -13,13 +13,17 @@
 #   NEXUS_CODESIGN_IDENTITY   "Developer ID Application: …": codesign macOS binaries (hardened runtime)
 #   NEXUS_INSTALLER_IDENTITY  "Developer ID Installer: …": sign the .pkg
 #   NEXUS_NOTARY_PROFILE      notarytool keychain profile: notarize and staple the .pkg
+#   NEXUS_NOTARY_KEY, NEXUS_NOTARY_KEY_ID, NEXUS_NOTARY_ISSUER
+#                             …or an App Store Connect API key (.p8 path, key ID, issuer ID), for CI
+#   Windows Authenticode signing: see agent/scripts/sign-windows.sh (Azure Trusted Signing,
+#                             DigiCert KeyLocker or a .pfx)
 #   NEXUS_TARGETS             default: "darwin/arm64 darwin/amd64 windows/amd64 windows/arm64 linux/amd64 linux/arm64"
 #   NEXUS_TEST_BREAK          test only: "selftest" or "checkin" builds a deliberately broken release
 set -euo pipefail
 
 version="${1:?usage: release.sh VERSION [NOTES]}"
 notes="${2:-}"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "version must be MAJOR.MINOR.PATCH" >&2; exit 1; }
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "version must be MAJOR.MINOR.PATCH" >&2; exit 1; }
 
 agent="$(cd "$(dirname "$0")/.." && pwd)"
 dist="$agent/dist"
@@ -50,6 +54,11 @@ for t in $targets; do
     codesign --force --timestamp --options runtime --sign "$NEXUS_CODESIGN_IDENTITY" "$bin"
   fi
 done
+
+# Authenticode-sign the Windows binaries now, so the release signature below covers the signed bytes
+# (the MSI then ships exactly the binary agents would self-update to).
+win=("$out"/nexus-agent-windows-*.exe)
+[[ -e "${win[0]}" ]] && "$agent/scripts/sign-windows.sh" "${win[@]}"
 
 # Sign last: the release signature covers the exact (codesigned) bytes agents download.
 (cd "$agent" && go run ./cmd/nexus-release sign --key "$key" --version "$version" --dir "$out" --notes "$notes")

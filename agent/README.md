@@ -80,12 +80,20 @@ Every outcome (`installed`, `failed`, `rolled_back`) is reported with the next c
 ```bash
 pnpm agent:release 0.2.0 "What changed"    # all platforms → agent/dist/releases/0.2.0 + agent/dist/installers/*.pkg
 ```
-Set `NEXUS_RELEASE_KEY` to the release key (without it, a dev key is generated in `agent/dist`). For signed and notarized macOS builds, set `NEXUS_CODESIGN_IDENTITY`, `NEXUS_INSTALLER_IDENTITY` and `NEXUS_NOTARY_PROFILE`.
+Set `NEXUS_RELEASE_KEY` to the release key (without it, a dev key is generated in `agent/dist`). Point the API at the output with `NEXUS_AGENT_RELEASES_DIR` and `NEXUS_AGENT_RELEASE_KEYS`; in dev both default to `agent/dist`. Releases are immutable, so re-signing a version is refused.
 
-Windows installers are built on Windows, with the WiX Toolset v5 (`dotnet tool install --global wix --version 5.0.2`), from a release directory: `agent/packaging/windows/build-msi.ps1 -Version 0.2.0 -ReleaseDir agent/dist/releases/0.2.0 -OutDir agent/dist/installers`. To sign the binary and the `.msi` with Authenticode, set `NEXUS_WINDOWS_CERT` (a base64 `.pfx`) and `NEXUS_WINDOWS_CERT_PASSWORD`. Point the API at the output with `NEXUS_AGENT_RELEASES_DIR` and `NEXUS_AGENT_RELEASE_KEYS`; in dev both default to `agent/dist`. Releases are immutable, so re-signing a version is refused.
+Windows installers are built on Windows, with the WiX Toolset v5 (`dotnet tool install --global wix --version 5.0.2`), from a release directory: `agent/packaging/windows/build-msi.ps1 -Version 0.2.0 -ReleaseDir agent/dist/releases/0.2.0 -OutDir agent/dist/installers`.
+
+**Signed releases** come from the *Agent release* GitHub workflow. It:
+- codesigns and notarizes for macOS (Developer ID);
+- Authenticode-signs for Windows (Azure Trusted Signing, DigiCert KeyLocker or a `.pfx`, via `scripts/sign-windows.sh`), before the Ed25519 release signature, so self-updates and installers carry identical bytes;
+- checks every signature with `scripts/verify-signatures.sh`;
+- installs the signed `.msi` on a clean Windows machine;
+- drafts a GitHub release.
+
+[docs/SIGNING.md](../docs/SIGNING.md) covers getting the certificates, the secrets, and deploying through Jamf and Intune.
 
 ## Not yet
-- **Real signing certificates:** Apple Developer ID (application and installer) and a Windows code-signing certificate. The hooks are in place for both.
 - **Hardware-backed key:** Secure Enclave on macOS, TPM on Windows.
 - **osquery-based inventory** (ADR-006).
 - **Remote commands:** these need the long-lived stream.

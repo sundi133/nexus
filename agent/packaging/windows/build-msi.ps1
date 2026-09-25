@@ -28,6 +28,8 @@ if ($env:NEXUS_WINDOWS_CERT) {
 $ts = if ($env:NEXUS_TIMESTAMP_URL) { $env:NEXUS_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
 function Sign([string] $path) {
   if (-not $pfx) { return }
+  # Already signed (release.sh signs binaries before the release signature): leave the bytes alone.
+  if ((Get-AuthenticodeSignature $path).Status -eq "Valid") { Write-Host "already signed: $path"; return }
   & signtool sign /fd SHA256 /td SHA256 /tr $ts /f $pfx /p $env:NEXUS_WINDOWS_CERT_PASSWORD /d "Votal Nexus agent" $path
   if ($LASTEXITCODE) { throw "signtool failed for $path" }
 }
@@ -47,7 +49,7 @@ try {
     & wix build (Join-Path $here "Package.wxs") -arch $a -d "Version=$msiVersion" -d "BinDir=$bin" -o $msi
     if ($LASTEXITCODE) { throw "wix build failed for $a" }
     Sign $msi
-    if (-not $pfx) { Write-Host "note: $msi is not signed (set NEXUS_WINDOWS_CERT and NEXUS_WINDOWS_CERT_PASSWORD)" }
+    if (-not $pfx) { Write-Host "note: $msi is not signed here (sign it with agent/scripts/sign-windows.sh; see docs/SIGNING.md)" }
   }
 } finally {
   if ($pfx) { Remove-Item $pfx -Force -ErrorAction SilentlyContinue }
