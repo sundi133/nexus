@@ -62,3 +62,5 @@ Release A1 in progress. Built:
 - **Visibility:** audit log, notification inbox with live updates, Overview with a "Needs attention" queue
 
 Next up: conditional access with device trust, then signed agent installers.
+
+**Trying it in your enterprise?** Start with the [pilot guide](docs/PILOT.md).
