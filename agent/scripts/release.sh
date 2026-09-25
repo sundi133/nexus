@@ -57,5 +57,8 @@ done
 if command -v pkgbuild >/dev/null && [[ -f "$out/nexus-agent-darwin-arm64" && -f "$out/nexus-agent-darwin-amd64" ]]; then
   "$agent/packaging/macos/build-pkg.sh" "$version" "$out" "$dist/installers"
 fi
+if [[ -f "$out/nexus-agent-linux-amd64" || -f "$out/nexus-agent-linux-arm64" ]]; then
+  "$agent/packaging/linux/build-packages.sh" "$version" "$out" "$dist/installers"
+fi
 [[ -z "${NEXUS_CODESIGN_IDENTITY:-}" ]] && echo "note: macOS binaries are not codesigned (set NEXUS_CODESIGN_IDENTITY)"
 echo "==> release $version ready in $out"

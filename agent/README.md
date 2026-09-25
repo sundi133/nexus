@@ -58,6 +58,12 @@ msiexec /i nexus-agent-1.2.3-x64.msi /qn SERVER=https://api.nexus.example.com TO
 - **Upgrades:** installing a newer `.msi` upgrades in place.
 - **Uninstalling:** removes the program and the service, but keeps the device key, so a reinstall resumes the same device.
 
+The Linux packages (`nexus-agent_<version>_amd64.deb`, `nexus-agent-<version>-1.x86_64.rpm`, and arm64) install the binary in `/opt/nexus/bin` (linked from `/usr/bin`) and a systemd unit, and start the agent.
+- **Enrolling with configuration management:** drop `/var/lib/nexus-agent/enroll.conf` (`server=…` and `token=…`); the service enrolls itself.
+- **Enrolling by hand:** `sudo nexus-agent install --server … --token …`.
+- **Removing:** removing the package keeps the device key, and `apt purge` deletes it. Upgrades restart the agent on the new version.
+- **Testing:** CI installs the `.deb` on a real systemd host and the `.rpm` in Fedora.
+
 Everything is declarative Windows Installer (no custom actions). CI installs, upgrades and uninstalls it on Windows and checks the service, ACLs and logs.
 
 ## Updates (DEV-07, ADR-017)
@@ -79,7 +85,6 @@ Set `NEXUS_RELEASE_KEY` to the release key (without it, a dev key is generated i
 Windows installers are built on Windows, with the WiX Toolset v5 (`dotnet tool install --global wix --version 5.0.2`), from a release directory: `agent/packaging/windows/build-msi.ps1 -Version 0.2.0 -ReleaseDir agent/dist/releases/0.2.0 -OutDir agent/dist/installers`. To sign the binary and the `.msi` with Authenticode, set `NEXUS_WINDOWS_CERT` (a base64 `.pfx`) and `NEXUS_WINDOWS_CERT_PASSWORD`. Point the API at the output with `NEXUS_AGENT_RELEASES_DIR` and `NEXUS_AGENT_RELEASE_KEYS`; in dev both default to `agent/dist`. Releases are immutable, so re-signing a version is refused.
 
 ## Not yet
-- **Linux `.deb`/`.rpm` packages.** The binary, systemd install and self-update already work.
 - **Real signing certificates:** Apple Developer ID (application and installer) and a Windows code-signing certificate. The hooks are in place for both.
 - **Hardware-backed key:** Secure Enclave on macOS, TPM on Windows.
 - **osquery-based inventory** (ADR-006).

@@ -1,0 +1,16 @@
+[Unit]
+Description=Votal Nexus device agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart="/opt/nexus/bin/nexus-agent" run --state-dir "/var/lib/nexus-agent"
+Restart=always
+RestartSec=5
+# The agent reads system security settings, so it runs as root, with the rest locked down.
+NoNewPrivileges=true
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

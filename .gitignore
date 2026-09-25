@@ -15,3 +15,4 @@ dist/
 .env
 .env.local
 .DS_Store
+agent/packaging/linux/.nfpm-*.yaml

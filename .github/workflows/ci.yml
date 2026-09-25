@@ -78,6 +78,38 @@ jobs:
       - run: go vet ./... && GOOS=windows go vet ./... && GOOS=darwin go vet ./...
       - run: go test ./...
 
+  agent-linux-packages:
+    name: Linux .deb/.rpm install test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: agent/go.mod }
+      - name: Build binaries and packages
+        run: |
+          mkdir -p rel pkg
+          for a in amd64 arm64; do (cd agent && CGO_ENABLED=0 GOOS=linux GOARCH=$a go build -trimpath -ldflags "-X main.version=0.3.0" -o ../rel/nexus-agent-linux-$a ./cmd/nexus-agent); done
+          agent/packaging/linux/build-packages.sh 0.3.0 rel pkg
+      - name: Install the .deb on this runner (real systemd), then remove it
+        run: |
+          sudo dpkg -i pkg/nexus-agent_0.3.0_amd64.deb
+          sleep 3
+          systemctl is-active nexus-agent          # running, waiting to be enrolled
+          sudo journalctl -u nexus-agent --no-pager | grep -q "not enrolled yet"
+          [ "$(sudo stat -c %a /var/lib/nexus-agent)" = "700" ]
+          # Configuration management drops enroll.conf; the service tries to enroll (the server here is unreachable) and keeps running.
+          printf 'server=https://127.0.0.1:9\ntoken=nxe_ci\n' | sudo tee /var/lib/nexus-agent/enroll.conf >/dev/null
+          sleep 45
+          sudo journalctl -u nexus-agent --no-pager | grep -q "enrolling from /var/lib/nexus-agent/enroll.conf failed"
+          systemctl is-active nexus-agent
+          sudo dpkg -r nexus-agent
+          if systemctl is-active --quiet nexus-agent; then echo "still running after removal"; exit 1; fi
+          test ! -e /opt/nexus/bin/nexus-agent
+      - name: Install the .rpm in Fedora
+        run: docker run --rm -v "$PWD/pkg:/pkg:ro" fedora:41 sh -c 'rpm -i /pkg/nexus-agent-0.3.0-1.x86_64.rpm && [ "$(nexus-agent version)" = "0.3.0" ] && rpm -e nexus-agent'
+      - uses: actions/upload-artifact@v4
+        with: { name: linux-packages, path: pkg/* }
+
   agent-windows:
     name: Go agent on Windows + MSI install test
     runs-on: windows-latest

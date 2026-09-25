@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/xml"
 	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -35,5 +36,16 @@ func TestSystemdUnitRestartsAndQuotes(t *testing.T) {
 		if !strings.Contains(u, want) {
 			t.Errorf("unit missing %q:\n%s", want, u)
 		}
+	}
+}
+
+// The unit the Linux packages ship must be the one `nexus-agent install` writes.
+func TestPackagedUnitMatches(t *testing.T) {
+	shipped, err := os.ReadFile("../../packaging/linux/nexus-agent.service")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := SystemdUnit("/opt/nexus/bin/nexus-agent", "/var/lib/nexus-agent"); string(shipped) != want {
+		t.Fatalf("packaging/linux/nexus-agent.service differs from SystemdUnit():\n%s", want)
 	}
 }
