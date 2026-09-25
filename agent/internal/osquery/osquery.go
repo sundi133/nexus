@@ -84,8 +84,15 @@ type Rows []map[string]string
 
 // Query runs one statement and returns at most maxRows rows.
 func (r Runner) Query(ctx context.Context, sql string, maxRows int) (Rows, bool, error) {
+	rows, _, truncated, err := r.QueryColumns(ctx, sql, maxRows)
+	return rows, truncated, err
+}
+
+// QueryColumns is Query that also returns the column names, in the order osquery wrote them
+// (its JSON output sorts them by name).
+func (r Runner) QueryColumns(ctx context.Context, sql string, maxRows int) (Rows, []string, bool, error) {
 	if err := CheckSQL(sql); err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	timeout := r.Timeout
 	if timeout == 0 {
@@ -96,7 +103,7 @@ func (r Runner) Query(ctx context.Context, sql string, maxRows int) (Rows, bool,
 	// A private, throwaway database: never touch (or lock) a running osqueryd's.
 	db, err := os.MkdirTemp("", "nexus-osq-")
 	if err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	defer os.RemoveAll(db)
 	cmd := exec.CommandContext(ctx, r.Bin, r.args("--json", "--disable_extensions=true", "--disable_events=true", "--database_path="+filepath.Join(db, "db"), sql)...)
@@ -106,10 +113,10 @@ func (r Runner) Query(ctx context.Context, sql string, maxRows int) (Rows, bool,
 	cmd.Stdout, cmd.Stderr = out, &stderr
 	werr := cmd.Run()
 	if ctx.Err() != nil {
-		return nil, false, fmt.Errorf("the query took longer than %s", timeout)
+		return nil, nil, false, fmt.Errorf("the query took longer than %s", timeout)
 	}
 	if out.over {
-		return nil, false, errors.New("the query returned too much data; add a LIMIT or narrow the columns")
+		return nil, nil, false, errors.New("the query returned too much data; add a LIMIT or narrow the columns")
 	}
 	data := out.buf.Bytes()
 	if werr != nil {
@@ -117,20 +124,44 @@ func (r Runner) Query(ctx context.Context, sql string, maxRows int) (Rows, bool,
 		if msg == "" {
 			msg = werr.Error()
 		}
-		return nil, false, errors.New(cleanError(msg))
+		return nil, nil, false, errors.New(cleanError(msg))
 	}
 	var rows Rows
 	if err := json.Unmarshal(bytes.TrimSpace(data), &rows); err != nil {
 		if len(bytes.TrimSpace(data)) == 0 {
-			return Rows{}, false, nil
+			return Rows{}, []string{}, false, nil
 		}
-		return nil, false, fmt.Errorf("unexpected osquery output: %.200s", data)
+		return nil, nil, false, fmt.Errorf("unexpected osquery output: %.200s", data)
 	}
 	truncated := false
 	if maxRows > 0 && len(rows) > maxRows {
 		rows, truncated = rows[:maxRows], true
 	}
-	return rows, truncated, nil
+	return rows, columnOrder(data), truncated, nil
+}
+
+// columnOrder reads the first row's keys in the order osquery wrote them.
+func columnOrder(data []byte) []string {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	if t, err := dec.Token(); err != nil || t != json.Delim('[') {
+		return []string{}
+	}
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return []string{}
+	}
+	cols := []string{}
+	for dec.More() {
+		k, err := dec.Token()
+		if err != nil {
+			break
+		}
+		cols = append(cols, fmt.Sprint(k))
+		var skip json.RawMessage
+		if dec.Decode(&skip) != nil {
+			break
+		}
+	}
+	return cols
 }
 
 // capped keeps at most max bytes and notes whether there was more.
@@ -167,9 +198,10 @@ func cleanError(msg string) string {
 
 // ---- What queries may do ----------------------------------------------------------------
 
-// Tables that would turn a read-only query into network egress or file theft.
+// Tables that would turn a read-only query into network egress, file-content reads
+// (plist, augeas: config files can hold tokens) or password-hash collection (shadow).
 // The server refuses them too; the agent checks again because it trusts only the signature.
-var denied = regexp.MustCompile(`(?i)\b(curl|curl_certificate|carves|carve|yara|yara_events|attach|pragma|detach)\b`)
+var denied = regexp.MustCompile(`(?i)\b(curl|curl_certificate|carves|carve|yara|yara_events|plist|augeas|shadow|attach|pragma|detach)\b`)
 var leading = regexp.MustCompile(`(?is)^\s*(?:--[^\n]*\n\s*|/\*.*?\*/\s*)*(select|with)\b`)
 
 // CheckSQL accepts one SELECT (or WITH … SELECT) statement that avoids the denied tables.

@@ -70,7 +70,11 @@ export const CommandResults = z
   .max(20);
 
 /** A live query's rows, as the agent returns them (checked before they're stored). */
-export const QueryResult = z.object({ rows: z.array(z.record(z.string().max(200), z.string().max(20_000))).max(1000), truncated: z.boolean().default(false) });
+export const QueryResult = z.object({
+  columns: z.array(z.string().max(200)).max(500).optional(), // as osquery listed them
+  rows: z.array(z.record(z.string().max(200), z.string().max(20_000))).max(1000),
+  truncated: z.boolean().default(false),
+});
 
 /** What the agent says happened. Only this device's own, still-open commands can be settled. */
 export async function recordCommandResults(tx: Tx, device: { id: string; org_id: string; hostname: string }, results: z.infer<typeof CommandResults>, meta: { ip: string; userAgent: string; requestId: string }) {

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { ConfirmAction } from "@/components/features/confirm-action";
 import { DeviceServers, TOOL_KIND } from "@/components/features/ai-bits";
+import { DeviceInventory } from "@/components/features/device-inventory";
 import { CheckList, ComplianceBadge, OnlineDot, PLATFORM_LABEL, PlatformIcon } from "@/components/features/device-bits";
 import { CommandHistory, DeviceActions } from "@/components/features/device-actions";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
       </div>
 
       <Tabs defaultValue="compliance">
-        <TabsList tabs={[{ value: "compliance", label: failing ? `Compliance (${failing} failing)` : "Compliance" }, { value: "details", label: "Details" }, { value: "ai", label: aiIssues ? `AI (${aiIssues} to review)` : "AI" }, { value: "actions", label: "Actions" }, { value: "activity", label: "Activity" }]} />
+        <TabsList tabs={[{ value: "compliance", label: failing ? `Compliance (${failing} failing)` : "Compliance" }, { value: "details", label: "Details" }, { value: "inventory", label: "Inventory" }, { value: "ai", label: aiIssues ? `AI (${aiIssues} to review)` : "AI" }, { value: "actions", label: "Actions" }, { value: "activity", label: "Activity" }]} />
         <TabsContent value="compliance">
           <Card className="overflow-hidden">
             <CardHeader title="Policy checks" description={d.compliance_changed_at ? `Compliance last changed ${formatDateTime(d.compliance_changed_at)}` : "Evaluated on every check-in (about once a minute)."} />
@@ -132,6 +133,9 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
               />
             </div>
           </Card>
+        </TabsContent>
+        <TabsContent value="inventory">
+          <DeviceInventory deviceId={d.id} hostname={d.hostname} />
         </TabsContent>
         <TabsContent value="ai" className="space-y-5">
           {!d.ai ? (

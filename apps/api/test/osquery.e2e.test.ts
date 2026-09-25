@@ -100,6 +100,7 @@ describe("live queries", () => {
       ["SELECT * FROM curl WHERE url = 'https://attacker.example'", "curl"],
       ["DELETE FROM apps", "Only SELECT"],
       ["SELECT 1; SELECT 2", "One statement"],
+      ["SELECT username, password_status FROM shadow", "password hashes"],
     ]) {
       const r = await h.call("POST", "/v1/live-queries", { token: analyst, body: { ...body, sql } });
       expect(r.status, sql).toBe(400);
@@ -121,12 +122,12 @@ describe("live queries", () => {
     expect(claims).toMatchObject({ act: "osquery", sub: mac.id, args: { sql: "SELECT name, version FROM apps WHERE name LIKE '%Slack%'" } });
 
     // The device answers on its next check-in.
-    await checkin(mac, { command_results: [{ id: cmd.id, status: "done", output: "1 rows", data: { rows: [{ name: "Slack", version: "4.41.105" }], truncated: false } }] });
+    await checkin(mac, { command_results: [{ id: cmd.id, status: "done", output: "1 rows", data: { columns: ["version", "name"], rows: [{ name: "Slack", version: "4.41.105" }], truncated: false } }] });
     const k = (await checkin(mac2)).body.commands[0];
     await checkin(mac2, { command_results: [{ id: k.id, status: "done", output: "?", data: { rows: [{ name: { nested: true } }] } }] });
 
     const d = (await h.call("GET", `/v1/live-queries/${queryId}`, { token: analyst })).body;
-    expect(d).toMatchObject({ devices: 2, done: 1, failed: 1, pending: 0, columns: ["name", "version"], rows: [{ _device: "sams-mac", name: "Slack", version: "4.41.105" }] });
+    expect(d).toMatchObject({ devices: 2, done: 1, failed: 1, pending: 0, columns: ["version", "name"], rows: [{ _device: "sams-mac", name: "Slack", version: "4.41.105" }] });
     expect(d.results.find((x: any) => x.hostname === "kims-mac")).toMatchObject({ status: "failed", message: "The device returned rows Nexus couldn't read" });
     expect((await h.call("GET", "/v1/live-queries", { token: analyst })).body.data[0]).toMatchObject({ id: queryId, requested_by: expect.stringContaining("security_analyst") });
   });

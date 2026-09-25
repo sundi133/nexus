@@ -29,11 +29,11 @@ func QueryAction(locate func() string) ArgExecutor {
 		if bin == "" {
 			return "", nil, errors.New("osquery isn't installed on this device")
 		}
-		rows, truncated, err := osquery.Runner{Bin: bin, Timeout: 60 * time.Second}.Query(ctx, a.SQL, queryMaxRows)
+		rows, columns, truncated, err := osquery.Runner{Bin: bin, Timeout: 60 * time.Second}.QueryColumns(ctx, a.SQL, queryMaxRows)
 		if err != nil {
 			return "", nil, err
 		}
-		data, err := json.Marshal(map[string]any{"rows": rows, "truncated": truncated})
+		data, err := json.Marshal(map[string]any{"columns": columns, "rows": rows, "truncated": truncated})
 		if err != nil {
 			return "", nil, err
 		}

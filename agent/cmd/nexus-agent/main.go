@@ -214,6 +214,12 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		if err != nil {
 			return err
 		}
+		// Commands ran during this check-in: report them now, since there's no next one.
+		if loop.Pending() {
+			if res, err = loop.Once(ctx, 0); err != nil {
+				return err
+			}
+		}
 		fmt.Printf("Checked in. Compliance: %s\n", res.Compliance)
 		return nil
 	}

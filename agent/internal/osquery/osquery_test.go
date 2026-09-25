@@ -4,8 +4,10 @@ package osquery
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -62,6 +64,9 @@ func TestQuery(t *testing.T) {
 	if rows, _, err := r.Query(ctx, "SELECT * FROM empty", 0); err != nil || len(rows) != 0 {
 		t.Errorf("empty = %v %v", rows, err)
 	}
+	if _, cols, _, _ := r.QueryColumns(ctx, "SELECT name, version FROM apps", 0); strings.Join(cols, ",") != "name,version,source,publisher" {
+		t.Errorf("columns = %v", cols)
+	}
 	if v := r.Version(ctx); v != "5.13.1" {
 		t.Errorf("version = %q", v)
 	}
@@ -89,6 +94,8 @@ func TestCheckSQL(t *testing.T) {
 		"SELECT * FROM carves":                      `"carves"`,
 		"ATTACH DATABASE '/tmp/x' AS y":             "only SELECT",
 		"SELECT 1 FROM yara WHERE path='/etc'":      `"yara"`,
+		"SELECT * FROM plist WHERE path = '/x'":     `"plist"`,
+		"SELECT hash FROM shadow":                   `"shadow"`,
 		"SELECT * FROM x; ATTACH '/tmp/y' AS z":     "one statement",
 	} {
 		if err := CheckSQL(sql); err == nil || !strings.Contains(err.Error(), why) {
@@ -116,5 +123,32 @@ func TestCollect(t *testing.T) {
 				t.Errorf("%s/%s: the pack's own query is refused: %v", goos, q.Name, err)
 			}
 		}
+	}
+}
+
+// Against a real osquery: NEXUS_OSQUERY_PATH=/path/to/osqueryd go test ./internal/osquery -run Real -v
+func TestRealOsquery(t *testing.T) {
+	bin := os.Getenv("NEXUS_OSQUERY_PATH")
+	if bin == "" {
+		t.Skip("set NEXUS_OSQUERY_PATH to run against a real osquery")
+	}
+	rep := Collect(context.Background(), bin, runtime.GOOS, time.Now())
+	if !rep.Available {
+		t.Fatalf("osquery at %s didn't run", bin)
+	}
+	t.Logf("osquery %s", rep.Version)
+	for _, r := range rep.Results {
+		sample := ""
+		if len(r.Rows) > 0 {
+			sample = fmt.Sprint(r.Rows[0])
+		}
+		t.Logf("%-20s %5d rows truncated=%v %s", r.Name, len(r.Rows), r.Truncated, sample)
+		if r.Error != "" {
+			t.Errorf("%s: %s", r.Name, r.Error)
+		}
+	}
+	// The denied tables stay denied, and a real error reads well.
+	if _, _, err := (Runner{Bin: bin}).Query(context.Background(), "SELECT * FROM no_such_table", 0); err == nil || !strings.Contains(err.Error(), "no such table") {
+		t.Errorf("error = %v", err)
 	}
 }

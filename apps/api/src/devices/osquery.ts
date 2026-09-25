@@ -62,7 +62,7 @@ export async function storeOsquery(tx: Tx, device: { id: string; org_id: string 
 
 // ---- What queries may do (the agent checks the same) ----------------------------------------
 
-const DENIED = /\b(curl|curl_certificate|carves|carve|yara|yara_events|attach|pragma|detach)\b/i;
+const DENIED = /\b(curl|curl_certificate|carves|carve|yara|yara_events|plist|augeas|shadow|attach|pragma|detach)\b/i;
 const LEADING = /^\s*(?:--[^\n]*\n\s*|\/\*[\s\S]*?\*\/\s*)*(select|with)\b/i;
 
 export function checkSQL(raw: string): string | null {
@@ -72,7 +72,7 @@ export function checkSQL(raw: string): string | null {
   if (!LEADING.test(s)) return "Only SELECT queries are allowed";
   if (s.replace(/'[^']*'|"[^"]*"/g, "").includes(";")) return "One statement at a time";
   const m = DENIED.exec(s);
-  if (m) return `"${m[1]!.toLowerCase()}" isn't allowed in Nexus queries: it reaches the network or reads file contents`;
+  if (m) return `"${m[1]!.toLowerCase()}" isn't allowed in Nexus queries: it reaches the network, reads file contents or collects password hashes`;
   return null;
 }
 
@@ -361,6 +361,7 @@ export function registerOsqueryRoutes(app: App) {
         const rows: Record<string, string>[] = [];
         const results = cmds.map((r) => {
           const res = QueryResult.safeParse(r.result).data;
+          for (const col of res?.columns ?? []) columns.add(col);
           for (const row of res?.rows ?? []) {
             if (rows.length >= 10_000) break;
             for (const k of Object.keys(row)) columns.add(k);

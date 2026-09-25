@@ -120,6 +120,9 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	return res, err
 }
 
+// Pending says whether command results are waiting for the next check-in.
+func (l *Loop) Pending() bool { return len(l.pending) > 0 }
+
 // osqueryPayload collects the pack when it's due, and returns a report to send:
 // when it changed, when the last one is a day old, or when the last send failed.
 func (l *Loop) osqueryPayload(ctx context.Context) *osquery.Report {

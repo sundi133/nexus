@@ -17,7 +17,7 @@ import { formatDateTime, timeAgo } from "@/lib/utils";
 
 type Device = Schemas["DeviceDetail"];
 type Command = Schemas["DeviceCommand"];
-type Action = Command["action"];
+type Action = Exclude<Command["action"], "osquery">; // live queries have their own page
 
 const LABEL: Record<Action, string> = { refresh: "Refresh", lock: "Lock", restart: "Restart", wipe: "Wipe" };
 
@@ -131,7 +131,7 @@ export function CommandHistory({ deviceId }: { deviceId: string }) {
         <li key={c.id} className="flex flex-wrap items-start gap-3 px-4 py-3 text-[13px]">
           <div className="min-w-0 flex-1">
             <p className="flex flex-wrap items-center gap-2 font-medium">
-              {LABEL[c.action]} <StatusPill tone={TONE[c.status].tone}>{TONE[c.status].label}</StatusPill>
+              {c.action === "osquery" ? "Live query" : LABEL[c.action]} <StatusPill tone={TONE[c.status].tone}>{TONE[c.status].label}</StatusPill>
               <span className="text-xs font-normal text-fg-muted">{c.channel === "mdm" ? "via MDM" : "via the Nexus agent"}</span>
             </p>
             <p className="text-xs text-fg-muted">
