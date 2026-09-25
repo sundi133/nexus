@@ -20,7 +20,7 @@ export async function bootApp(overrides: Partial<Config> = {}, opts: { push?: Pu
   const mailer = new MemoryMailer();
   const recorder = new RecordingPushSender();
   const push = opts.push ?? recorder;
-  const deps = { cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push, resolveTxt: opts.resolveTxt };
+  const deps = { cfg, db, sealer: new Sealer(cfg.sealKeys), realtime, mailer, push, resolveTxt: opts.resolveTxt };
   const app = createApp(deps);
   // Tests drive background work explicitly: jobs.runOnce({ orgId }).
   const jobs = new JobRunner(deps);

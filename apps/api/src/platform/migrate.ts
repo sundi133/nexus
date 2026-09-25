@@ -1,8 +1,12 @@
+import { readdirSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 
 const MIGRATIONS_DIR = fileURLToPath(new URL("../../migrations/", import.meta.url));
+
+/** The newest migration this build ships (readiness compares it with the database). */
+export const LATEST_MIGRATION = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort().at(-1) ?? null;
 
 /** Applies pending SQL migrations in filename order, each in its own transaction, as the owner role. */
 export async function migrate(ownerUrl: string, log: (msg: string) => void = () => {}) {

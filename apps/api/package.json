@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx --env-file-if-exists=../../.env src/cli/migrate.ts",
     "spec": "tsx src/cli/spec.ts > openapi.json",
+    "reseal": "tsx --env-file-if-exists=../../.env src/cli/reseal.ts",
     "test": "vitest run"
   },
   "dependencies": {

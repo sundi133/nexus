@@ -2,6 +2,7 @@ import { sql } from "kysely";
 import type { Deps } from "../context.js";
 import type { Tx } from "./db.js";
 import { newId } from "./ids.js";
+import { metrics } from "./metrics.js";
 
 /**
  * Durable background jobs (ARCHITECTURE §9). Enqueue inside the transaction
@@ -83,6 +84,7 @@ export class JobRunner {
     const handler = handlers.get(job.kind);
     let error: string | null = null;
     let retryAt: Date | null = null;
+    const started = performance.now();
     try {
       if (!handler) throw new PermanentJobError(`No handler for job kind ${job.kind}`);
       await handler(this.deps, job);
@@ -92,26 +94,41 @@ export class JobRunner {
       if (!retryAt) console.error(`[jobs] ${job.kind} ${job.id} gave up: ${error}`);
     }
     await this.deps.db.unscoped((tx) => sql`SELECT nexus_finish_job(${job.id}::uuid, ${error}, ${retryAt})`.execute(tx));
+    metrics.jobRuns.inc({ kind: job.kind, result: error === null ? "ok" : retryAt ? "retry" : "dead" });
+    metrics.jobDuration.observe({ kind: job.kind }, (performance.now() - started) / 1000);
   }
+
+  private current: Promise<void> | null = null;
+  private lastPrune = 0;
 
   start(intervalMs = 2000) {
     const loop = async () => {
       if (this.running) return;
       this.running = true;
-      try {
-        for (const t of this.ticks) await t().catch((e) => console.error("[jobs] tick failed", e));
-        await this.runOnce();
-      } catch (err) {
-        console.error("[jobs] loop failed", err);
-      } finally {
-        this.running = false;
-      }
+      this.current = (async () => {
+        try {
+          for (const t of this.ticks) await t().catch((e) => console.error("[jobs] tick failed", e));
+          if (Date.now() - this.lastPrune > 3600_000) {
+            this.lastPrune = Date.now();
+            await this.deps.db.unscoped((tx) => sql`SELECT nexus_prune_jobs()`.execute(tx)).catch((e) => console.error("[jobs] prune failed", e));
+          }
+          await this.runOnce();
+        } catch (err) {
+          console.error("[jobs] loop failed", err);
+        } finally {
+          this.running = false;
+        }
+      })();
+      await this.current;
     };
     this.timer = setInterval(loop, intervalMs);
     void loop();
   }
 
-  stop() {
+  /** Stops polling and waits for the jobs in flight (a lease covers anything cut short). */
+  async stop() {
     if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    await this.current;
   }
 }

@@ -5,7 +5,10 @@ import { cors } from "hono/cors";
 import { randomUUID } from "node:crypto";
 import type { Deps, Env } from "./context.js";
 import { registerAuditRoutes } from "./audit/routes.js";
+import { sql } from "kysely";
 import { loadPrincipal } from "./auth/guard.js";
+import { metrics, renderMetrics } from "./platform/metrics.js";
+import { LATEST_MIGRATION } from "./platform/migrate.js";
 import { unauthorized } from "./platform/errors.js";
 import { isPublicRoute } from "./auth/public-routes.js";
 import { registerAuthRoutes } from "./auth/routes.js";
@@ -77,7 +80,25 @@ export function createApp(deps: Deps) {
     c.set("deps", deps);
     c.set("meta", { ip, userAgent: c.req.header("user-agent") ?? "", requestId });
     c.header("X-Request-Id", requestId);
+    // Security headers: the API only serves JSON (and a few protocol responses) to other code.
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("Referrer-Policy", "no-referrer");
+    c.header("X-Frame-Options", "DENY");
+    if (deps.cfg.env === "prod") c.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+    const started = performance.now();
     await next();
+    if (c.req.path.startsWith("/v1/") && !c.res.headers.has("cache-control")) c.header("Cache-Control", "no-store");
+    // Metrics and a log line per request, by route template (never raw IDs).
+    const route = c.req.routePath && c.req.routePath !== "*" && c.req.routePath !== "/v1/*" ? c.req.routePath : "unmatched";
+    const seconds = (performance.now() - started) / 1000;
+    const status = c.res.status;
+    metrics.httpRequests.inc({ method: c.req.method, route, status: `${Math.floor(status / 100)}xx` });
+    metrics.httpDuration.observe({ method: c.req.method, route }, seconds);
+    if (deps.cfg.env !== "test" && route !== "/healthz" && route !== "/metrics") {
+      const p = c.get("principal");
+      const line = { ts: new Date().toISOString(), level: status >= 500 ? "error" : "info", msg: "request", method: c.req.method, route, status, ms: Math.round(seconds * 1000), request_id: requestId, org_id: p?.orgId, actor: p ? (p.apiKey ? `key:${p.apiKey.id}` : `user:${p.userId}`) : undefined, ip };
+      console.log(deps.cfg.logFormat === "json" ? JSON.stringify(line) : `${line.method} ${route} ${status} ${line.ms}ms`);
+    }
   });
 
   app.use("/v1/*", cors({ origin: deps.cfg.publicUrl, credentials: false, maxAge: 600 }));
@@ -95,7 +116,31 @@ export function createApp(deps: Deps) {
   });
   app.notFound((c) => problem(c, new ApiError(404, "not_found", "No such endpoint")));
 
+  // Liveness: the process answers. Readiness: it can reach the database and the schema is current.
   app.get("/healthz", (c) => c.json({ ok: true }));
+  app.get("/readyz", async (c) => {
+    try {
+      const v = await deps.db.unscoped(async (tx) => (await sql<{ v: string | null }>`SELECT nexus_schema_version() AS v`.execute(tx)).rows[0]!.v);
+      const want = LATEST_MIGRATION;
+      if (want && v !== want) return c.json({ ok: false, reason: `schema at ${v}, code expects ${want}` }, 503);
+      return c.json({ ok: true, schema: v }, 200);
+    } catch (err) {
+      return c.json({ ok: false, reason: `database unavailable: ${(err as Error).message}` }, 503);
+    }
+  });
+  // Prometheus scrape endpoint. Needs NEXUS_METRICS_TOKEN (always, in production).
+  app.get("/metrics", async (c) => {
+    const token = deps.cfg.metricsToken;
+    if ((token || deps.cfg.env === "prod") && c.req.header("authorization") !== `Bearer ${token}`) return c.text("unauthorized", 401);
+    const queue = await deps.db
+      .unscoped(async (tx) => (await sql<{ status: string; kind: string; n: number }>`SELECT * FROM nexus_job_queue_stats()`.execute(tx)).rows)
+      .catch(() => []);
+    return c.text(
+      renderMetrics([{ name: "nexus_jobs", help: "Background jobs by status and kind", values: queue.map((q) => [{ status: q.status, kind: q.kind }, q.n] as [Record<string, string>, number]) }]),
+      200,
+      { "content-type": "text/plain; version=0.0.4" },
+    );
+  });
 
   registerAuthRoutes(app);
   registerPasskeyRoutes(app);
