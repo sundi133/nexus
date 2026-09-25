@@ -21,7 +21,7 @@ async function handler(req: Request, ctx: RouteContext<"/bff/v1/[...path]">) {
     signal: req.signal,
   });
   const headers = new Headers();
-  for (const k of ["content-type", "cache-control", "x-request-id", "www-authenticate"]) {
+  for (const k of ["content-type", "content-disposition", "cache-control", "x-request-id", "www-authenticate"]) {
     const v = upstream.headers.get(k);
     if (v) headers.set(k, v);
   }

@@ -19,6 +19,7 @@ import { registerMdmRoutes, scheduleMdmSyncs } from "./devices/mdm.js";
 import { registerCommandRoutes } from "./devices/commands.js";
 import { registerAccessRequestRoutes } from "./governance/routes.js";
 import { scheduleAccessExpiry } from "./governance/requests.js";
+import { registerAccessReviewRoutes, scheduleAccessReviews } from "./governance/reviews.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
@@ -155,6 +156,7 @@ export function createApp(deps: Deps) {
   registerMdmRoutes(app);
   registerCommandRoutes(app);
   registerAccessRequestRoutes(app);
+  registerAccessReviewRoutes(app);
   registerPasskeyRoutes(app);
   registerPushRoutes(app);
   registerImportRoutes(app);
@@ -205,4 +207,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleGraceChecks(jobs, deps);
   scheduleMdmSyncs(jobs, deps);
   scheduleAccessExpiry(jobs, deps);
+  scheduleAccessReviews(jobs, deps);
 }

@@ -2,6 +2,7 @@ import {
   Activity,
   AppWindow,
   Bot,
+  ClipboardCheck,
   FileClock,
   FolderSync,
   Home,
@@ -58,6 +59,7 @@ export const NAV: NavSection[] = [
       { label: "Applications", href: "/apps", icon: AppWindow },
       { label: "Conditional access", href: "/conditional-access", icon: ShieldCheck },
       { label: "Access requests", href: "/access-requests", icon: KeyRound },
+      { label: "Access reviews", href: "/access-reviews", icon: ClipboardCheck },
     ],
   },
   {

@@ -280,6 +280,38 @@ export interface Database {
     sent_at: NullableTimestamp;
     finished_at: NullableTimestamp;
   };
+  access_reviews: {
+    id: string;
+    org_id: string;
+    name: string;
+    scope_type: "app" | "group" | "admin_roles";
+    scope_id: string | null;
+    reviewer_kind: "users" | "manager";
+    reviewer_ids: Generated<string[]>;
+    on_no_decision: Generated<"keep" | "revoke">;
+    status: Generated<"open" | "closed">;
+    due_at: Timestamp;
+    reminded_at: NullableTimestamp;
+    closed_at: NullableTimestamp;
+    summary: Json;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
+  access_review_items: {
+    id: string;
+    org_id: string;
+    review_id: string;
+    user_id: string;
+    grant_kind: "app_user" | "group_member" | "role";
+    grant_ref: string;
+    via: Generated<string>;
+    reviewer_id: string | null;
+    decision: "keep" | "revoke" | null;
+    note: Generated<string>;
+    decided_by: string | null;
+    decided_at: NullableTimestamp;
+    outcome: Generated<"" | "kept" | "revoked" | "already_gone" | "skipped">;
+  };
   access_catalog: {
     id: string;
     org_id: string;
