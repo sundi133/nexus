@@ -21,6 +21,9 @@ import { registerAccessRequestRoutes } from "./governance/routes.js";
 import { scheduleAccessExpiry } from "./governance/requests.js";
 import { registerAccessReviewRoutes, scheduleAccessReviews } from "./governance/reviews.js";
 import { registerAiAgentRoutes } from "./ai-agents/routes.js";
+import { registerMcpGateway } from "./mcp/gateway.js";
+import { registerMcpRoutes } from "./mcp/routes.js";
+import { scheduleMcpSyncs } from "./mcp/service.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
@@ -160,6 +163,8 @@ export function createApp(deps: Deps) {
   registerAccessRequestRoutes(app);
   registerAccessReviewRoutes(app);
   registerAiAgentRoutes(app);
+  registerMcpRoutes(app);
+  registerMcpGateway(app);
   registerPasskeyRoutes(app);
   registerPushRoutes(app);
   registerImportRoutes(app);
@@ -212,4 +217,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleAccessExpiry(jobs, deps);
   scheduleAccessReviews(jobs, deps);
   scheduleDynamicGroups(jobs, deps);
+  scheduleMcpSyncs(jobs, deps);
 }

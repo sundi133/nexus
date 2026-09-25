@@ -73,7 +73,7 @@ describe("registry", () => {
   });
 
   it("advertises client_credentials and private_key_jwt", async () => {
-    const d = await (await h.app.request(`/oidc/${slug}/.well-known/openid-configuration`)).json();
+    const d = (await (await h.app.request(`/oidc/${slug}/.well-known/openid-configuration`)).json()) as any;
     expect(d.grant_types_supported).toContain("client_credentials");
     expect(d.token_endpoint_auth_methods_supported).toContain("private_key_jwt");
   });
