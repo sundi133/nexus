@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
@@ -163,8 +164,22 @@ func enroll(ctx context.Context, store state.Store, server, token string) error 
 
 func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logger) error {
 	key, e, err := store.Load()
+	if errors.Is(err, state.ErrNotEnrolled) && !once {
+		// Installed but not enrolled yet (an MSI without TOKEN, or enroll.conf still to come):
+		// wait rather than exit, so the service doesn't crash-loop.
+		if err := awaitEnrollment(ctx, store, log); err != nil {
+			return err
+		}
+		key, e, err = store.Load()
+	}
 	if err != nil {
 		return err
+	}
+	if err := store.Prepare(); err != nil { // also tightens folders created by older versions
+		log.Warn("could not restrict the state folder", "dir", store.Dir, "err", err)
+	}
+	if err := os.Remove(store.EnrollConfig()); err == nil {
+		log.Info("removed an unused enroll.conf: this device is already enrolled") // e.g. an upgrade run with TOKEN= again
 	}
 	c, err := client.New(e.Server, key, e.DeviceID)
 	if err != nil {
@@ -223,6 +238,43 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		_ = store.Forget()
 	}
 	return err
+}
+
+var enrollRetry = 30 * time.Second // first retry; doubles up to 10 minutes
+
+// awaitEnrollment enrolls from the installer's enroll.conf when it appears
+// (retrying with backoff while the network or token is not ready), or returns
+// once someone enrolls the device by hand.
+func awaitEnrollment(ctx context.Context, store state.Store, log *slog.Logger) error {
+	wait, waiting := enrollRetry, false
+	for {
+		if _, _, err := store.Load(); err == nil {
+			return nil
+		} else if !errors.Is(err, state.ErrNotEnrolled) {
+			return err
+		}
+		conf := store.EnrollConfig()
+		if server, token, err := readConfig(conf); err == nil {
+			if err := enroll(ctx, store, server, token); err != nil {
+				log.Warn("enrolling from "+conf+" failed; will retry", "err", err, "in", wait)
+			} else {
+				_ = os.Remove(conf) // it holds an enrollment secret
+				log.Info("enrolled from " + conf)
+				continue
+			}
+		} else if !waiting {
+			log.Info("not enrolled yet: waiting for "+conf+" or `nexus-agent install --server … --token …`", "dir", store.Dir)
+			waiting = true
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(wait):
+		}
+		if wait < 10*time.Minute {
+			wait *= 2
+		}
+	}
 }
 
 func newUpdater(store state.Store, c *client.Client, log *slog.Logger) (*update.Updater, error) {

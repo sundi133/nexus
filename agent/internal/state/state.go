@@ -69,7 +69,7 @@ func (s Store) Load() (*identity.Key, *Enrollment, error) {
 
 // Save writes key and enrollment atomically with owner-only permissions.
 func (s Store) Save(k *identity.Key, e Enrollment) error {
-	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
+	if err := s.Prepare(); err != nil {
 		return err
 	}
 	keyPEM, err := k.MarshalPEM()
@@ -82,6 +82,18 @@ func (s Store) Save(k *identity.Key, e Enrollment) error {
 	data, _ := json.MarshalIndent(e, "", "  ")
 	return writeAtomic(s.statePath(), data)
 }
+
+// Prepare creates the state folder if needed and restricts it to the system and administrators.
+func (s Store) Prepare() error {
+	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
+		return err
+	}
+	return secureDir(s.Dir)
+}
+
+// EnrollConfig is where an installer (MSI properties, MDM) leaves server= and
+// token= for the agent to enroll itself; the agent deletes it after use.
+func (s Store) EnrollConfig() string { return filepath.Join(s.Dir, "enroll.conf") }
 
 // Forget removes the enrollment (after the server says the device was removed).
 func (s Store) Forget() error {

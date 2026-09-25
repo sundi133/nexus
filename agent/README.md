@@ -46,6 +46,20 @@ Use `--state-dir` to keep state somewhere other than the system default (`/Libra
 
 The macOS package (`nexus-agent-<version>.pkg`) holds a universal binary. For MDM rollout, deploy `/Library/Application Support/Nexus/enroll.conf` (`server=…` and `token=…` lines) before the package: the postinstall script enrolls and then deletes the file. Installing over an enrolled Mac upgrades it in place.
 
+The Windows packages (`nexus-agent-<version>-x64.msi` and `-arm64.msi`) are for Intune, Group Policy or any software-deployment tool:
+
+```
+msiexec /i nexus-agent-1.2.3-x64.msi /qn SERVER=https://api.nexus.example.com TOKEN=nxe_…
+```
+
+- **What it installs:** the binary in `C:\Program Files\Nexus` and the `NexusAgent` service (automatic start, restarts on exit).
+- **State folder:** `C:\ProgramData\Nexus`, limited to SYSTEM and Administrators because it holds the device key.
+- **Enrollment:** with `TOKEN`, the installer leaves `enroll.conf` there. The service enrolls from it (retrying until the server is reachable) and deletes it. `TOKEN` is hidden from installer logs. Without `TOKEN`, the service waits until someone runs `nexus-agent install --server … --token …`.
+- **Upgrades:** installing a newer `.msi` upgrades in place.
+- **Uninstalling:** removes the program and the service, but keeps the device key, so a reinstall resumes the same device.
+
+Everything is declarative Windows Installer (no custom actions). CI installs, upgrades and uninstalls it on Windows and checks the service, ACLs and logs.
+
 ## Updates (DEV-07, ADR-017)
 The server offers an update in the check-in response when this device's rollout stage is due. Agents move canary → 10% → everyone. The agent then:
 1. **Verifies the offer** against the Ed25519 release keys compiled into it (`-X main.releaseKeys=…`), so a compromised server can't push code. It refuses downgrades, and a build without keys installs nothing.
@@ -60,11 +74,13 @@ Every outcome (`installed`, `failed`, `rolled_back`) is reported with the next c
 ```bash
 pnpm agent:release 0.2.0 "What changed"    # all platforms → agent/dist/releases/0.2.0 + agent/dist/installers/*.pkg
 ```
-Set `NEXUS_RELEASE_KEY` to the release key (without it, a dev key is generated in `agent/dist`). For signed and notarized macOS builds, set `NEXUS_CODESIGN_IDENTITY`, `NEXUS_INSTALLER_IDENTITY` and `NEXUS_NOTARY_PROFILE`. Point the API at the output with `NEXUS_AGENT_RELEASES_DIR` and `NEXUS_AGENT_RELEASE_KEYS`; in dev both default to `agent/dist`. Releases are immutable, so re-signing a version is refused.
+Set `NEXUS_RELEASE_KEY` to the release key (without it, a dev key is generated in `agent/dist`). For signed and notarized macOS builds, set `NEXUS_CODESIGN_IDENTITY`, `NEXUS_INSTALLER_IDENTITY` and `NEXUS_NOTARY_PROFILE`.
+
+Windows installers are built on Windows, with the WiX Toolset v5 (`dotnet tool install --global wix --version 5.0.2`), from a release directory: `agent/packaging/windows/build-msi.ps1 -Version 0.2.0 -ReleaseDir agent/dist/releases/0.2.0 -OutDir agent/dist/installers`. To sign the binary and the `.msi` with Authenticode, set `NEXUS_WINDOWS_CERT` (a base64 `.pfx`) and `NEXUS_WINDOWS_CERT_PASSWORD`. Point the API at the output with `NEXUS_AGENT_RELEASES_DIR` and `NEXUS_AGENT_RELEASE_KEYS`; in dev both default to `agent/dist`. Releases are immutable, so re-signing a version is refused.
 
 ## Not yet
-- **Windows `.msi` and Linux `.deb`/`.rpm` packages:** these need Windows and Linux build hosts. The binaries, service installation and self-update already work on both.
-- **Real Developer ID signing:** needs the certificates. The hooks are in place.
+- **Linux `.deb`/`.rpm` packages.** The binary, systemd install and self-update already work.
+- **Real signing certificates:** Apple Developer ID (application and installer) and a Windows code-signing certificate. The hooks are in place for both.
 - **Hardware-backed key:** Secure Enclave on macOS, TPM on Windows.
 - **osquery-based inventory** (ADR-006).
 - **Remote commands:** these need the long-lived stream.

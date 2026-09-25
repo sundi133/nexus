@@ -43,7 +43,7 @@ Every organization's data is separated in two independent layers.
   - Format `nxk_…`, stored hashed.
   - Each key has explicit scopes limited to what it can be granted, and always expires.
   - Rate-limited to 600 requests per minute. Every use is audited as the key itself.
-- **Devices:** the agent enrolls with a single-use token and then signs every check-in with a device-bound ES256 key. Agent updates are signed releases, verified before install.
+- **Devices:** the agent enrolls with a single-use token and then signs every check-in with a device-bound ES256 key. The key's folder is readable only by root, or on Windows by SYSTEM and Administrators (not inherited from `ProgramData`). The Windows installer keeps the enrollment token out of its logs, and the agent deletes it after use. Agent updates are signed releases, verified before install.
 - **Password reset:** single-use, short-lived links, stored hashed. The request always returns the same response, so it can't be used to discover which accounts exist. A reset signs out every session.
 - **Break-glass accounts:** designated owners, exempt from directory sync and conditional access, so an SSO or directory outage can't lock everyone out. Every use alerts all admins with a critical alert and is audited.
 

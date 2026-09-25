@@ -78,6 +78,75 @@ jobs:
       - run: go vet ./... && GOOS=windows go vet ./... && GOOS=darwin go vet ./...
       - run: go test ./...
 
+  agent-windows:
+    name: Go agent on Windows + MSI install test
+    runs-on: windows-latest
+    defaults: { run: { shell: pwsh } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: agent/go.mod }
+      - name: Tests (Windows service, ACLs)
+        working-directory: agent
+        run: go test ./...
+      - name: Build the agent and the MSI (two versions, for the upgrade test)
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          foreach ($v in "0.1.0", "0.1.1") {
+            New-Item -ItemType Directory -Force dist/$v | Out-Null
+            Push-Location agent
+            go build -trimpath -ldflags "-X main.version=$v" -o ../dist/$v/nexus-agent-windows-amd64.exe ./cmd/nexus-agent
+            if ($LASTEXITCODE) { throw "go build failed" }
+            Pop-Location
+            ./agent/packaging/windows/build-msi.ps1 -Version $v -ReleaseDir dist/$v -OutDir dist/$v -Arch x64
+          }
+      - name: Install, check, upgrade, uninstall
+        run: |
+          function Msi([string] $args_) {
+            $p = Start-Process msiexec.exe -ArgumentList $args_ -Wait -PassThru
+            if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 60 -ErrorAction SilentlyContinue; throw "msiexec $args_ exited $($p.ExitCode)" }
+          }
+          function Installed { @(Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object DisplayName -eq "Votal Nexus agent") }
+          $old = (Resolve-Path dist/0.1.0/nexus-agent-0.1.0-x64.msi).Path
+          $new = (Resolve-Path dist/0.1.1/nexus-agent-0.1.1-x64.msi).Path
+
+          # Silent install with enrollment properties, as Intune / GPO would. The server is unreachable,
+          # so the service stays up, waiting to enroll from enroll.conf.
+          Msi "/i `"$old`" /qn /l*v install.log SERVER=https://127.0.0.1:9 TOKEN=nxe_ci_secret_token"
+          Start-Sleep 5
+          $svc = Get-Service NexusAgent
+          if ($svc.Status -ne "Running" -or $svc.StartType -ne "Automatic") { throw "service: $($svc.Status) $($svc.StartType)" }
+          if (-not (Test-Path "C:\Program Files\Nexus\nexus-agent.exe")) { throw "binary missing" }
+          $cmd = (Get-CimInstance Win32_Service -Filter "Name='NexusAgent'").PathName
+          if ($cmd -notmatch 'run --state-dir "C:\\ProgramData\\Nexus"$') { throw "service command line: $cmd" }
+          if (-not ((sc.exe qfailure NexusAgent) -match "RESTART")) { throw "no restart-on-failure" }
+          # Locked down: SYSTEM and Administrators only, including the enrollment token file.
+          foreach ($path in "C:\ProgramData\Nexus", "C:\ProgramData\Nexus\enroll.conf") {
+            $acl = (icacls $path) -join "`n"
+            Write-Host $acl
+            if ($acl -match "BUILTIN\\Users|Everyone|Authenticated Users") { throw "$path is readable by ordinary users" }
+          }
+          if (-not ((Get-Content C:\ProgramData\Nexus\enroll.conf) -match "token=nxe_ci_secret_token")) { throw "enroll.conf not written" }
+          if (Select-String -Path install.log -Pattern "nxe_ci_secret_token" -Quiet) { throw "the enrollment token leaked into the MSI log" }
+
+          # Upgrade in place: one product, still running.
+          Msi "/i `"$new`" /qn /l*v upgrade.log"
+          $p = Installed
+          if ($p.Count -ne 1 -or $p[0].DisplayVersion -ne "0.1.1") { throw "after upgrade: $($p | Out-String)" }
+          if ((Get-Service NexusAgent).Status -ne "Running") { throw "not running after upgrade" }
+          if (-not ((& "C:\Program Files\Nexus\nexus-agent.exe" version) -eq "0.1.1")) { throw "old binary after upgrade" }
+
+          # Uninstall: service and program gone, device state kept for a reinstall.
+          Msi "/x `"$new`" /qn /l*v uninstall.log"
+          if (Get-Service NexusAgent -ErrorAction SilentlyContinue) { throw "service still registered" }
+          if (Test-Path "C:\Program Files\Nexus") { throw "program folder left behind" }
+          if (-not (Test-Path "C:\ProgramData\Nexus")) { throw "device state should be kept" }
+          if ((Installed).Count) { throw "still listed in Programs and Features" }
+          Write-Host "MSI install, upgrade and uninstall OK"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: msi, path: "dist/*/*.msi\n*.log", if-no-files-found: ignore }
+
   images:
     name: Container images + production smoke test
     runs-on: ubuntu-latest

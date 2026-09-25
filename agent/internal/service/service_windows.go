@@ -43,15 +43,33 @@ func Install(bin, stateDir string) error {
 		return err
 	}
 	defer s.Close()
-	// Restart whenever the agent exits, including the deliberate exit after a self-update.
+	if err := setRecovery(s); err != nil {
+		return err
+	}
+	return s.Start()
+}
+
+// Restart whenever the agent exits, including the deliberate exit after a self-update.
+func setRecovery(s *mgr.Service) error {
 	restart := mgr.RecoveryAction{Type: mgr.ServiceRestart, Delay: 5 * time.Second}
 	if err := s.SetRecoveryActions([]mgr.RecoveryAction{restart, restart, restart}, 86400); err != nil {
 		return err
 	}
-	if err := s.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
-		return err
+	return s.SetRecoveryActionsOnNonCrashFailures(true)
+}
+
+// ensureRecovery re-applies the restart policy to our own service: the MSI
+// registers the service declaratively and can't set the non-crash-failure flag.
+func ensureRecovery() {
+	m, err := mgr.Connect()
+	if err != nil {
+		return
 	}
-	return s.Start()
+	defer m.Disconnect()
+	if s, err := m.OpenService(WindowsName); err == nil {
+		_ = setRecovery(s)
+		s.Close()
+	}
 }
 
 func Uninstall() error {
@@ -80,6 +98,7 @@ func RunAsService(fn func(ctx context.Context) error) (bool, error) {
 	if err != nil || !isSvc {
 		return false, err
 	}
+	ensureRecovery()
 	return true, svc.Run(WindowsName, handler{fn})
 }
 
