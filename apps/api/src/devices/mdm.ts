@@ -25,6 +25,7 @@ import { reevaluateAll } from "./service.js";
 
 export const mdmSecretAad = (id: string) => `mdm_connection:${id}`;
 import { MDM_PROVIDER as PROVIDER, mdmRowsForDevice } from "./mdm-signals.js";
+import { usableSerial } from "./serial.js";
 const SYSTEM_META: RequestMeta = { ip: "", userAgent: "nexus-mdm-sync", requestId: "" };
 
 // ---- Sync ------------------------------------------------------------------------------------
@@ -79,11 +80,17 @@ export async function syncMdm(deps: Deps, orgId: string, connectionId: string) {
     }
     // Gone from the MDM: forget them.
     await tx.deleteFrom("mdm_devices").where("connection_id", "=", conn.id).where("updated_at", "<", now).execute();
-    // Match to Nexus devices by serial number.
+    // Match to Nexus devices by serial number: only real serials, and only when exactly one active
+    // Nexus device and one record in this MDM carry it (placeholders and cloned VMs share serials).
+    const usable = [...new Set(devices.map((d) => usableSerial(d.serial)).filter((s): s is string => !!s))];
+    await sql`UPDATE mdm_devices SET device_id = NULL WHERE connection_id = ${conn.id} AND device_id IS NOT NULL`.execute(tx);
     await sql`
       UPDATE mdm_devices m SET device_id = d.id
       FROM devices d
-      WHERE m.connection_id = ${conn.id} AND m.serial <> '' AND d.status = 'active' AND lower(d.serial) = lower(m.serial)`.execute(tx);
+      WHERE m.connection_id = ${conn.id} AND d.status = 'active' AND lower(d.serial) = lower(m.serial)
+        AND lower(m.serial) = ANY(${usable}::text[])
+        AND (SELECT count(*) FROM devices d2 WHERE d2.status = 'active' AND lower(d2.serial) = lower(m.serial)) = 1
+        AND (SELECT count(*) FROM mdm_devices m2 WHERE m2.connection_id = m.connection_id AND lower(m2.serial) = lower(m.serial)) = 1`.execute(tx);
     const counts = (
       await sql<{ total: number; matched: number; noncompliant: number }>`
         SELECT count(*)::int AS total, count(device_id)::int AS matched, count(*) FILTER (WHERE compliant = false OR NOT managed)::int AS noncompliant

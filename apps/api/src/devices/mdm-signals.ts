@@ -1,6 +1,7 @@
 import { sql } from "kysely";
 import type { Tx } from "../platform/db.js";
 import type { EvalContext, MdmSignal } from "./posture.js";
+import { usableSerial } from "./serial.js";
 
 /** MDM signals for device evaluation (kept apart from mdm.ts so evaluation doesn't import the API). */
 
@@ -11,7 +12,7 @@ const RANK = (m: MdmSignal) => (!m.managed ? 0 : m.compliant === false ? 1 : m.c
 
 /**
  * The MDM records for a device: linked by the last MDM sync, or found by serial
- * number (a device enrolled since). Read-only, so evaluating a device never
+ * number (a device enrolled since). Also picks the target of MDM lock and wipe. Read-only, so evaluating a device never
  * contends with an MDM sync writing the same rows.
  */
 export async function mdmRowsForDevice(tx: Tx, device: { id: string; serial?: string | null }) {
@@ -33,8 +34,21 @@ export async function mdmRowsForDevice(tx: Tx, device: { id: string; serial?: st
       "mdm_devices.last_contact_at",
     ])
     .where("mdm_connections.enabled", "=", true);
-  const serial = device.serial?.trim().toLowerCase();
-  q = serial ? q.where((eb) => eb.or([eb("mdm_devices.device_id", "=", device.id), eb(sql`lower(mdm_devices.serial)`, "=", serial)])) : q.where("mdm_devices.device_id", "=", device.id);
+  // A device enrolled since the last sync is found by serial, under the same rules as the sync:
+  // a real serial, carried by no other active device and by one record in that MDM.
+  const serial = usableSerial(device.serial);
+  q = serial
+    ? q.where((eb) =>
+        eb.or([
+          eb("mdm_devices.device_id", "=", device.id),
+          eb.and([
+            eb(sql`lower(mdm_devices.serial)`, "=", serial),
+            sql<boolean>`NOT EXISTS (SELECT 1 FROM devices d2 WHERE d2.status = 'active' AND d2.id <> ${device.id} AND lower(d2.serial) = ${serial})`,
+            sql<boolean>`(SELECT count(*) FROM mdm_devices m2 WHERE m2.connection_id = mdm_devices.connection_id AND lower(m2.serial) = ${serial}) = 1`,
+          ]),
+        ]),
+      )
+    : q.where("mdm_devices.device_id", "=", device.id);
   return q.execute();
 }
 

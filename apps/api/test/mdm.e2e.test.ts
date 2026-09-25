@@ -151,6 +151,46 @@ describe("the policy", () => {
   });
 });
 
+describe("serials that don't identify one machine", () => {
+  const mdmCheck = async (id: string) => (await device(id)).checks.find((c: any) => c.key === "mdm_compliant");
+  it("never lends another machine's verdict, or makes it a wipe target", async () => {
+    const managed = { operatingSystem: "Windows", osVersion: "10.0.22631", complianceState: "compliant", isEncrypted: true, managementState: "managed" };
+    intune.devices.push(
+      { id: "i5", deviceName: "WHITEBOX-1", serialNumber: "To Be Filled By O.E.M.", ...managed },
+      { id: "i6", deviceName: "VDI-A", serialNumber: "VMCLONE01", ...managed },
+      { id: "i7", deviceName: "VDI-B", serialNumber: "vmclone01", ...managed },
+      { id: "i8", deviceName: "SHARED", serialNumber: "PF3DUPE", ...managed },
+    );
+    await h.call("POST", `/v1/mdm/connections/${intuneId}/sync`, { token: admin, body: {} });
+    await sync();
+
+    // A placeholder serial: never matched, and the check says why.
+    const oem = await enrolledDevice("To Be Filled By O.E.M.");
+    await checkin(oem);
+    expect(await mdmCheck(oem.id)).toMatchObject({ status: "fail", detail: expect.stringContaining("manufacturer placeholder") });
+    expect((await device(oem.id)).mdm).toEqual([]);
+    const wipe = await h.call("POST", `/v1/devices/${oem.id}/actions`, { token: admin, body: { action: "wipe", reason: "Stolen", confirm: "host-To Be Filled By O.E.M." } });
+    expect(wipe.body.code).toBe("no_mdm");
+
+    // Two MDM records with the same serial (cloned VMs): neither is picked.
+    const clone = await enrolledDevice("VMCLONE01");
+    await checkin(clone);
+    expect(await mdmCheck(clone.id)).toMatchObject({ status: "fail", detail: "Not found in your MDM (serial VMCLONE01)" });
+
+    // Two Nexus devices with the same serial: neither gets the MDM's verdict, before or after a sync.
+    const a = await enrolledDevice("PF3DUPE");
+    const b = await enrolledDevice("PF3DUPE");
+    await checkin(a);
+    await checkin(b);
+    await h.call("POST", `/v1/mdm/connections/${intuneId}/sync`, { token: admin, body: {} });
+    await sync();
+    for (const d of [a, b]) expect((await device(d.id)).mdm).toEqual([]);
+    const rows = (await h.call("GET", `/v1/mdm/connections/${intuneId}/devices?without_agent=true`, { token: admin })).body.data.map((d: any) => d.name);
+    expect(rows).toEqual(expect.arrayContaining(["WHITEBOX-1", "VDI-A", "VDI-B", "SHARED"]));
+    intune.devices.splice(4);
+  });
+});
+
 describe("Jamf Pro", () => {
   it("reads managed Macs and their FileVault state", async () => {
     const r = await h.call("POST", "/v1/mdm/connections", { token: admin, body: { name: "Jamf", credentials: { provider: "jamf", base_url: `${base}/jamf`, client_id: "nexus", client_secret: jamf.secret } } });

@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import type { CheckStatus, Compliance, DevicePlatform } from "../platform/db-types.js";
+import { usableSerial } from "./serial.js";
 
 /**
  * Device posture (SPEC DEV-05, DPOL-01/03). The agent reports raw facts; the
@@ -120,7 +121,16 @@ export function evaluate(device: { platform: DevicePlatform; os_version: string;
     if (p.key === "mdm_compliant") {
       const m = ctx.mdm;
       if (!ctx.mdmConnected) out.push({ key: p.key, status: "not_applicable", detail: "No MDM connected" });
-      else if (!m) out.push({ key: p.key, status: "fail", detail: device.serial ? `Not found in your MDM (serial ${device.serial})` : "Not found in your MDM (no serial number reported)" });
+      else if (!m)
+        out.push({
+          key: p.key,
+          status: "fail",
+          detail: !device.serial?.trim()
+            ? "Not found in your MDM (no serial number reported)"
+            : usableSerial(device.serial)
+              ? `Not found in your MDM (serial ${device.serial})`
+              : `Can't be matched to your MDM: its serial number "${device.serial}" is a manufacturer placeholder`,
+        });
       else if (!m.managed) out.push({ key: p.key, status: "fail", detail: `Not managed by ${m.source}` });
       else if (m.compliant === false) out.push({ key: p.key, status: "fail", detail: `${m.source} reports it non-compliant${m.detail ? ` (${m.detail})` : ""}` });
       else out.push({ key: p.key, status: "pass", detail: m.compliant ? `Compliant in ${m.source}` : `Managed by ${m.source}` });
