@@ -53,31 +53,44 @@ async function sign(privatePem: string, claims: Record<string, unknown>) {
 /** Commands waiting for this device, signed, for the check-in response. */
 export async function pendingCommands(tx: Tx, deps: Deps, device: { id: string; org_id: string }) {
   await tx.updateTable("device_commands").set({ status: "expired", finished_at: new Date() }).where("device_id", "=", device.id).where("status", "in", ["queued", "sent"]).where("expires_at", "<", new Date()).execute();
-  const rows = await tx.selectFrom("device_commands").select(["id", "action", "expires_at"]).where("device_id", "=", device.id).where("channel", "=", "agent").where("status", "in", ["queued", "sent"]).orderBy("created_at").limit(10).execute();
+  const rows = await tx.selectFrom("device_commands").select(["id", "action", "args", "expires_at"]).where("device_id", "=", device.id).where("channel", "=", "agent").where("status", "in", ["queued", "sent"]).orderBy("created_at").limit(10).execute();
   if (!rows.length) return [];
   const key = await commandKey(tx, deps, device.org_id);
   const out = [];
   for (const r of rows) {
-    out.push({ id: r.id, jws: await sign(key.privatePem, { jti: r.id, sub: device.id, act: r.action, iat: Math.floor(Date.now() / 1000), exp: Math.floor(r.expires_at.getTime() / 1000) }) });
+    const args = r.args && Object.keys(r.args as object).length ? { args: r.args } : {}; // signed with the rest: e.g. a live query's SQL
+    out.push({ id: r.id, jws: await sign(key.privatePem, { jti: r.id, sub: device.id, act: r.action, ...args, iat: Math.floor(Date.now() / 1000), exp: Math.floor(r.expires_at.getTime() / 1000) }) });
   }
   await tx.updateTable("device_commands").set({ status: "sent", sent_at: new Date() }).where("id", "in", rows.map((r) => r.id)).where("status", "=", "queued").execute();
   return out;
 }
 
-export const CommandResults = z.array(z.object({ id: z.string().uuid(), status: z.enum(["done", "failed"]), output: z.string().max(4000).default("") })).max(20);
+export const CommandResults = z
+  .array(z.object({ id: z.string().uuid(), status: z.enum(["done", "failed"]), output: z.string().max(4000).default(""), data: z.unknown().optional() }))
+  .max(20);
+
+/** A live query's rows, as the agent returns them (checked before they're stored). */
+export const QueryResult = z.object({ rows: z.array(z.record(z.string().max(200), z.string().max(20_000))).max(1000), truncated: z.boolean().default(false) });
 
 /** What the agent says happened. Only this device's own, still-open commands can be settled. */
 export async function recordCommandResults(tx: Tx, device: { id: string; org_id: string; hostname: string }, results: z.infer<typeof CommandResults>, meta: { ip: string; userAgent: string; requestId: string }) {
   for (const r of results) {
+    const data = r.data === undefined ? null : QueryResult.safeParse(r.data);
+    const failedData = data && !data.success;
     const row = await tx
       .updateTable("device_commands")
-      .set({ status: r.status, output: r.output.slice(0, 2000), finished_at: new Date() })
+      .set({
+        status: failedData ? "failed" : r.status,
+        output: failedData ? "The device returned rows Nexus couldn't read" : r.output.slice(0, 2000),
+        ...(data?.success ? { result: JSON.stringify(data.data) } : {}),
+        finished_at: new Date(),
+      })
       .where("id", "=", r.id)
       .where("device_id", "=", device.id)
       .where("status", "in", ["queued", "sent"])
       .returning(["action", "requested_by"])
       .executeTakeFirst();
-    if (!row) continue;
+    if (!row || row.action === "osquery") continue; // a live query is audited once, when it's run
     await audit(tx, device.org_id, { meta }, {
       type: "device.action_finished",
       actor: { type: "system", id: null, display: device.hostname },
@@ -90,7 +103,7 @@ export async function recordCommandResults(tx: Tx, device: { id: string; org_id:
 const CommandOut = z
   .object({
     id: Id,
-    action: z.enum(["refresh", "lock", "restart", "wipe"]),
+    action: z.enum(["refresh", "lock", "restart", "wipe", "osquery"]),
     channel: z.enum(["agent", "mdm"]),
     status: z.enum(["queued", "sent", "done", "failed", "expired", "canceled"]),
     reason: z.string(),
@@ -109,6 +122,7 @@ async function history(tx: Tx, deviceId: string) {
     .selectAll("device_commands")
     .select("users.email")
     .where("device_commands.device_id", "=", deviceId)
+    .where("device_commands.action", "!=", "osquery") // live queries have their own page
     .orderBy("device_commands.created_at", "desc")
     .limit(50)
     .execute();

@@ -384,6 +384,7 @@
           "devices:updates",
           "devices:actions",
           "devices:wipe",
+          "devices:query",
           "directory:sync",
           "api_keys:manage",
           "integrations:manage",
@@ -922,7 +923,8 @@
               "refresh",
               "lock",
               "restart",
-              "wipe"
+              "wipe",
+              "osquery"
             ]
           },
           "channel": {
@@ -3574,6 +3576,7 @@
                       "devices:updates",
                       "devices:actions",
                       "devices:wipe",
+                      "devices:query",
                       "directory:sync",
                       "api_keys:manage",
                       "integrations:manage",
@@ -3630,6 +3633,7 @@
                     "devices:updates",
                     "devices:actions",
                     "devices:wipe",
+                    "devices:query",
                     "directory:sync",
                     "api_keys:manage",
                     "integrations:manage",
@@ -3701,6 +3705,7 @@
                 "devices:updates",
                 "devices:actions",
                 "devices:wipe",
+                "devices:query",
                 "directory:sync",
                 "api_keys:manage",
                 "integrations:manage",
@@ -7619,6 +7624,247 @@
           "people",
           "inline_secrets",
           "on"
+        ]
+      },
+      "DeviceOsquery": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_reported",
+              "not_installed",
+              "installed"
+            ]
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "collected_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tables": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "truncated": {
+                  "type": "boolean"
+                },
+                "error": {
+                  "type": "string"
+                },
+                "collected_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "rows",
+                "truncated",
+                "error",
+                "collected_at"
+              ]
+            }
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "collected_at",
+          "tables"
+        ]
+      },
+      "SoftwareItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "devices": {
+            "type": "integer"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string"
+                },
+                "devices": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "version",
+                "devices"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "source",
+          "devices",
+          "versions"
+        ]
+      },
+      "LiveQuerySummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "sql": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "devices": {
+            "type": "integer"
+          },
+          "done": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "pending": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "sql",
+          "reason",
+          "requested_by",
+          "created_at",
+          "expires_at",
+          "devices",
+          "done",
+          "failed",
+          "pending"
+        ]
+      },
+      "LiveQueryDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/LiveQuerySummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "device_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                    },
+                    "hostname": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "sent",
+                        "done",
+                        "failed",
+                        "expired",
+                        "canceled"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "rows": {
+                      "type": "integer"
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "finished_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "device_id",
+                    "hostname",
+                    "status",
+                    "message",
+                    "rows",
+                    "truncated",
+                    "finished_at"
+                  ]
+                }
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "description": "Every device's rows, each with a `_device` column (up to 10,000 rows)"
+              }
+            },
+            "required": [
+              "results",
+              "columns",
+              "rows"
+            ]
+          }
         ]
       },
       "DevicePage": {
@@ -18704,6 +18950,7 @@
                         "devices:updates",
                         "devices:actions",
                         "devices:wipe",
+                        "devices:query",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -18855,6 +19102,7 @@
                         "devices:updates",
                         "devices:actions",
                         "devices:wipe",
+                        "devices:query",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -31773,6 +32021,656 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AIFleetInventory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/osquery": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A device's osquery inventory: software, listening ports, USB devices, browser extensions, startup items",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceOsquery"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/software": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Software across devices (from osquery), with the versions in use",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SoftwareItem"
+                      }
+                    },
+                    "devices_reporting": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "devices_reporting"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/software/devices": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Devices that have a given piece of software (optionally one version)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "required": true,
+            "name": "name",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 50
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "version",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "device_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          },
+                          "hostname": {
+                            "type": "string"
+                          },
+                          "user_email": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "version": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "device_id",
+                          "hostname",
+                          "user_email",
+                          "version"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/live-queries": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Run an osquery SQL query on devices",
+        "description": "Sends one SELECT statement to the chosen devices as signed commands; each runs it on its next check-in (about a minute) and returns up to 1,000 rows. Needs `devices:query` and a recent MFA. Tables that reach the network or read file contents (curl, carves, yara) are refused.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sql": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "device_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid",
+                          "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                        },
+                        "maxItems": 1000
+                      },
+                      "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                      },
+                      "all": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "sql",
+                  "reason",
+                  "target"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/LiveQuerySummary"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "skipped_without_osquery": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "skipped_without_osquery"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Recent live queries",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LiveQuerySummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/live-queries/{id}": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A live query's results, per device and as one table",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveQueryDetail"
                 }
               }
             }

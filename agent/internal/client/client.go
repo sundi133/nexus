@@ -132,6 +132,7 @@ func (c *Client) Enroll(ctx context.Context, token string, info DeviceInfo) (*En
 type CheckinResult struct {
 	CheckinInterval   int    `json:"checkin_interval_seconds"`
 	InventoryInterval int    `json:"inventory_interval_seconds"`
+	OsqueryInterval   int    `json:"osquery_interval_seconds"`
 	Compliance        string `json:"compliance"`
 	WebOrigin         string `json:"web_origin"`
 	// Update is set when the server's rollout says this device should update.

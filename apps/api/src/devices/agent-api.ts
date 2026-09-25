@@ -14,6 +14,7 @@ import { ApiError, badRequest, conflict } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { CHECKIN_INTERVAL_S, evaluateDevice, getPolicies, INVENTORY_INTERVAL_S } from "./service.js";
 import { AIInventory, classify, diffServers, loadAIContext, parseAI, type ReportedServer, serverTarget } from "./ai.js";
+import { OSQUERY_INTERVAL_S, OsqueryReport, storeOsquery } from "./osquery.js";
 import { PostureFacts } from "./posture.js";
 import { releaseStore } from "./releases.js";
 import { offerFor, recordResult } from "./updates.js";
@@ -87,6 +88,8 @@ const CheckinBody = z.object({
     .optional(),
   // What happened to commands from earlier check-ins (CMD-04).
   command_results: CommandResults.optional(),
+  // The osquery inventory pack, validated on its own so a bad report can't stop posture reporting.
+  osquery: z.unknown().optional(),
 });
 
 /** Records MCP servers appearing on or leaving a device (not the first report: that's the baseline). */
@@ -274,10 +277,14 @@ export function registerAgentRoutes(app: App) {
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
       if (input.update_result) await recordResult(tx, dev.org_id, d, input.update_result, meta);
       if (input.command_results?.length) await recordCommandResults(tx, d, input.command_results, meta);
+      if (input.osquery !== undefined) {
+        const rep = OsqueryReport.safeParse(input.osquery);
+        if (rep.success) await storeOsquery(tx, d, rep.data);
+      }
       const commands = await pendingCommands(tx, deps, d);
       const key = await commandKey(tx, deps, dev.org_id);
       const update = await offerFor(tx, dev.org_id, d, releaseStore(deps.cfg), meta);
-      return { checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update, commands, command_key: key.publicKey };
+      return { checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, osquery_interval_seconds: OSQUERY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update, commands, command_key: key.publicKey };
     });
     return c.json(out, 200);
   });

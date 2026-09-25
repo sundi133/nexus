@@ -25,18 +25,20 @@ type Signed struct {
 
 // Result is reported on the next check-in.
 type Result struct {
-	ID     string `json:"id"`
-	Status string `json:"status"` // done | failed
-	Output string `json:"output"`
+	ID     string          `json:"id"`
+	Status string          `json:"status"` // done | failed
+	Output string          `json:"output"`
+	Data   json.RawMessage `json:"data,omitempty"` // structured results (live queries)
 }
 
 // Claims are what the server signed.
 type Claims struct {
-	ID     string `json:"jti"`
-	Device string `json:"sub"`
-	Action string `json:"act"`
-	Iat    int64  `json:"iat"`
-	Exp    int64  `json:"exp"`
+	ID     string          `json:"jti"`
+	Device string          `json:"sub"`
+	Action string          `json:"act"`
+	Args   json.RawMessage `json:"args,omitempty"` // signed with the rest: e.g. a live query's SQL
+	Iat    int64           `json:"iat"`
+	Exp    int64           `json:"exp"`
 }
 
 const typ = "nexus-command+jwt"
@@ -81,11 +83,15 @@ func Verify(jws string, key ed25519.PublicKey, deviceID string, now time.Time) (
 // Executor carries out one kind of action and says what happened.
 type Executor func(ctx context.Context) (string, error)
 
+// ArgExecutor is an action that takes (signed) arguments and returns structured data.
+type ArgExecutor func(ctx context.Context, args json.RawMessage) (string, json.RawMessage, error)
+
 // Runner verifies and runs commands, remembering which it has run.
 type Runner struct {
 	StateDir string
 	DeviceID string
 	Exec     map[string]Executor
+	ArgExec  map[string]ArgExecutor
 	Log      *slog.Logger
 	Now      func() time.Time
 }
@@ -180,6 +186,16 @@ func (r *Runner) Handle(ctx context.Context, cmds []Signed) []Result {
 			continue
 		}
 		r.remember(seen, c.ID) // before running: a crash mid-action must not repeat it
+		if ax, ok := r.ArgExec[c.Action]; ok {
+			r.Log.Info("running command", "id", c.ID, "action", c.Action)
+			msg, data, err := ax(ctx, c.Args)
+			if err != nil {
+				out = append(out, Result{ID: c.ID, Status: "failed", Output: err.Error()})
+			} else {
+				out = append(out, Result{ID: c.ID, Status: "done", Output: msg, Data: data})
+			}
+			continue
+		}
 		exec, ok := r.Exec[c.Action]
 		if !ok {
 			out = append(out, Result{ID: c.ID, Status: "failed", Output: fmt.Sprintf("this agent can't %s", c.Action)})

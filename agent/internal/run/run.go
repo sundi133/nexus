@@ -13,6 +13,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
+	"github.com/votal-ai/nexus/agent/internal/osquery"
 	"github.com/votal-ai/nexus/agent/internal/release"
 	"github.com/votal-ai/nexus/agent/internal/update"
 )
@@ -40,11 +41,18 @@ type Loop struct {
 	Updater Updater
 	// Commands, if set, runs signed actions from the server and reports how they went.
 	Commands *command.Runner
+	// Osquery, if set, collects the osquery inventory pack (slow: seconds), every OsqueryEvery.
+	Osquery      func(context.Context) osquery.Report
+	OsqueryEvery time.Duration
 
 	lastInventory     [32]byte
 	lastInventoryTime time.Time
 	pending           []command.Result // to report on the next check-in
-	soon              bool             // check in again right away (to report, or after a refresh)
+	osqueryRan        time.Time        // last collection
+	osquerySent       time.Time        // last time a report went out
+	osqueryHash       [32]byte
+	osqueryReport     *osquery.Report // collected, not yet delivered
+	soon              bool            // check in again right away (to report, or after a refresh)
 }
 
 // Once performs one check-in. Inventory is sent when it changed or every inventoryEvery.
@@ -64,6 +72,10 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	if sendInventory {
 		payload["inventory"] = snap.Inventory
 	}
+	sentOsquery := l.osqueryPayload(ctx)
+	if sentOsquery != nil {
+		payload["osquery"] = sentOsquery
+	}
 	sentResults := len(l.pending)
 	if sentResults > 0 {
 		payload["command_results"] = l.pending
@@ -81,6 +93,12 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	if err == nil && sendInventory {
 		l.lastInventory, l.lastInventoryTime = sum, time.Now()
 	}
+	if err == nil && sentOsquery != nil {
+		l.osquerySent, l.osqueryReport = time.Now(), nil
+	}
+	if err == nil && res.OsqueryInterval > 0 {
+		l.OsqueryEvery = time.Duration(res.OsqueryInterval) * time.Second
+	}
 	if err == nil && l.OnCheckin != nil {
 		l.OnCheckin(res)
 	}
@@ -95,10 +113,33 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 				l.pending = append(l.pending, results...)
 				l.soon = len(results) > 0
 				l.lastInventoryTime = time.Time{} // a refresh sends full inventory
+				l.osqueryRan = time.Time{}        // …and collects osquery again
 			}
 		}
 	}
 	return res, err
+}
+
+// osqueryPayload collects the pack when it's due, and returns a report to send:
+// when it changed, when the last one is a day old, or when the last send failed.
+func (l *Loop) osqueryPayload(ctx context.Context) *osquery.Report {
+	if l.Osquery == nil {
+		return nil
+	}
+	every := l.OsqueryEvery
+	if every <= 0 {
+		every = 6 * time.Hour
+	}
+	if l.osqueryReport == nil && time.Since(l.osqueryRan) >= every {
+		rep := l.Osquery(ctx)
+		l.osqueryRan = time.Now()
+		body, _ := json.Marshal(rep.Results)
+		sum := sha256.Sum256(append([]byte(rep.Version), body...))
+		if sum != l.osqueryHash || time.Since(l.osquerySent) >= 24*time.Hour {
+			l.osqueryHash, l.osqueryReport = sum, &rep
+		}
+	}
+	return l.osqueryReport
 }
 
 // Run checks in until ctx is cancelled, the server says the device was

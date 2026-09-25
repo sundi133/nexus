@@ -7826,7 +7826,7 @@ export interface paths {
                         name: string;
                         /** @default  */
                         description?: string;
-                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                     };
                 };
             };
@@ -7995,7 +7995,7 @@ export interface paths {
                         name?: string;
                         /** @default  */
                         description?: string;
-                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                     };
                 };
             };
@@ -18909,6 +18909,524 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/devices/{id}/osquery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A device's osquery inventory: software, listening ports, USB devices, browser extensions, startup items */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeviceOsquery"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/software": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Software across devices (from osquery), with the versions in use */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["SoftwareItem"][];
+                            devices_reporting: number;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/software/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Devices that have a given piece of software (optionally one version) */
+        get: {
+            parameters: {
+                query: {
+                    name: string;
+                    source?: string;
+                    version?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                /**
+                                 * Format: uuid
+                                 * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                                 */
+                                device_id: string;
+                                hostname: string;
+                                user_email: string | null;
+                                version: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/live-queries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent live queries */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["LiveQuerySummary"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Run an osquery SQL query on devices
+         * @description Sends one SELECT statement to the chosen devices as signed commands; each runs it on its next check-in (about a minute) and returns up to 1,000 rows. Needs `devices:query` and a recent MFA. Tables that reach the network or read file contents (curl, carves, yara) are refused.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        sql: string;
+                        reason: string;
+                        target: {
+                            device_ids?: string[];
+                            /**
+                             * Format: uuid
+                             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                             */
+                            group_id?: string;
+                            all?: boolean;
+                        };
+                    };
+                };
+            };
+            responses: {
+                /** @description Sent */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LiveQuerySummary"] & {
+                            skipped_without_osquery: number;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/live-queries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A live query's results, per device and as one table */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LiveQueryDetail"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -20565,7 +21083,7 @@ export interface components {
             created_at: string;
         };
         /** @enum {string} */
-        Permission: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+        Permission: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
         Factor: {
             /**
              * Format: uuid
@@ -20739,7 +21257,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            action: "refresh" | "lock" | "restart" | "wipe";
+            action: "refresh" | "lock" | "restart" | "wipe" | "osquery";
             /** @enum {string} */
             channel: "agent" | "mdm";
             /** @enum {string} */
@@ -21563,13 +22081,13 @@ export interface components {
             builtin: {
                 /** @enum {string} */
                 key: "owner" | "admin" | "helpdesk" | "security_analyst" | "readonly";
-                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                 scopable: boolean;
             }[];
             custom: components["schemas"]["CustomRole"][];
             permissions: {
                 /** @enum {string} */
-                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
                 /** @description Can be limited to groups in a scoped grant */
                 scopable: boolean;
                 in_custom_roles: boolean;
@@ -21583,7 +22101,7 @@ export interface components {
             id: string;
             name: string;
             description: string;
-            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
             holders: number;
             /**
              * Format: date-time
@@ -22690,6 +23208,67 @@ export interface components {
                 user_email: string | null;
                 clients: string[];
                 inline_secrets: boolean;
+            }[];
+        };
+        DeviceOsquery: {
+            /** @enum {string} */
+            status: "not_reported" | "not_installed" | "installed";
+            version: string | null;
+            collected_at: string | null;
+            tables: {
+                name: string;
+                rows: {
+                    [key: string]: string;
+                }[];
+                truncated: boolean;
+                error: string;
+                collected_at: string;
+            }[];
+        };
+        SoftwareItem: {
+            name: string;
+            source: string;
+            devices: number;
+            versions: {
+                version: string;
+                devices: number;
+            }[];
+        };
+        LiveQuerySummary: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            sql: string;
+            reason: string;
+            requested_by: string | null;
+            created_at: string;
+            expires_at: string;
+            devices: number;
+            done: number;
+            failed: number;
+            pending: number;
+        };
+        LiveQueryDetail: components["schemas"]["LiveQuerySummary"] & {
+            results: {
+                /**
+                 * Format: uuid
+                 * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                 */
+                device_id: string;
+                hostname: string;
+                /** @enum {string} */
+                status: "queued" | "sent" | "done" | "failed" | "expired" | "canceled";
+                message: string;
+                rows: number;
+                truncated: boolean;
+                finished_at: string | null;
+            }[];
+            columns: string[];
+            /** @description Every device's rows, each with a `_device` column (up to 10,000 rows) */
+            rows: {
+                [key: string]: string;
             }[];
         };
         DevicePage: {

@@ -15,6 +15,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
+	"github.com/votal-ai/nexus/agent/internal/osquery"
 	"github.com/votal-ai/nexus/agent/internal/release"
 	"github.com/votal-ai/nexus/agent/internal/update"
 )
@@ -148,5 +149,41 @@ func TestCommandResultsReportedNextCheckin(t *testing.T) {
 	}
 	if _, has := f.calls[2]["command_results"]; has {
 		t.Fatal("results reported twice")
+	}
+}
+
+func TestOsqueryPackScheduling(t *testing.T) {
+	f := &fake{}
+	runs := 0
+	version := "5.13.1"
+	l := &Loop{Client: f, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Collect: func(context.Context) collect.Snapshot { return collect.Snapshot{} },
+		OsqueryEvery: time.Hour,
+		Osquery: func(context.Context) osquery.Report {
+			runs++
+			return osquery.Report{Available: true, Version: version, Results: []osquery.Result{{Name: "software", Rows: osquery.Rows{{"name": "Slack"}}}}}
+		}}
+	ctx := context.Background()
+	sent := func(i int) bool { _, ok := f.calls[i]["osquery"]; return ok }
+
+	_, _ = l.Once(ctx, time.Hour) // first: collect and send
+	_, _ = l.Once(ctx, time.Hour) // not due: nothing
+	l.osqueryRan = time.Time{}    // due again, same results: collected, not sent
+	_, _ = l.Once(ctx, time.Hour)
+	version = "5.14.0" // changed: sent
+	l.osqueryRan = time.Time{}
+	_, _ = l.Once(ctx, time.Hour)
+	if runs != 3 || !sent(0) || sent(1) || sent(2) || !sent(3) {
+		t.Fatalf("runs=%d sent=%v %v %v %v", runs, sent(0), sent(1), sent(2), sent(3))
+	}
+
+	// A failed check-in keeps the report for the next one, without collecting again.
+	version = "5.15.0"
+	l.osqueryRan = time.Time{}
+	f.failWith = errors.New("offline")
+	_, _ = l.Once(ctx, time.Hour)
+	f.failWith = nil
+	_, _ = l.Once(ctx, time.Hour)
+	if runs != 4 || !sent(4) || !sent(5) {
+		t.Fatalf("retry: runs=%d sent=%v %v", runs, sent(4), sent(5))
 	}
 }

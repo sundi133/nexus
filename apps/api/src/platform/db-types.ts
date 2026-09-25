@@ -218,6 +218,8 @@ export interface Database {
     compliance_grace_until: NullableTimestamp;
     inventory: Json;
     posture: Json;
+    osquery_version: string | null;
+    osquery_collected_at: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
     last_ip: Generated<string>;
@@ -271,7 +273,7 @@ export interface Database {
     id: string;
     org_id: string;
     device_id: string;
-    action: "refresh" | "lock" | "restart" | "wipe";
+    action: "refresh" | "lock" | "restart" | "wipe" | "osquery";
     channel: "agent" | "mdm";
     status: Generated<"queued" | "sent" | "done" | "failed" | "expired" | "canceled">;
     reason: Generated<string>;
@@ -281,6 +283,29 @@ export interface Database {
     expires_at: Timestamp;
     sent_at: NullableTimestamp;
     finished_at: NullableTimestamp;
+    args: Json;
+    result: Json<unknown> | null;
+    query_id: string | null;
+  };
+  device_osquery: {
+    org_id: string;
+    device_id: string;
+    name: string;
+    rows: Json<Record<string, string>[]>;
+    truncated: Generated<boolean>;
+    error: Generated<string>;
+    collected_at: Timestamp;
+  };
+  live_queries: {
+    id: string;
+    org_id: string;
+    sql: string;
+    reason: Generated<string>;
+    target: Json;
+    device_count: number;
+    requested_by: string | null;
+    created_at: Generated<Date>;
+    expires_at: Timestamp;
   };
   access_reviews: {
     id: string;

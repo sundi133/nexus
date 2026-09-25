@@ -92,3 +92,36 @@ func TestPinsTheFirstKeyOnly(t *testing.T) {
 		t.Fatal("garbage accepted")
 	}
 }
+
+func TestLiveQueryRunsTheSignedSQL(t *testing.T) {
+	r, priv, _ := setup(t)
+	var got string
+	r.ArgExec = map[string]ArgExecutor{"osquery": func(_ context.Context, args json.RawMessage) (string, json.RawMessage, error) {
+		got = string(args)
+		return "1 rows", json.RawMessage(`{"rows":[{"a":"1"}]}`), nil
+	}}
+	exp := time.Now().Add(time.Hour).Unix()
+	args := json.RawMessage(`{"sql":"SELECT 1"}`)
+	res := r.Handle(context.Background(), []Signed{{ID: "q1", JWS: sign(t, priv, Claims{ID: "q1", Device: "dev-1", Action: "osquery", Args: args, Exp: exp})}})
+	if len(res) != 1 || res[0].Status != "done" || string(res[0].Data) != `{"rows":[{"a":"1"}]}` || got != `{"sql":"SELECT 1"}` {
+		t.Fatalf("got %+v, ran with %s", res, got)
+	}
+	// Swapping the SQL breaks the signature.
+	jws := sign(t, priv, Claims{ID: "q2", Device: "dev-1", Action: "osquery", Args: args, Exp: exp})
+	parts := strings.Split(jws, ".")
+	p, _ := json.Marshal(Claims{ID: "q2", Device: "dev-1", Action: "osquery", Args: json.RawMessage(`{"sql":"SELECT * FROM shadow"}`), Exp: exp})
+	parts[1] = b64.EncodeToString(p)
+	if res := r.Handle(context.Background(), []Signed{{ID: "q2", JWS: strings.Join(parts, ".")}}); res[0].Status != "failed" || got != `{"sql":"SELECT 1"}` {
+		t.Fatalf("edited SQL ran: %+v", res)
+	}
+}
+
+func TestQueryActionWithoutOsquery(t *testing.T) {
+	_, _, err := QueryAction(func() string { return "" })(context.Background(), json.RawMessage(`{"sql":"SELECT 1"}`))
+	if err == nil || err.Error() != "osquery isn't installed on this device" {
+		t.Fatalf("err = %v", err)
+	}
+	if _, _, err := QueryAction(func() string { return "/bin/true" })(context.Background(), json.RawMessage(`{"sql":"SELECT * FROM curl"}`)); err == nil || !strings.Contains(err.Error(), "curl") {
+		t.Fatalf("denied table ran: %v", err)
+	}
+}

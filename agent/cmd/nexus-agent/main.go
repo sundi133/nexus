@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,6 +32,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/identity"
 	"github.com/votal-ai/nexus/agent/internal/local"
+	"github.com/votal-ai/nexus/agent/internal/osquery"
 	"github.com/votal-ai/nexus/agent/internal/release"
 	"github.com/votal-ai/nexus/agent/internal/run"
 	"github.com/votal-ai/nexus/agent/internal/service"
@@ -203,7 +205,10 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		}
 	}
 	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin,
-		Commands: &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), Log: log}}
+		Commands: &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate)}, Log: log},
+		Osquery: func(ctx context.Context) osquery.Report {
+			return osquery.Collect(ctx, osquery.Locate(), runtime.GOOS, time.Now())
+		}}
 	if once {
 		res, err := loop.Once(ctx, 0)
 		if err != nil {
