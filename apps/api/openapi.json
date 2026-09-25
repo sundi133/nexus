@@ -2808,6 +2808,720 @@
           "rows"
         ]
       },
+      "OrgConfig": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "enum": [
+              1
+            ]
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "mfa_policy": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "admins",
+                  "everyone"
+                ],
+                "description": "Who must enroll MFA. Users without a factor are asked to set one up at their next sign-in."
+              },
+              "session_ttl_hours": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 168,
+                "description": "How long a sign-in lasts before re-authentication"
+              },
+              "restrict_to_verified_domains": {
+                "type": "boolean",
+                "description": "Only people with emails in your verified domains can be added"
+              },
+              "owners_require_passkey": {
+                "type": "boolean",
+                "description": "Owners confirm admin actions with a passkey (phishing-resistant); other methods aren't accepted for them"
+              },
+              "audit_retention_days": {
+                "type": "integer",
+                "minimum": 30,
+                "maximum": 3650,
+                "description": "How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept."
+              }
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "default": ""
+                },
+                "rule": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/GroupRule"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          },
+          "conditional_access": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "report_only",
+                    "enforce"
+                  ],
+                  "default": "report_only"
+                },
+                "requirement": {
+                  "type": "string",
+                  "enum": [
+                    "require_mfa",
+                    "require_managed_device",
+                    "require_compliant_device",
+                    "block"
+                  ]
+                },
+                "apps": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "all"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "minItems": 1
+                    }
+                  ],
+                  "description": "App names"
+                },
+                "users": {
+                  "type": "object",
+                  "properties": {
+                    "include": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "all"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "groups": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100
+                              },
+                              "default": []
+                            },
+                            "users": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "email"
+                              },
+                              "default": []
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "exclude": {
+                      "type": "object",
+                      "properties": {
+                        "groups": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "default": []
+                        },
+                        "users": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "default": []
+                        }
+                      },
+                      "default": {
+                        "groups": [],
+                        "users": []
+                      }
+                    }
+                  },
+                  "required": [
+                    "include"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "requirement",
+                "apps",
+                "users"
+              ]
+            }
+          },
+          "device_policies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "check": {
+                  "type": "string",
+                  "enum": [
+                    "disk_encryption",
+                    "firewall",
+                    "screen_lock",
+                    "os_version",
+                    "system_integrity",
+                    "mdm_compliant"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "audit",
+                    "enforce"
+                  ],
+                  "default": "enforce"
+                },
+                "grace_hours": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 720,
+                  "default": 0
+                },
+                "params": {
+                  "type": "object",
+                  "additionalProperties": {},
+                  "default": {}
+                }
+              },
+              "required": [
+                "check",
+                "enabled"
+              ]
+            }
+          },
+          "alert_rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "builtin": {
+                  "type": "string",
+                  "maxLength": 50,
+                  "description": "For a default rule: its key"
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "default": ""
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "critical"
+                  ]
+                },
+                "match": {
+                  "type": "object",
+                  "properties": {
+                    "types": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "minItems": 1,
+                      "maxItems": 20
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "failure",
+                        "denied"
+                      ]
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "types"
+                  ]
+                },
+                "group_by": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "actor",
+                    "target",
+                    "ip"
+                  ],
+                  "default": "none"
+                },
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10000,
+                  "default": 1
+                },
+                "window_minutes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1440,
+                  "default": 5
+                }
+              },
+              "required": [
+                "name",
+                "severity",
+                "match"
+              ]
+            }
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "default": ""
+                },
+                "owner": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "description": "An email, or group:<name>"
+                },
+                "environment": {
+                  "type": "string",
+                  "enum": [
+                    "production",
+                    "staging",
+                    "development"
+                  ],
+                  "default": "production"
+                },
+                "runtime": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "default": ""
+                },
+                "model": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "default": ""
+                },
+                "risk_tier": {
+                  "type": "string",
+                  "enum": [
+                    "low",
+                    "medium",
+                    "high",
+                    "critical"
+                  ],
+                  "default": "medium"
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "maxLength": 50
+                  },
+                  "maxItems": 20,
+                  "default": []
+                },
+                "token_ttl_minutes": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "maximum": 60,
+                  "default": 15
+                }
+              },
+              "required": [
+                "name",
+                "owner"
+              ]
+            }
+          },
+          "mcp_servers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "url": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "format": "uri"
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "default": ""
+                },
+                "auth": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "bearer",
+                        "header"
+                      ]
+                    },
+                    "header": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "token": {
+                      "type": "string",
+                      "maxLength": 4000
+                    },
+                    "token_env": {
+                      "type": "string",
+                      "maxLength": 100,
+                      "description": "Read by the CLI; the API never sees it"
+                    }
+                  },
+                  "default": {
+                    "kind": "none"
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                "auto_approve_read": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "calls_per_minute": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10000,
+                  "default": 120
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "disabled"
+                  ],
+                  "default": "active"
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "effect": {
+                        "type": "string",
+                        "enum": [
+                          "allow",
+                          "deny"
+                        ]
+                      },
+                      "subject": {
+                        "type": "string",
+                        "maxLength": 150,
+                        "description": "all_agents, agent:<name> or tag:<tag>"
+                      },
+                      "tools": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 128
+                        },
+                        "minItems": 1
+                      },
+                      "risks": {
+                        "type": [
+                          "array",
+                          "null"
+                        ],
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "read",
+                            "write",
+                            "external",
+                            "destructive"
+                          ]
+                        },
+                        "default": null
+                      },
+                      "conditions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "argument": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "op": {
+                              "type": "string",
+                              "enum": [
+                                "equals",
+                                "in",
+                                "not_in",
+                                "prefix"
+                              ]
+                            },
+                            "values": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              "minItems": 1
+                            }
+                          },
+                          "required": [
+                            "argument",
+                            "op",
+                            "values"
+                          ]
+                        },
+                        "default": []
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "default": ""
+                      }
+                    },
+                    "required": [
+                      "effect",
+                      "subject",
+                      "tools"
+                    ]
+                  },
+                  "default": []
+                }
+              },
+              "required": [
+                "slug",
+                "name",
+                "url"
+              ]
+            }
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "GroupRule": {
+        "type": "object",
+        "properties": {
+          "match": {
+            "type": "string",
+            "enum": [
+              "all",
+              "any"
+            ]
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupRuleCondition"
+            },
+            "minItems": 1,
+            "maxItems": 20
+          }
+        },
+        "required": [
+          "match",
+          "conditions"
+        ]
+      },
+      "GroupRuleCondition": {
+        "type": "object",
+        "properties": {
+          "attribute": {
+            "type": "string",
+            "enum": [
+              "email",
+              "email_domain",
+              "department",
+              "title",
+              "given_name",
+              "family_name",
+              "manager_id",
+              "source"
+            ],
+            "description": "source: where the person comes from (google, entra, scim, or none)"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "equals",
+              "not_equals",
+              "contains",
+              "starts_with",
+              "ends_with",
+              "in",
+              "is_empty",
+              "is_not_empty"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "maxItems": 100,
+            "description": "For op=in"
+          }
+        },
+        "required": [
+          "attribute",
+          "op"
+        ]
+      },
+      "ConfigPlan": {
+        "type": "object",
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "description": "Pass to apply to make sure nothing changed since the plan"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigChange"
+            }
+          }
+        },
+        "required": [
+          "plan_id",
+          "changes"
+        ]
+      },
+      "ConfigChange": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "update",
+              "delete"
+            ]
+          },
+          "key": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "from": {},
+                "to": {}
+              }
+            }
+          }
+        },
+        "required": [
+          "section",
+          "action",
+          "key"
+        ]
+      },
       "WebAuthnCeremony": {
         "type": "object",
         "properties": {
@@ -3419,79 +4133,6 @@
         "required": [
           "count",
           "sample"
-        ]
-      },
-      "GroupRule": {
-        "type": "object",
-        "properties": {
-          "match": {
-            "type": "string",
-            "enum": [
-              "all",
-              "any"
-            ]
-          },
-          "conditions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/GroupRuleCondition"
-            },
-            "minItems": 1,
-            "maxItems": 20
-          }
-        },
-        "required": [
-          "match",
-          "conditions"
-        ]
-      },
-      "GroupRuleCondition": {
-        "type": "object",
-        "properties": {
-          "attribute": {
-            "type": "string",
-            "enum": [
-              "email",
-              "email_domain",
-              "department",
-              "title",
-              "given_name",
-              "family_name",
-              "manager_id",
-              "source"
-            ],
-            "description": "source: where the person comes from (google, entra, scim, or none)"
-          },
-          "op": {
-            "type": "string",
-            "enum": [
-              "equals",
-              "not_equals",
-              "contains",
-              "starts_with",
-              "ends_with",
-              "in",
-              "is_empty",
-              "is_not_empty"
-            ]
-          },
-          "value": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "values": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "maxLength": 200
-            },
-            "maxItems": 100,
-            "description": "For op=in"
-          }
-        },
-        "required": [
-          "attribute",
-          "op"
         ]
       },
       "GroupPage": {
@@ -16922,6 +17563,284 @@
               "text/csv": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/config": {
+      "get": {
+        "tags": [
+          "Config as code"
+        ],
+        "summary": "Export the organization's config",
+        "description": "Settings, groups (not directory-managed), conditional access, device policies, alert rules, agents and MCP servers with their permissions, by name. Secrets are never included; MCP server auth names an environment variable for the CLI instead.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/config/plan": {
+      "post": {
+        "tags": [
+          "Config as code"
+        ],
+        "summary": "Plan a config change",
+        "description": "What apply would change. Nothing is changed.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "config": {
+                    "$ref": "#/components/schemas/OrgConfig"
+                  },
+                  "prune": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Also delete what a listed section doesn't mention"
+                  }
+                },
+                "required": [
+                  "config"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/config/apply": {
+      "post": {
+        "tags": [
+          "Config as code"
+        ],
+        "summary": "Apply a config",
+        "description": "Makes the organization match the document, all or nothing, and records every change in the audit log. With `plan_id`, refuses if the plan would now be different.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "config": {
+                    "$ref": "#/components/schemas/OrgConfig"
+                  },
+                  "prune": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Also delete what a listed section doesn't mention"
+                  },
+                  "plan_id": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "config"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPlan"
                 }
               }
             }

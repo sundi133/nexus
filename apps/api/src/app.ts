@@ -28,6 +28,7 @@ import { scheduleAuditIntegrity } from "./audit/integrity.js";
 import { scheduleAlerts } from "./alerts/engine.js";
 import { registerAlertRoutes } from "./alerts/routes.js";
 import { registerReportRoutes } from "./reports/routes.js";
+import { registerConfigRoutes } from "./config/routes.js";
 import "./alerts/oncall.js";
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
@@ -172,6 +173,7 @@ export function createApp(deps: Deps) {
   registerMcpGateway(app);
   registerAlertRoutes(app);
   registerReportRoutes(app);
+  registerConfigRoutes(app);
   registerPasskeyRoutes(app);
   registerPushRoutes(app);
   registerImportRoutes(app);

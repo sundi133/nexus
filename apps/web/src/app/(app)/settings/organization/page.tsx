@@ -242,6 +242,26 @@ export default function OrganizationSettingsPage() {
 
         <AlertChannelsCard />
 
+        {editable ? (
+          <Card>
+            <CardHeader
+              title="Config as code"
+              description="Keep these settings, groups, policies, alert rules, agents and MCP permissions in Git, and promote them from staging to production with the nexus CLI: export, plan, apply. Secrets are never exported."
+              actions={
+                <a href="/bff/v1/config" download="nexus-config.json">
+                  <Button size="sm">Download current config</Button>
+                </a>
+              }
+            />
+            <pre className="mx-4 mb-4 overflow-x-auto rounded-md border border-border bg-bg-subtle p-3 font-mono text-[11px] leading-relaxed text-fg-muted">
+              {`export NEXUS_URL=<api url>  NEXUS_TOKEN=<api key>
+nexus config export -o nexus.yaml
+nexus config plan  -f nexus.yaml
+nexus config apply -f nexus.yaml`}
+            </pre>
+          </Card>
+        ) : null}
+
         <Card className="overflow-hidden">
           <CardHeader title="Change history" description="Every change to these settings: who, when and what." />
           {history.data?.data.length ? (

@@ -7463,6 +7463,281 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the organization's config
+         * @description Settings, groups (not directory-managed), conditional access, device policies, alert rules, agents and MCP servers with their permissions, by name. Secrets are never included; MCP server auth names an environment variable for the CLI instead.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["OrgConfig"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/config/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plan a config change
+         * @description What apply would change. Nothing is changed.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        config: components["schemas"]["OrgConfig"];
+                        /**
+                         * @description Also delete what a listed section doesn't mention
+                         * @default false
+                         */
+                        prune?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConfigPlan"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/config/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a config
+         * @description Makes the organization match the document, all or nothing, and records every change in the audit log. With `plan_id`, refuses if the plan would now be different.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        config: components["schemas"]["OrgConfig"];
+                        /**
+                         * @description Also delete what a listed section doesn't mention
+                         * @default false
+                         */
+                        prune?: boolean;
+                        plan_id?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConfigPlan"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/factors/webauthn/options": {
         parameters: {
             query?: never;
@@ -20478,6 +20753,218 @@ export interface components {
             columns: string[];
             rows: (string | number | boolean | null)[][];
         };
+        OrgConfig: {
+            /** @enum {number} */
+            version: 1;
+            settings?: {
+                /**
+                 * @description Who must enroll MFA. Users without a factor are asked to set one up at their next sign-in.
+                 * @enum {string}
+                 */
+                mfa_policy?: "off" | "admins" | "everyone";
+                /** @description How long a sign-in lasts before re-authentication */
+                session_ttl_hours?: number;
+                /** @description Only people with emails in your verified domains can be added */
+                restrict_to_verified_domains?: boolean;
+                /** @description Owners confirm admin actions with a passkey (phishing-resistant); other methods aren't accepted for them */
+                owners_require_passkey?: boolean;
+                /** @description How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept. */
+                audit_retention_days?: number;
+            };
+            groups?: {
+                name: string;
+                /** @default  */
+                description: string;
+                /** @default null */
+                rule: components["schemas"]["GroupRule"] | null;
+            }[];
+            conditional_access?: {
+                name: string;
+                /** @default true */
+                enabled: boolean;
+                /**
+                 * @default report_only
+                 * @enum {string}
+                 */
+                mode: "report_only" | "enforce";
+                /** @enum {string} */
+                requirement: "require_mfa" | "require_managed_device" | "require_compliant_device" | "block";
+                /** @description App names */
+                apps: "all" | string[];
+                users: {
+                    include: "all" | {
+                        /** @default [] */
+                        groups: string[];
+                        /** @default [] */
+                        users: string[];
+                    };
+                    /**
+                     * @default {
+                     *       "groups": [],
+                     *       "users": []
+                     *     }
+                     */
+                    exclude: {
+                        /** @default [] */
+                        groups: string[];
+                        /** @default [] */
+                        users: string[];
+                    };
+                };
+            }[];
+            device_policies?: {
+                /** @enum {string} */
+                check: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant";
+                enabled: boolean;
+                /**
+                 * @default enforce
+                 * @enum {string}
+                 */
+                mode: "audit" | "enforce";
+                /** @default 0 */
+                grace_hours: number;
+                /** @default {} */
+                params: {
+                    [key: string]: unknown;
+                };
+            }[];
+            alert_rules?: {
+                name: string;
+                /** @description For a default rule: its key */
+                builtin?: string;
+                /** @default  */
+                description: string;
+                /** @default true */
+                enabled: boolean;
+                /** @enum {string} */
+                severity: "low" | "medium" | "high" | "critical";
+                match: {
+                    types: string[];
+                    /** @enum {string} */
+                    outcome?: "success" | "failure" | "denied";
+                    details?: {
+                        [key: string]: string;
+                    };
+                };
+                /**
+                 * @default none
+                 * @enum {string}
+                 */
+                group_by: "none" | "actor" | "target" | "ip";
+                /** @default 1 */
+                threshold: number;
+                /** @default 5 */
+                window_minutes: number;
+            }[];
+            agents?: {
+                name: string;
+                /** @default  */
+                description: string;
+                /** @description An email, or group:<name> */
+                owner: string;
+                /**
+                 * @default production
+                 * @enum {string}
+                 */
+                environment: "production" | "staging" | "development";
+                /** @default  */
+                runtime: string;
+                /** @default  */
+                model: string;
+                /**
+                 * @default medium
+                 * @enum {string}
+                 */
+                risk_tier: "low" | "medium" | "high" | "critical";
+                /** @default [] */
+                tags: string[];
+                /** @default 15 */
+                token_ttl_minutes: number;
+            }[];
+            mcp_servers?: {
+                slug: string;
+                name: string;
+                /** Format: uri */
+                url: string;
+                /** @default  */
+                description: string;
+                /**
+                 * @default {
+                 *       "kind": "none"
+                 *     }
+                 */
+                auth: {
+                    /** @enum {string} */
+                    kind: "none" | "bearer" | "header";
+                    header?: string;
+                    token?: string;
+                    /** @description Read by the CLI; the API never sees it */
+                    token_env?: string;
+                };
+                /** @default false */
+                auto_approve_read: boolean;
+                /** @default 120 */
+                calls_per_minute: number;
+                /**
+                 * @default active
+                 * @enum {string}
+                 */
+                status: "active" | "disabled";
+                /** @default [] */
+                permissions: {
+                    /** @enum {string} */
+                    effect: "allow" | "deny";
+                    /** @description all_agents, agent:<name> or tag:<tag> */
+                    subject: string;
+                    tools: string[];
+                    /** @default null */
+                    risks: ("read" | "write" | "external" | "destructive")[] | null;
+                    /** @default [] */
+                    conditions: {
+                        argument: string;
+                        /** @enum {string} */
+                        op: "equals" | "in" | "not_in" | "prefix";
+                        values: string[];
+                    }[];
+                    /** @default  */
+                    description: string;
+                }[];
+            }[];
+        };
+        GroupRule: {
+            /** @enum {string} */
+            match: "all" | "any";
+            conditions: components["schemas"]["GroupRuleCondition"][];
+        };
+        GroupRuleCondition: {
+            /**
+             * @description source: where the person comes from (google, entra, scim, or none)
+             * @enum {string}
+             */
+            attribute: "email" | "email_domain" | "department" | "title" | "given_name" | "family_name" | "manager_id" | "source";
+            /** @enum {string} */
+            op: "equals" | "not_equals" | "contains" | "starts_with" | "ends_with" | "in" | "is_empty" | "is_not_empty";
+            value?: string;
+            /** @description For op=in */
+            values?: string[];
+        };
+        ConfigPlan: {
+            /** @description Pass to apply to make sure nothing changed since the plan */
+            plan_id: string;
+            changes: components["schemas"]["ConfigChange"][];
+        };
+        ConfigChange: {
+            section: string;
+            /** @enum {string} */
+            action: "create" | "update" | "delete";
+            key: string;
+            changes?: {
+                [key: string]: {
+                    from?: unknown;
+                    to?: unknown;
+                };
+            };
+        };
         WebAuthnCeremony: {
             /**
              * Format: uuid
@@ -20666,23 +21153,6 @@ export interface components {
             adds?: number;
             /** @description With group_id: members the rule would remove */
             removes?: number;
-        };
-        GroupRule: {
-            /** @enum {string} */
-            match: "all" | "any";
-            conditions: components["schemas"]["GroupRuleCondition"][];
-        };
-        GroupRuleCondition: {
-            /**
-             * @description source: where the person comes from (google, entra, scim, or none)
-             * @enum {string}
-             */
-            attribute: "email" | "email_domain" | "department" | "title" | "given_name" | "family_name" | "manager_id" | "source";
-            /** @enum {string} */
-            op: "equals" | "not_equals" | "contains" | "starts_with" | "ends_with" | "in" | "is_empty" | "is_not_empty";
-            value?: string;
-            /** @description For op=in */
-            values?: string[];
         };
         GroupPage: {
             data: components["schemas"]["Group"][];

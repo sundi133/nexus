@@ -113,7 +113,7 @@ async function baseline(tx: Tx, orgId: string) {
   return { settings: s, result: { score: items.filter((i) => i.compliant).length / items.length, items } };
 }
 
-async function applySettings(tx: Tx, p: Principal, meta: Parameters<typeof audit>[2]["meta"], before: Settings, after: Settings, via: string) {
+export async function applySettings(tx: Tx, p: Principal, meta: Parameters<typeof audit>[2]["meta"], before: Settings, after: Settings, via: string) {
   const changes = diff(before, after);
   if (Object.keys(changes).length === 0) return changes;
   await saveSettings(tx, p.orgId, after);
