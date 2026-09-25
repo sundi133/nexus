@@ -134,7 +134,14 @@ async function checkRefs(tx: Tx, input: { resource_type?: string; resource_id?: 
     if (missing.length) throw badRequest("unknown_reference", `Unknown ${table === "applications" ? "app" : table.slice(0, -1)}: ${missing.join(", ")}`);
   };
   if (input.resource_type === "app") await exists("applications", [input.resource_id!]);
-  if (input.resource_type === "group") await exists("groups", [input.resource_id!]);
+  if (input.resource_type === "group") {
+    await exists("groups", [input.resource_id!]);
+    // Membership of dynamic and directory groups is decided elsewhere; a grant would be undone.
+    const g = await tx.selectFrom("groups").select("rule").where("id", "=", input.resource_id!).executeTakeFirstOrThrow();
+    if (g.rule) throw badRequest("dynamic_group", "Dynamic groups can't be requested: their members follow the group's rule");
+    const linked = await tx.selectFrom("directory_links").select("local_id").where("kind", "=", "group").where("local_id", "=", input.resource_id!).executeTakeFirst();
+    if (linked) throw badRequest("directory_managed", "This group's members come from a directory, so it can't be requested here");
+  }
   for (const s of input.stages ?? []) {
     if (s.kind === "users") await exists("users", s.ids);
     if (s.kind === "group") await exists("groups", [s.id]);

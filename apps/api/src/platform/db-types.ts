@@ -51,6 +51,8 @@ export interface Database {
     description: Generated<string>;
     created_at: Generated<Date>;
     updated_at: Timestamp;
+    rule: Json | null;
+    rule_evaluated_at: NullableTimestamp;
   };
   group_members: {
     org_id: string;

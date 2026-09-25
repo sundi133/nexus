@@ -2141,6 +2141,131 @@
           "mfa"
         ]
       },
+      "GroupRulePreview": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "sample": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "department": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "email",
+                "name",
+                "department",
+                "title"
+              ]
+            }
+          },
+          "adds": {
+            "type": "integer",
+            "description": "With group_id: people the rule would add"
+          },
+          "removes": {
+            "type": "integer",
+            "description": "With group_id: members the rule would remove"
+          }
+        },
+        "required": [
+          "count",
+          "sample"
+        ]
+      },
+      "GroupRule": {
+        "type": "object",
+        "properties": {
+          "match": {
+            "type": "string",
+            "enum": [
+              "all",
+              "any"
+            ]
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupRuleCondition"
+            },
+            "minItems": 1,
+            "maxItems": 20
+          }
+        },
+        "required": [
+          "match",
+          "conditions"
+        ]
+      },
+      "GroupRuleCondition": {
+        "type": "object",
+        "properties": {
+          "attribute": {
+            "type": "string",
+            "enum": [
+              "email",
+              "email_domain",
+              "department",
+              "title",
+              "given_name",
+              "family_name",
+              "manager_id",
+              "source"
+            ],
+            "description": "source: where the person comes from (google, entra, scim, or none)"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "equals",
+              "not_equals",
+              "contains",
+              "starts_with",
+              "ends_with",
+              "in",
+              "is_empty",
+              "is_not_empty"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "maxItems": 100,
+            "description": "For op=in"
+          }
+        },
+        "required": [
+          "attribute",
+          "op"
+        ]
+      },
       "GroupPage": {
         "type": "object",
         "properties": {
@@ -2179,6 +2304,32 @@
           "member_count": {
             "type": "integer"
           },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GroupRule"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for dynamic groups: members follow the rule and can't be edited by hand"
+          },
+          "rule_evaluated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "example": "2026-10-05T12:00:00.000Z"
+          },
+          "managed_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The directory that manages this group's members, if any"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -2195,6 +2346,9 @@
           "name",
           "description",
           "member_count",
+          "rule",
+          "rule_evaluated_at",
+          "managed_by",
           "created_at",
           "updated_at"
         ]
@@ -13726,6 +13880,105 @@
         }
       }
     },
+    "/v1/groups/rule-preview": {
+      "post": {
+        "tags": [
+          "Groups"
+        ],
+        "summary": "Preview who a rule matches",
+        "description": "Counts the people a dynamic group rule matches now. With group_id, also how many it would add to and remove from that group.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rule": {
+                    "$ref": "#/components/schemas/GroupRule"
+                  },
+                  "group_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  }
+                },
+                "required": [
+                  "rule"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupRulePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/groups": {
       "get": {
         "tags": [
@@ -13858,6 +14111,18 @@
                     "type": "string",
                     "maxLength": 500,
                     "default": ""
+                  },
+                  "rule": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/GroupRule"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Makes this a dynamic group. null: members are managed by hand"
                   }
                 },
                 "required": [
@@ -14054,6 +14319,16 @@
                   "description": {
                     "type": "string",
                     "maxLength": 500
+                  },
+                  "rule": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/GroupRule"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 }
               }

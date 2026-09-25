@@ -1,4 +1,5 @@
 import { touchUsers } from "../provisioning/service.js";
+import { scheduleDynamicEvaluation } from "./dynamic-groups-schedule.js";
 import { assertEmailAllowed } from "../org/domains.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
@@ -218,6 +219,7 @@ export function registerUserRoutes(app: App) {
             details: { roles: input.roles, invited: input.invite },
           });
           if (input.roles.length) await alertAdminGrant(tx, p.orgId, input.email, input.roles);
+          await scheduleDynamicEvaluation(tx, p.orgId); // they may belong in dynamic groups
           if (input.invite) invite = await issueInvitation(tx, p, id);
           return getUserOr404(tx, id);
         });

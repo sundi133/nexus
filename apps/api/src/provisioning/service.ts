@@ -14,14 +14,18 @@ import { ScimClient, ScimError, scimUser } from "./scim-client.js";
  * the app to it. A periodic reconcile catches anything a touch missed.
  */
 
+import { scheduleDynamicEvaluation } from "../directory/dynamic-groups-schedule.js";
+
 export const tokenAad = (appId: string) => `app_provisioning:${appId}`;
 
 const enabledApps = async (tx: Tx) => (await tx.selectFrom("app_provisioning").select(["app_id", "push_groups"]).where("enabled", "=", true).execute());
 
 /** People changed (profile, status, groups, assignments): converge their accounts in every provisioned app. */
-export async function touchUsers(tx: Tx, orgId: string, userIds: Iterable<string>, apps?: string[]) {
+export async function touchUsers(tx: Tx, orgId: string, userIds: Iterable<string>, apps?: string[], opts: { fromDynamicGroups?: boolean } = {}) {
   const ids = [...new Set(userIds)];
   if (!ids.length) return;
+  // Their attributes may have changed: dynamic groups follow (not when those groups caused this).
+  if (!opts.fromDynamicGroups) await scheduleDynamicEvaluation(tx, orgId);
   for (const a of await enabledApps(tx)) {
     if (apps && !apps.includes(a.app_id)) continue;
     for (const user_id of ids) {

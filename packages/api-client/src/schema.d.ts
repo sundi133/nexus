@@ -6589,6 +6589,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/groups/rule-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview who a rule matches
+         * @description Counts the people a dynamic group rule matches now. With group_id, also how many it would add to and remove from that group.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        rule: components["schemas"]["GroupRule"];
+                        /**
+                         * Format: uuid
+                         * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                         */
+                        group_id?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["GroupRulePreview"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/groups": {
         parameters: {
             query?: never;
@@ -6682,6 +6777,11 @@ export interface paths {
                         name: string;
                         /** @default  */
                         description?: string;
+                        /**
+                         * @description Makes this a dynamic group. null: members are managed by hand
+                         * @default null
+                         */
+                        rule?: components["schemas"]["GroupRule"] | null;
                     };
                 };
             };
@@ -6908,6 +7008,7 @@ export interface paths {
                     "application/json": {
                         name?: string;
                         description?: string;
+                        rule?: components["schemas"]["GroupRule"] | null;
                     };
                 };
             };
@@ -16547,6 +16648,41 @@ export interface components {
                 factors: ("totp" | "push" | "webauthn")[];
             };
         };
+        GroupRulePreview: {
+            count: number;
+            sample: {
+                /**
+                 * Format: uuid
+                 * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                 */
+                id: string;
+                email: string;
+                name: string;
+                department: string;
+                title: string;
+            }[];
+            /** @description With group_id: people the rule would add */
+            adds?: number;
+            /** @description With group_id: members the rule would remove */
+            removes?: number;
+        };
+        GroupRule: {
+            /** @enum {string} */
+            match: "all" | "any";
+            conditions: components["schemas"]["GroupRuleCondition"][];
+        };
+        GroupRuleCondition: {
+            /**
+             * @description source: where the person comes from (google, entra, scim, or none)
+             * @enum {string}
+             */
+            attribute: "email" | "email_domain" | "department" | "title" | "given_name" | "family_name" | "manager_id" | "source";
+            /** @enum {string} */
+            op: "equals" | "not_equals" | "contains" | "starts_with" | "ends_with" | "in" | "is_empty" | "is_not_empty";
+            value?: string;
+            /** @description For op=in */
+            values?: string[];
+        };
         GroupPage: {
             data: components["schemas"]["Group"][];
             next_cursor: string | null;
@@ -16560,6 +16696,15 @@ export interface components {
             name: string;
             description: string;
             member_count: number;
+            /** @description Set for dynamic groups: members follow the rule and can't be edited by hand */
+            rule: components["schemas"]["GroupRule"] | null;
+            /**
+             * Format: date-time
+             * @example 2026-10-05T12:00:00.000Z
+             */
+            rule_evaluated_at: string | null;
+            /** @description The directory that manages this group's members, if any */
+            managed_by: string | null;
             /**
              * Format: date-time
              * @example 2026-10-05T12:00:00.000Z

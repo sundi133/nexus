@@ -23,6 +23,7 @@ import { registerAccessReviewRoutes, scheduleAccessReviews } from "./governance/
 import { registerPasskeyRoutes } from "./auth/passkeys.js";
 import { registerPushRoutes } from "./auth/push.js";
 import { registerGroupRoutes } from "./directory/groups.js";
+import { scheduleDynamicGroups } from "./directory/dynamic-groups.js";
 import { registerUserRoutes } from "./directory/users.js";
 import { registerInvitationRoutes } from "./directory/invitations.js";
 import { registerImportRoutes } from "./directory/import.js";
@@ -208,4 +209,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleMdmSyncs(jobs, deps);
   scheduleAccessExpiry(jobs, deps);
   scheduleAccessReviews(jobs, deps);
+  scheduleDynamicGroups(jobs, deps);
 }

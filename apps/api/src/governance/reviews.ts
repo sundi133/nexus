@@ -95,6 +95,9 @@ async function revokeOne(tx: Tx, orgId: string, i: Item, meta: RequestMeta, revi
     if (!Number(r.numDeletedRows)) return "already_gone";
     await touchUsers(tx, orgId, [i.user_id], [i.grant_ref]);
   } else if (i.grant_kind === "group_member") {
+    // A dynamic group would add them straight back: its rule decides, so this is left to an admin.
+    const g = await tx.selectFrom("groups").select("rule").where("id", "=", i.grant_ref).executeTakeFirst();
+    if (g?.rule) return "skipped";
     const r = await tx.deleteFrom("group_members").where("group_id", "=", i.grant_ref).where("user_id", "=", i.user_id).executeTakeFirst();
     if (!Number(r.numDeletedRows)) return "already_gone";
     await touchUsers(tx, orgId, [i.user_id]);

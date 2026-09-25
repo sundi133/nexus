@@ -100,12 +100,29 @@ export const Factor = z
   })
   .openapi("Factor");
 
+/** Dynamic groups (DIR-05): members are everyone matching the rule. */
+export const RULE_ATTRIBUTES = ["email", "email_domain", "department", "title", "given_name", "family_name", "manager_id", "source"] as const;
+export const RULE_OPS = ["equals", "not_equals", "contains", "starts_with", "ends_with", "in", "is_empty", "is_not_empty"] as const;
+
+export const GroupRuleCondition = z
+  .object({
+    attribute: z.enum(RULE_ATTRIBUTES).openapi({ description: "source: where the person comes from (google, entra, scim, or none)" }),
+    op: z.enum(RULE_OPS),
+    value: z.string().max(200).optional(),
+    values: z.array(z.string().max(200)).max(100).optional().openapi({ description: "For op=in" }),
+  })
+  .refine((c) => (c.op === "in" ? !!c.values?.length : c.op === "is_empty" || c.op === "is_not_empty" ? true : c.value !== undefined && c.value !== ""), { message: "This operator needs a value (or values, for in)" })
+  .openapi("GroupRuleCondition");
+export const GroupRule = z.object({ match: z.enum(["all", "any"]), conditions: z.array(GroupRuleCondition).min(1).max(20) }).openapi("GroupRule");
 export const Group = z
   .object({
     id: Id,
     name: z.string(),
     description: z.string(),
     member_count: z.number().int(),
+    rule: z.union([GroupRule, z.null()]).openapi({ description: "Set for dynamic groups: members follow the rule and can't be edited by hand" }),
+    rule_evaluated_at: Timestamp.nullable(),
+    managed_by: z.string().nullable().openapi({ description: "The directory that manages this group's members, if any" }),
     created_at: Timestamp,
     updated_at: Timestamp,
   })
