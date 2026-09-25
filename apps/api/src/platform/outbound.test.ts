@@ -25,3 +25,29 @@ describe("outbound URL guard", () => {
     await expect(assertSafeUrl("file:///etc/passwd", { allowPrivate: true })).rejects.toThrow("http(s)");
   });
 });
+
+describe("private address ranges", () => {
+  it("covers IPv6 forms that embed private IPv4 addresses", () => {
+    for (const ip of ["::1", "::", "fe80::1", "fec0::1", "fd00::1", "ff02::1", "::ffff:10.0.0.1", "::ffff:a9fe:a9fe", "64:ff9b::a9fe:a9fe", "64:ff9b::127.0.0.1", "2002:0a00:0001::1", "::127.0.0.1"]) expect(_isPrivate(ip), ip).toBe(true);
+    for (const ip of ["2606:4700::1111", "64:ff9b::8.8.8.8", "2002:0808:0808::1", "8.8.8.8"]) expect(_isPrivate(ip), ip).toBe(false);
+  });
+});
+
+describe("DNS rebinding", () => {
+  it("refuses a connection whose name resolves to a private address, whatever was checked earlier", async () => {
+    const { createServer } = await import("node:http");
+    const { Agent, setGlobalDispatcher } = await import("undici");
+    const { installOutboundGuard } = await import("./outbound.js");
+    const server = createServer((_q, r) => r.end("internal secret"));
+    await new Promise<void>((res) => server.listen(0, "127.0.0.1", res));
+    const port = (server.address() as { port: number }).port;
+    try {
+      installOutboundGuard(false);
+      const err = await fetch(`http://localhost:${port}/`).then(() => null, (e: Error & { cause?: { code?: string } }) => e);
+      expect(err?.cause?.code).toBe("EPRIVATE");
+    } finally {
+      setGlobalDispatcher(new Agent());
+      server.close();
+    }
+  });
+});

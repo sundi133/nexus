@@ -37,6 +37,8 @@ import { refuseIfFederationRequired } from "../federation/enforce.js";
 import { directoryPasswordCheck } from "../directory/sync/ldap.js";
 
 const loginLimiter = new RateLimiter(10, 5 * 60_000, "login"); // per email+IP
+// Password spraying: one address trying many accounts (and locking out directory accounts).
+const loginIpLimiter = new RateLimiter(60, 5 * 60_000, "login-ip");
 const mfaLimiter = new RateLimiter(5, 5 * 60_000, "mfa"); // per session
 
 const Client = z.enum(["web", "mobile", "cli"]).default("web");
@@ -310,7 +312,7 @@ export function registerAuthRoutes(app: App) {
       const meta = c.get("meta");
       const email = input.email.toLowerCase();
 
-      if (!(await loginLimiter.take(`${email}|${meta.ip}`))) {
+      if (!(await loginLimiter.take(`${email}|${meta.ip}`)) || (meta.ip && !(await loginIpLimiter.take(meta.ip)))) {
         throw new ApiError(429, "rate_limited", "Too many sign-in attempts. Try again in a few minutes.");
       }
 

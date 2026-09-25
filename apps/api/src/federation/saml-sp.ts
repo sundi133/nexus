@@ -97,6 +97,9 @@ function signedAssertion(xml: string, root: Element, certs: string[]): Element {
       const sx = new SignedXml({ publicCert: cert }); // uses only our configured certificate, never KeyInfo
       sx.loadSignature(sigNode);
       if (/sha1$/i.test(sx.signatureAlgorithm ?? "")) throw new FederationError("weak_signature", "The IdP signs with SHA-1. Switch it to SHA-256.");
+      // The digest over the signed content counts as much as the signature algorithm.
+      const digests = [...sigNode.getElementsByTagNameNS(NS.ds, "DigestMethod")].map((d) => d.getAttribute("Algorithm") ?? "");
+      if (digests.some((d) => /sha1$/i.test(d))) throw new FederationError("weak_signature", "The IdP uses a SHA-1 digest. Switch it to SHA-256.");
       let ok = false;
       try {
         ok = sx.checkSignature(xml);
@@ -172,8 +175,11 @@ export function verifySamlResponse(
     return true;
   };
   if (!conditions || !within(conditions)) throw new FederationError("expired", "The assertion has expired or isn't valid yet (check the clocks)");
-  const audiences = children(conditions, NS.saml, "AudienceRestriction").flatMap((r) => children(r, NS.saml, "Audience").map(text));
-  if (!audiences.includes(o.spEntityId)) throw new FederationError("invalid_response", `The assertion is for "${audiences.join(", ")}", not Nexus (${o.spEntityId})`);
+  // Every AudienceRestriction must name Nexus (SAML core 2.5.1.4): each one narrows who may use it.
+  const restrictions = children(conditions, NS.saml, "AudienceRestriction").map((r) => children(r, NS.saml, "Audience").map(text));
+  if (!restrictions.length || !restrictions.every((r) => r.includes(o.spEntityId))) {
+    throw new FederationError("invalid_response", `The assertion is for "${restrictions.flat().join(", ")}", not Nexus (${o.spEntityId})`);
+  }
 
   const subject = child(a, NS.saml, "Subject");
   const confirmed = children(subject!, NS.saml, "SubjectConfirmation").some((sc) => {

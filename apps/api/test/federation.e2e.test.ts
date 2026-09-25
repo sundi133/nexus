@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildResponse, decodeAuthnRequest, idpMetadata } from "../src/sso/saml.js";
 import { createSamlCert } from "../src/sso/saml-cert.js";
 import { verifySamlResponse } from "../src/federation/saml-sp.js";
+import { SignedXml } from "xml-crypto";
 
 /**
  * Signing in through the organization's own IdP (AUTH-10), OIDC and SAML:
@@ -326,6 +327,37 @@ describe("signing in with SAML", () => {
     expect(check(new Date()).email).toBe(lin);
     expect(() => check(new Date(Date.now() + 60 * 60_000))).toThrow(/expired/);
     expect(() => check(new Date(Date.now() - 60 * 60_000))).toThrow(/expired|isn't valid yet/);
+  });
+
+  it("refuses SHA-1 digests, and assertions any audience restriction excludes", () => {
+    const base = Buffer.from(
+      buildResponse({
+        idp: SAML_IDP,
+        cfg: { entity_id: sp.saml_entity_id, acs_url: sp.saml_acs_url, name_id_format: "email", sign: "assertion" },
+        user: { id: "u1", email: lin, given_name: "Lin", family_name: "", department: "", title: "" } as never,
+        groups: [],
+        inResponseTo: "_req1",
+        sessionIndex: "s1",
+        authnInstant: new Date(),
+        cert: samlKey,
+      }),
+      "base64",
+    ).toString("utf8");
+    // Re-sign the assertion as an IdP would, optionally changing it first.
+    const resign = (change: (x: string) => string, digest: string) => {
+      const unsigned = change(base.replace(/<ds:Signature[\s\S]*?<\/ds:Signature>/, ""));
+      const id = /<saml:Assertion[^>]*ID="([^"]+)"/.exec(unsigned)![1]!;
+      const sig = new SignedXml({ privateKey: samlKey.privateKeyPem, publicCert: samlKey.certPem, signatureAlgorithm: "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256", canonicalizationAlgorithm: "http://www.w3.org/2001/10/xml-exc-c14n#" });
+      sig.addReference({ xpath: `//*[@ID='${id}']`, transforms: ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"], digestAlgorithm: digest });
+      sig.computeSignature(unsigned, { prefix: "ds", location: { reference: "//*[local-name(.)='Assertion']/*[local-name(.)='Issuer']", action: "after" } });
+      return Buffer.from(sig.getSignedXml()).toString("base64");
+    };
+    const check = (b64: string) => verifySamlResponse(b64, { certs: [samlKey.certPem], idpEntityId: SAML_IDP, spEntityId: sp.saml_entity_id, acsUrl: sp.saml_acs_url, requestId: "_req1", now: new Date() });
+    const SHA256 = "http://www.w3.org/2001/04/xmlenc#sha256";
+    expect(check(resign((x) => x, SHA256)).email).toBe(lin); // the re-signing itself is sound
+    expect(() => check(resign((x) => x, "http://www.w3.org/2000/09/xmldsig#sha1"))).toThrow(/SHA-1 digest/);
+    const extraAudience = (x: string) => x.replace("</saml:AudienceRestriction>", "</saml:AudienceRestriction><saml:AudienceRestriction><saml:Audience>https://other-app.example.com</saml:Audience></saml:AudienceRestriction>");
+    expect(() => check(resign(extraAudience, SHA256))).toThrow(/not Nexus/);
   });
 
   it("isn't fooled by signature wrapping", async () => {
