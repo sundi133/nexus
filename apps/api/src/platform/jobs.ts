@@ -36,7 +36,9 @@ export async function enqueue(
       org_id: orgId,
       kind,
       payload: JSON.stringify(payload),
-      run_at: opts.runAt ?? new Date(),
+      // The database's clock, not ours: claiming compares against its now(), and a host clock a
+      // millisecond ahead would make a fresh job look not-yet-due.
+      run_at: opts.runAt ?? sql<Date>`now()`,
       dedupe_key: opts.dedupeKey ?? null,
       max_attempts: opts.maxAttempts ?? 8,
     })

@@ -76,7 +76,7 @@ export async function deliver(deps: Deps, orgId: string, destinationId: string) 
         .values({ id: newId(), org_id: orgId, destination_id: d.id, ok: !result.error, http_status: result.status, events: delivered, duration_ms: Date.now() - started, error: result.error })
         .execute();
       if (!result.error) {
-        await tx.updateTable("event_destinations").set({ consecutive_failures: 0, last_error: "", last_delivered_at: new Date(), next_attempt_at: new Date() }).where("id", "=", d.id).execute();
+        await tx.updateTable("event_destinations").set({ consecutive_failures: 0, last_error: "", last_delivered_at: new Date(), next_attempt_at: sql<Date>`now()` }).where("id", "=", d.id).execute();
         return;
       }
       const failures = d.consecutive_failures + 1;
