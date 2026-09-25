@@ -8,17 +8,18 @@ import { migrate } from "../src/platform/migrate.js";
 import { Realtime } from "../src/platform/realtime.js";
 import { Sealer } from "../src/platform/seal.js";
 import { MemoryMailer } from "../src/platform/mailer.js";
-import { RecordingPushSender } from "../src/platform/push.js";
+import { RecordingPushSender, type PushSender } from "../src/platform/push.js";
 
 /** Boots the real app against the nexus_test database. Tests talk HTTP to it via app.request(). */
-export async function bootApp(overrides: Partial<Config> = {}) {
+export async function bootApp(overrides: Partial<Config> = {}, opts: { push?: PushSender } = {}) {
   const cfg = { ...loadConfig(), ...overrides };
   await migrate(cfg.databaseOwnerUrl);
   const db = new Db(cfg.databaseUrl);
   const realtime = new Realtime(cfg.databaseUrl);
   await realtime.start();
   const mailer = new MemoryMailer();
-  const push = new RecordingPushSender();
+  const recorder = new RecordingPushSender();
+  const push = opts.push ?? recorder;
   const deps = { cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push };
   const app = createApp(deps);
   // Tests drive background work explicitly: jobs.runOnce({ orgId }).
@@ -44,7 +45,7 @@ export async function bootApp(overrides: Partial<Config> = {}) {
     jobs,
     call,
     mailer,
-    push,
+    push: recorder, // what was pushed when no custom sender is given
     close: async () => {
       await realtime.stop();
       await db.close();

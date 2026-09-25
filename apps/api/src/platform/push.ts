@@ -20,3 +20,12 @@ export class RecordingPushSender implements PushSender {
     return { ok: true };
   }
 }
+
+/** Sends each push through the service for its platform; platforms without a configured service are skipped. */
+export class RoutingPushSender implements PushSender {
+  constructor(private readonly routes: Partial<Record<PushTarget["platform"], PushSender>>, private readonly fallback?: PushSender) {}
+  async send(target: PushTarget, payload: PushPayload) {
+    const s = this.routes[target.platform] ?? this.fallback;
+    return s ? s.send(target, payload) : { ok: false };
+  }
+}

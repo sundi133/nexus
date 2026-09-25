@@ -250,6 +250,28 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Timestamp;
   };
+  notification_preferences: {
+    user_id: string;
+    org_id: string;
+    email: Generated<"all" | "important" | "critical">;
+    push: Generated<"all" | "important" | "critical">;
+    updated_at: Generated<Date>;
+  };
+  org_alert_channels: {
+    org_id: string;
+    slack_webhook: Buffer | null;
+    slack_min_severity: Generated<"info" | "warning" | "critical">;
+    updated_at: Generated<Date>;
+  };
+  notification_deliveries: {
+    id: string;
+    org_id: string;
+    notification_id: string | null;
+    channel: "push" | "email" | "slack";
+    status: "sent" | "failed" | "skipped";
+    detail: Generated<string>;
+    at: Generated<Date>;
+  };
   recovery_codes: {
     id: string;
     org_id: string;

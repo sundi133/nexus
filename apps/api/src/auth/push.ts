@@ -63,14 +63,17 @@ const PendingChallenge = z
 
 type Pairing = { pairing_id: string; org_id: string; user_id: string; session_id: string | null };
 
-async function sendPushes(deps: Deps, tx: Tx, userId: string, challengeId: string) {
+async function sendPushes(deps: Deps, tx: Tx, orgId: string, userId: string, challengeId: string) {
   const regs = await tx.selectFrom("push_registrations").select(["id", "platform", "token"]).where("user_id", "=", userId).execute();
-  return regs.map((r) => () =>
-    deps.push.send(
+  return regs.map((r) => async () => {
+    const res = await deps.push.send(
       { platform: r.platform, token: r.token },
       { title: "Sign-in request", category: "auth.mfa_challenge", id: challengeId, priority: "high" },
-    ),
-  );
+    );
+    // The app was uninstalled or the token rotated: stop pushing to it.
+    if (res.invalidToken) await deps.db.tenant(orgId, (t) => t.deleteFrom("push_registrations").where("id", "=", r.id).execute());
+    return res;
+  });
 }
 
 export function registerPushRoutes(app: App) {
@@ -296,7 +299,7 @@ export function registerPushRoutes(app: App) {
             expires_at: expires,
           })
           .execute();
-        return sendPushes(deps, tx, p.userId, id);
+        return sendPushes(deps, tx, p.orgId, p.userId, id);
       });
       // Deliver after commit so the phone can always fetch what it was told about.
       await Promise.allSettled(sends.map((s) => s()));

@@ -50,3 +50,10 @@ export async function assertSafeUrl(raw: string, opts: { allowPrivate: boolean }
 }
 
 export const _isPrivate = isPrivate;
+
+/** "fetch failed" hides the reason; surface the underlying cause (DNS, refused, TLS, blocked port…). */
+export function networkError(err: unknown): string {
+  const e = err as Error & { cause?: { code?: string; message?: string } };
+  const cause = e?.cause?.code ?? e?.cause?.message;
+  return cause && e.message === "fetch failed" ? `fetch failed (${cause})` : (e?.message ?? String(err));
+}

@@ -29,6 +29,9 @@ export type Config = {
   allowPrivateOutbound: boolean;
   // Have I Been Pwned range API for breached-password checks ("" = off).
   hibpBase: string;
+  // Push delivery. Unset = pushes are recorded/logged only (development).
+  apns: { teamId: string; keyId: string; bundleId: string; privateKey: string; production: boolean } | null;
+  fcmServiceAccount: string; // JSON
 };
 
 export function loadConfig(env = process.env): Config {
@@ -67,6 +70,18 @@ export function loadConfig(env = process.env): Config {
     graphBase: env.NEXUS_GRAPH_BASE ?? "https://graph.microsoft.com",
     allowPrivateOutbound: mode !== "prod" && env.NEXUS_ALLOW_PRIVATE_OUTBOUND !== "false",
     hibpBase: env.NEXUS_HIBP_BASE ?? (mode === "test" ? "" : "https://api.pwnedpasswords.com"),
+    apns:
+      env.NEXUS_APNS_KEY && env.NEXUS_APNS_KEY_ID && env.NEXUS_APNS_TEAM_ID
+        ? {
+            teamId: env.NEXUS_APNS_TEAM_ID,
+            keyId: env.NEXUS_APNS_KEY_ID,
+            bundleId: env.NEXUS_APNS_BUNDLE_ID ?? "ai.votal.nexus",
+            // Accept the .p8 contents or base64 of it (easier in env files).
+            privateKey: env.NEXUS_APNS_KEY.includes("BEGIN") ? env.NEXUS_APNS_KEY : Buffer.from(env.NEXUS_APNS_KEY, "base64").toString(),
+            production: (env.NEXUS_APNS_ENV ?? (mode === "prod" ? "production" : "sandbox")) === "production",
+          }
+        : null,
+    fcmServiceAccount: env.NEXUS_FCM_SERVICE_ACCOUNT ?? "",
   };
 }
 

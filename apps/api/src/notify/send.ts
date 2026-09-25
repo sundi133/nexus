@@ -1,6 +1,7 @@
 import type { NotificationAction } from "../platform/db-types.js";
 import type { Tx } from "../platform/db.js";
 import { newId } from "../platform/ids.js";
+import { enqueue } from "../platform/jobs.js";
 import type { Role } from "../rbac.js";
 
 export type NotificationInput = {
@@ -20,11 +21,12 @@ export type NotificationInput = {
  */
 export async function notifyUsers(tx: Tx, orgId: string, userIds: string[], n: NotificationInput) {
   if (userIds.length === 0) return;
+  const ids = userIds.map(() => newId());
   await tx
     .insertInto("notifications")
     .values(
-      userIds.map((uid) => ({
-        id: newId(),
+      userIds.map((uid, i) => ({
+        id: ids[i]!,
         org_id: orgId,
         recipient_user_id: uid,
         category: n.category,
@@ -38,6 +40,8 @@ export async function notifyUsers(tx: Tx, orgId: string, userIds: string[], n: N
       })),
     )
     .execute();
+  // Phone and email, per each recipient's preferences (after commit, by the job runner).
+  for (const id of ids) await enqueue(tx, orgId, "notify.deliver", { notification_id: id }, { maxAttempts: 4 });
 }
 
 /** Recipients by admin role, e.g. security alerts go to owners + admins + security analysts. */
@@ -56,4 +60,8 @@ export async function notifyRoles(tx: Tx, orgId: string, roles: Role[], n: Notif
     rows.map((r) => r.user_id),
     n,
   );
+  // Org alerts also go once to the team's Slack channel, if one is set up.
+  if (await tx.selectFrom("org_alert_channels").select("org_id").where("slack_webhook", "is not", null).executeTakeFirst()) {
+    await enqueue(tx, orgId, "notify.slack", { title: n.title, body: n.body ?? "", severity: n.severity ?? "info", link: n.link ?? "", category: n.category }, { maxAttempts: 4 });
+  }
 }

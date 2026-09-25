@@ -29,6 +29,7 @@ beforeAll(async () => {
   await owner.connect();
   const admin = (await h.call("POST", "/v1/signup", { body: { organization_name: "Jobs Inc", email: uniqueEmail("j"), password: PASSWORD, given_name: "J" } })).body.token;
   orgId = (await h.call("GET", "/v1/me", { token: admin })).body.organization.id;
+  await h.jobs.runOnce({ orgId }); // e.g. welcome notifications' delivery jobs
 });
 afterAll(async () => {
   await owner.end();
@@ -104,7 +105,9 @@ describe("background jobs", () => {
   it("keeps tenants apart", async () => {
     const other = (await h.call("POST", "/v1/signup", { body: { organization_name: "Other", email: uniqueEmail("o"), password: PASSWORD, given_name: "O" } })).body.token;
     const otherOrg = (await h.call("GET", "/v1/me", { token: other })).body.organization.id;
-    const visible = await h.deps.db.tenant(otherOrg, (tx) => tx.selectFrom("jobs").select("id").execute());
+    const mine = await h.deps.db.tenant(orgId, (tx) => tx.selectFrom("jobs").select("id").where("kind", "like", "test.%").execute());
+    expect(mine.length).toBeGreaterThan(0);
+    const visible = await h.deps.db.tenant(otherOrg, (tx) => tx.selectFrom("jobs").select("id").where("kind", "like", "test.%").execute());
     expect(visible).toEqual([]);
   });
 });

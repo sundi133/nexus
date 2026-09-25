@@ -7,7 +7,9 @@ import { migrate } from "./platform/migrate.js";
 import { Realtime } from "./platform/realtime.js";
 import { Sealer } from "./platform/seal.js";
 import { SmtpMailer } from "./platform/mailer.js";
-import { RecordingPushSender } from "./platform/push.js";
+import { RecordingPushSender, RoutingPushSender } from "./platform/push.js";
+import { ApnsSender } from "./platform/push-apns.js";
+import { FcmSender } from "./platform/push-fcm.js";
 
 const cfg = loadConfig();
 if (cfg.env !== "prod") await migrate(cfg.databaseOwnerUrl, (m) => console.log(`[migrate] ${m}`));
@@ -16,7 +18,17 @@ const db = new Db(cfg.databaseUrl);
 const realtime = new Realtime(cfg.databaseUrl);
 await realtime.start();
 const mailer = new SmtpMailer(cfg.smtpUrl, cfg.mailFrom);
-const deps = { cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push: new RecordingPushSender(true) };
+// Real APNs/FCM when configured; otherwise pushes are logged (the app also gets challenges live over SSE).
+const push = new RoutingPushSender(
+  {
+    ...(cfg.apns ? { ios: new ApnsSender(cfg.apns) } : {}),
+    ...(cfg.fcmServiceAccount ? { android: FcmSender.fromServiceAccount(cfg.fcmServiceAccount) } : {}),
+  },
+  cfg.env === "prod" ? undefined : new RecordingPushSender(true),
+);
+if (cfg.env === "prod" && !cfg.apns) console.warn("[push] APNs is not configured: iOS pushes are disabled");
+if (cfg.env === "prod" && !cfg.fcmServiceAccount) console.warn("[push] FCM is not configured: Android pushes are disabled");
+const deps = { cfg, db, sealer: new Sealer(cfg.sealKey), realtime, mailer, push };
 const app = createApp(deps);
 const jobs = new JobRunner(deps);
 registerSchedules(jobs, deps);

@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { networkError } from "../platform/outbound.js";
 
 /**
  * Delivery to one destination kind. Returns how many of the given events were
@@ -17,7 +18,7 @@ async function post(url: string, body: string, headers: Record<string, string>):
     const text = res.ok ? "" : (await res.text()).slice(0, 300);
     return { status: res.status, error: res.ok ? "" : `HTTP ${res.status}${text ? `: ${text}` : ""}` };
   } catch (err) {
-    return { status: 0, error: `Couldn't connect: ${(err as Error).message}` };
+    return { status: 0, error: `Couldn't connect: ${networkError(err)}` };
   }
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertChannelsCard } from "@/components/features/notification-channels";
 import type { Schemas } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, CircleAlert, ShieldCheck } from "lucide-react";
@@ -181,6 +182,8 @@ export default function OrganizationSettingsPage() {
         </Card>
 
         <SigningKeysCard />
+
+        <AlertChannelsCard />
 
         <Card className="overflow-hidden">
           <CardHeader title="Change history" description="Every change to these settings: who, when and what." />

@@ -1,3 +1,5 @@
+import { networkError } from "../platform/outbound.js";
+
 /**
  * Minimal SCIM 2.0 client (RFC 7643/7644) for pushing people and groups to
  * apps. Only the operations provisioning needs; PATCH uses value-only
@@ -69,7 +71,7 @@ export class ScimClient {
         redirect: "error",
       });
     } catch (err) {
-      throw new ScimError(`Couldn't reach the app: ${(err as Error).message}`, 0, true);
+      throw new ScimError(`Couldn't reach the app: ${networkError(err)}`, 0, true);
     }
     const text = await res.text();
     let json: any = null;
