@@ -14,6 +14,7 @@ import {
   KeyRound,
   LayoutGrid,
   LogIn,
+  Network,
   MonitorSmartphone,
   PackageCheck,
   PackageSearch,
@@ -77,6 +78,7 @@ export const NAV: NavSection[] = [
       { label: "Agents", href: "/agents", icon: Bot },
       { label: "MCP servers", href: "/mcp", icon: Server },
       { label: "AI on devices", href: "/ai-devices", icon: BrainCircuit },
+      { label: "Access graph", href: "/access-graph", icon: Network },
     ],
   },
   {

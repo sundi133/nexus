@@ -8043,6 +8043,100 @@
           "occurred_at"
         ]
       },
+      "PersonRisk": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer",
+            "description": "0–100: the sum of the factors' points"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "factors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "points": {
+                  "type": "integer"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": "string"
+                },
+                "device": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "hostname": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "hostname"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "points",
+                "title",
+                "detail"
+              ]
+            }
+          },
+          "devices": {
+            "type": "integer"
+          },
+          "ai_clients": {
+            "type": "integer"
+          },
+          "mcp_servers": {
+            "type": "integer"
+          },
+          "agents": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "email",
+          "name",
+          "score",
+          "level",
+          "factors",
+          "devices",
+          "ai_clients",
+          "mcp_servers",
+          "agents"
+        ]
+      },
       "DevicePage": {
         "type": "object",
         "properties": {
@@ -33687,6 +33781,277 @@
                     "in_sync",
                     "status",
                     "last_seen_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/risk/people": {
+      "get": {
+        "tags": [
+          "Risk"
+        ],
+        "summary": "People by risk, with the reasons",
+        "description": "Scores from each person's admin rights, MFA, devices, the AI clients and MCP servers on them, and the AI agents they own. Every point comes from a named factor.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PersonRisk"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/risk/people/{id}/graph": {
+      "get": {
+        "tags": [
+          "Risk"
+        ],
+        "summary": "A person's access graph: devices, AI clients, MCP servers, gateway tools and owned AI agents",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "person": {
+                      "$ref": "#/components/schemas/PersonRisk"
+                    },
+                    "nodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "person",
+                              "device",
+                              "client",
+                              "server",
+                              "gateway_server",
+                              "tools",
+                              "agent"
+                            ]
+                          },
+                          "column": {
+                            "type": "integer"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "sublabel": {
+                            "type": "string"
+                          },
+                          "tone": {
+                            "type": "string",
+                            "enum": [
+                              "neutral",
+                              "success",
+                              "warning",
+                              "danger"
+                            ]
+                          },
+                          "href": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "column",
+                          "label",
+                          "sublabel",
+                          "tone"
+                        ]
+                      }
+                    },
+                    "edges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "from": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "tone": {
+                            "type": "string",
+                            "enum": [
+                              "neutral",
+                              "success",
+                              "warning",
+                              "danger"
+                            ]
+                          },
+                          "dashed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "from",
+                          "to",
+                          "label",
+                          "tone"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "person",
+                    "nodes",
+                    "edges"
                   ]
                 }
               }

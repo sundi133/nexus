@@ -64,6 +64,7 @@ import { scheduleDirectorySyncs } from "./directory/sync/service.js";
 import { registerAIRoutes } from "./devices/ai-routes.js";
 import { registerOsqueryRoutes } from "./devices/osquery.js";
 import { registerEnforcementRoutes } from "./devices/enforcement.js";
+import { registerRiskRoutes, scheduleRisk } from "./risk/routes.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
 import { registerDeviceTrustRoutes } from "./access/device-trust.js";
 import { registerAccessPolicyRoutes } from "./access/routes.js";
@@ -228,6 +229,7 @@ export function createApp(deps: Deps) {
   registerAIRoutes(app); // before /v1/devices/{id}
   registerOsqueryRoutes(app);
   registerEnforcementRoutes(app);
+  registerRiskRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -256,4 +258,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleMcpSyncs(jobs, deps);
   scheduleAuditIntegrity(jobs, deps);
   scheduleAlerts(jobs, deps);
+  scheduleRisk(jobs, deps);
 }

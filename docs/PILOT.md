@@ -102,7 +102,8 @@ Go to **Applications → Add app**: pick one from the catalog or add any SAML/OI
 2. **MCP servers → Add server**, e.g. your GitHub or internal MCP server with a scoped token. Review the discovered tools, approve the read-only ones, and add a permission rule (e.g. agents tagged `support` may use read tools on `repo in [acme/web]`).
 3. Point your agent at the gateway URL shown on the server's page, with a Nexus token from the client credentials grant (the curl command is on the agent's page).
 4. Watch **Agents → activity** and **Audit log**. Try a denied call, and the **Suspend now** kill switch.
-5. Open **AI on devices** to see which AI tools and MCP servers the pilot group's laptops use, and which bypass the gateway or keep tokens in config files. Then turn on the **AI tools use approved MCP servers** device policy in audit mode ([AI-ON-DEVICES.md](AI-ON-DEVICES.md)).
+5. Open **Access graph** to see each pilot user's devices, AI clients, MCP servers and owned agents, ranked by risk with the reasons ([ACCESS-GRAPH.md](ACCESS-GRAPH.md)).
+6. Open **AI on devices** to see which AI tools and MCP servers the pilot group's laptops use, and which bypass the gateway or keep tokens in config files. Then turn on the **AI tools use approved MCP servers** device policy in audit mode ([AI-ON-DEVICES.md](AI-ON-DEVICES.md)).
 
 ## 8. SecOps
 

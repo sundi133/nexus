@@ -328,6 +328,14 @@ export interface Database {
     occurred_at: Timestamp;
     received_at: Generated<Date>;
   };
+  risk_scores: {
+    org_id: string;
+    user_id: string;
+    score: number;
+    level: "low" | "medium" | "high" | "critical";
+    factors: Json<unknown[]>;
+    computed_at: Generated<Date>;
+  };
   live_queries: {
     id: string;
     org_id: string;

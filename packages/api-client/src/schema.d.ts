@@ -19995,6 +19995,196 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/risk/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * People by risk, with the reasons
+         * @description Scores from each person's admin rights, MFA, devices, the AI clients and MCP servers on them, and the AI agents they own. Every point comes from a named factor.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["PersonRisk"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/risk/people/{id}/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A person's access graph: devices, AI clients, MCP servers, gateway tools and owned AI agents */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            person: components["schemas"]["PersonRisk"];
+                            nodes: {
+                                id: string;
+                                /** @enum {string} */
+                                type: "person" | "device" | "client" | "server" | "gateway_server" | "tools" | "agent";
+                                column: number;
+                                label: string;
+                                sublabel: string;
+                                /** @enum {string} */
+                                tone: "neutral" | "success" | "warning" | "danger";
+                                href?: string;
+                            }[];
+                            edges: {
+                                from: string;
+                                to: string;
+                                label: string;
+                                /** @enum {string} */
+                                tone: "neutral" | "success" | "warning" | "danger";
+                                dashed?: boolean;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -23889,6 +24079,33 @@ export interface components {
             count: number;
             detail: string;
             occurred_at: string;
+        };
+        PersonRisk: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            user_id: string;
+            email: string;
+            name: string;
+            /** @description 0–100: the sum of the factors' points */
+            score: number;
+            /** @enum {string} */
+            level: "low" | "medium" | "high" | "critical";
+            factors: {
+                key: string;
+                points: number;
+                title: string;
+                detail: string;
+                device?: {
+                    id: string;
+                    hostname: string;
+                };
+            }[];
+            devices: number;
+            ai_clients: number;
+            mcp_servers: number;
+            agents: number;
         };
         DevicePage: {
             data: components["schemas"]["Device"][];
