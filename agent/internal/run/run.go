@@ -13,6 +13,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
+	"github.com/votal-ai/nexus/agent/internal/enforce"
 	"github.com/votal-ai/nexus/agent/internal/osquery"
 	"github.com/votal-ai/nexus/agent/internal/release"
 	"github.com/votal-ai/nexus/agent/internal/update"
@@ -44,6 +45,8 @@ type Loop struct {
 	// Osquery, if set, collects the osquery inventory pack (slow: seconds), every OsqueryEvery.
 	Osquery      func(context.Context) osquery.Report
 	OsqueryEvery time.Duration
+	// Enforcer, if set, applies the signed block rules from check-ins and reports what it stopped.
+	Enforcer *enforce.Enforcer
 
 	lastInventory     [32]byte
 	lastInventoryTime time.Time
@@ -52,6 +55,7 @@ type Loop struct {
 	osquerySent       time.Time        // last time a report went out
 	osqueryHash       [32]byte
 	osqueryReport     *osquery.Report // collected, not yet delivered
+	extra             bool            // run --once: report once more
 	soon              bool            // check in again right away (to report, or after a refresh)
 }
 
@@ -76,6 +80,12 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	if sentOsquery != nil {
 		payload["osquery"] = sentOsquery
 	}
+	var sentEnforcement *enforce.Report
+	if l.Enforcer != nil {
+		r := l.Enforcer.Report()
+		sentEnforcement = &r
+		payload["enforcement"] = r
+	}
 	sentResults := len(l.pending)
 	if sentResults > 0 {
 		payload["command_results"] = l.pending
@@ -93,6 +103,10 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	if err == nil && sendInventory {
 		l.lastInventory, l.lastInventoryTime = sum, time.Now()
 	}
+	if err == nil && sentEnforcement != nil {
+		l.Enforcer.Delivered(*sentEnforcement)
+		l.extra = false
+	}
 	if err == nil && sentOsquery != nil {
 		l.osquerySent, l.osqueryReport = time.Now(), nil
 	}
@@ -108,6 +122,11 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 			if perr := l.Commands.Pin(res.CommandKey); perr != nil {
 				l.Log.Warn("command key", "err", perr)
 			}
+			if l.Enforcer != nil && res.Enforcement != "" {
+				if aerr := l.Enforcer.Apply(res.Enforcement); aerr != nil {
+					l.Log.Warn("block rules refused", "err", aerr)
+				}
+			}
 			if len(res.Commands) > 0 {
 				results := l.Commands.Handle(ctx, res.Commands)
 				l.pending = append(l.pending, results...)
@@ -120,8 +139,11 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 	return res, err
 }
 
-// Pending says whether command results are waiting for the next check-in.
-func (l *Loop) Pending() bool { return len(l.pending) > 0 }
+// Pending says whether command results or enforcement events are waiting for the next check-in.
+func (l *Loop) Pending() bool { return len(l.pending) > 0 || l.extra }
+
+// MarkPending asks for one more check-in (run --once): something happened after the last one.
+func (l *Loop) MarkPending() { l.extra = true }
 
 // osqueryPayload collects the pack when it's due, and returns a report to send:
 // when it changed, when the last one is a day old, or when the last send failed.

@@ -63,6 +63,7 @@ import { scheduleProvisioningReconcile } from "./provisioning/service.js";
 import { scheduleDirectorySyncs } from "./directory/sync/service.js";
 import { registerAIRoutes } from "./devices/ai-routes.js";
 import { registerOsqueryRoutes } from "./devices/osquery.js";
+import { registerEnforcementRoutes } from "./devices/enforcement.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
 import { registerDeviceTrustRoutes } from "./access/device-trust.js";
 import { registerAccessPolicyRoutes } from "./access/routes.js";
@@ -226,6 +227,7 @@ export function createApp(deps: Deps) {
   registerEventDestinationRoutes(app);
   registerAIRoutes(app); // before /v1/devices/{id}
   registerOsqueryRoutes(app);
+  registerEnforcementRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);

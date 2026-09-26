@@ -25,6 +25,7 @@ export const PERMISSIONS = [
   "devices:actions", // refresh, lock and restart a device
   "devices:wipe", // erase a device through its MDM (irreversible)
   "devices:query", // run live osquery queries on devices (reads anything osquery can see)
+  "devices:enforce", // block apps and domains on devices (can stop people working)
   "directory:sync", // connect Google Workspace / Entra ID (can create and suspend many users)
   "api_keys:manage", // create and revoke API keys
   "integrations:manage", // webhooks and SIEM streaming (they export the audit log)
@@ -50,7 +51,7 @@ const GRANTS: Record<Role, readonly Permission[]> = {
 };
 
 /** What an API key may be granted: everything except managing admins and keys (a key can't entrench itself). */
-export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage" && p !== "devices:wipe" && p !== "devices:query");
+export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage" && p !== "devices:wipe" && p !== "devices:query" && p !== "devices:enforce");
 
 export function permissionsFor(roles: readonly Role[]): Permission[] {
   const set = new Set<Permission>();

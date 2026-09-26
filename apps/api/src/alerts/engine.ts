@@ -33,6 +33,7 @@ export const BUILTIN_RULES: RuleDef[] = [
   { key: "agent_denied_burst", name: "Agent keeps getting denied", description: "An AI agent is repeatedly calling tools it isn't allowed to: a prompt injection or a broken agent.", severity: "high", match: { types: ["mcp.tool_denied"] }, group_by: "actor", threshold: 5, window_minutes: 1 },
   { key: "mass_offboarding", name: "Many people offboarded", description: "Unusually many offboardings in an hour.", severity: "high", match: { types: ["user.offboarded"] }, group_by: "none", threshold: 5, window_minutes: 60 },
   { key: "device_wipe", name: "Device wipe requested", description: "A device is being erased.", severity: "high", match: { types: ["device.action_requested"], details: { action: "wipe" } }, group_by: "target", threshold: 1, window_minutes: 60 },
+  { key: "blocked_app_burst", name: "Blocked app keeps coming back", description: "Someone keeps starting an app Nexus blocks on their device: they may need it for work, or be trying to get around the rule.", severity: "medium", match: { types: ["device.app_terminated"] }, group_by: "target", threshold: 5, window_minutes: 60 },
   { key: "audit_tamper", name: "Audit log tampering", description: "The audit log failed its integrity check.", severity: "critical", match: { types: ["audit.integrity_failed"] }, group_by: "none", threshold: 1, window_minutes: 1440 },
 ];
 

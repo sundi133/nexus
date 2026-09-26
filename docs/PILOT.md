@@ -89,7 +89,8 @@ Then:
 1. Set **Device policies** to *audit* mode first and look at what would fail.
 2. Connect **Intune or Jamf** under **Device management** so their compliance verdicts count.
 3. osquery comes with the agent ([OSQUERY.md](OSQUERY.md)): **Software** shows what's installed across the fleet, and **Live query** answers ad-hoc questions in about a minute.
-4. Add a **Conditional access** policy in *report-only* mode ("require a compliant device for app X") and read its 7-day impact before you enforce it.
+4. Try **Block rules** ([BLOCK-RULES.md](BLOCK-RULES.md)): add an app rule for an unapproved AI tool in monitor mode, watch what it would stop, then start blocking on the pilot group; block a shadow-AI domain.
+5. Add a **Conditional access** policy in *report-only* mode ("require a compliant device for app X") and read its 7-day impact before you enforce it.
 
 ## 6. Apps
 
@@ -146,4 +147,5 @@ Tick these off with your pilot group; each item is a real enterprise scenario.
 - **Agent signing needs your certificates:** the pipeline is built and verified, but builds are unsigned until you add an Apple Developer ID and a Windows signing identity ([SIGNING.md](SIGNING.md)).
 - **Barely tested against real vendors:** Entra ID, Okta, AD, Intune, Jamf, PagerDuty, Opsgenie and Sentinel are covered by protocol tests and local fakes. Only the public Entra ID, Okta and Google sign-in metadata has been checked live. Before the pilot, run the [live vendor check](LIVE-CHECK.md) against your tenants and send the report back.
 - **Single host:** Postgres runs on the same VM (see [OPERATIONS.md](OPERATIONS.md) for a managed database), and audit data stays in Postgres. That's fine for a pilot of hundreds of users.
+- **Device blocking is userland:** app rules end a program within ~2 seconds rather than preventing its launch, and domain rules use the hosts file, which a local admin can undo ([BLOCK-RULES.md](BLOCK-RULES.md#limits)).
 - **Not built yet:** organization data export and deletion (use `down -v`), a Terraform provider, MCP resources and prompts, content guardrails, and letting people connect their own MCP clients (agents only).

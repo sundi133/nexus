@@ -219,6 +219,8 @@ export interface Database {
     inventory: Json;
     posture: Json;
     osquery_version: string | null;
+    enforcement_version: Generated<string>;
+    enforcement_status: Generated<string>;
     osquery_collected_at: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
@@ -295,6 +297,36 @@ export interface Database {
     truncated: Generated<boolean>;
     error: Generated<string>;
     collected_at: Timestamp;
+  };
+  enforcement_rules: {
+    id: string;
+    org_id: string;
+    name: string;
+    kind: "app" | "domain";
+    match: "name" | "path" | "sha256" | "domain";
+    value: string;
+    mode: Generated<"monitor" | "block">;
+    target: Json<{ all?: boolean; group_ids?: string[] }>;
+    platforms: Generated<string[]>;
+    reason: Generated<string>;
+    enabled: Generated<boolean>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  enforcement_events: {
+    id: string;
+    org_id: string;
+    device_id: string;
+    rule_id: string | null;
+    rule_name: Generated<string>;
+    action: "terminated" | "would_terminate" | "domain_blocked" | "failed";
+    subject: Generated<string>;
+    user_name: Generated<string>;
+    count: Generated<number>;
+    detail: Generated<string>;
+    occurred_at: Timestamp;
+    received_at: Generated<Date>;
   };
   live_queries: {
     id: string;

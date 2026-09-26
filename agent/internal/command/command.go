@@ -45,27 +45,36 @@ const typ = "nexus-command+jwt"
 
 var b64 = base64.RawURLEncoding
 
-// Verify checks an EdDSA compact JWS against the pinned key, and that it's for this device and not expired.
-func Verify(jws string, key ed25519.PublicKey, deviceID string, now time.Time) (*Claims, error) {
+// VerifySigned checks an EdDSA compact JWS of the given type against the pinned key and returns its payload.
+func VerifySigned(jws string, key ed25519.PublicKey, wantTyp, what string) ([]byte, error) {
 	parts := strings.Split(jws, ".")
 	if len(parts) != 3 {
-		return nil, errors.New("malformed command")
+		return nil, fmt.Errorf("malformed %s", what)
 	}
 	var hdr struct {
 		Alg string `json:"alg"`
 		Typ string `json:"typ"`
 	}
 	raw, err := b64.DecodeString(parts[0])
-	if err != nil || json.Unmarshal(raw, &hdr) != nil || hdr.Alg != "EdDSA" || hdr.Typ != typ {
-		return nil, errors.New("unexpected command header")
+	if err != nil || json.Unmarshal(raw, &hdr) != nil || hdr.Alg != "EdDSA" || hdr.Typ != wantTyp {
+		return nil, fmt.Errorf("unexpected %s header", what)
 	}
 	sig, err := b64.DecodeString(parts[2])
 	if err != nil || !ed25519.Verify(key, []byte(parts[0]+"."+parts[1]), sig) {
-		return nil, errors.New("bad command signature")
+		return nil, fmt.Errorf("bad %s signature", what)
 	}
 	payload, err := b64.DecodeString(parts[1])
 	if err != nil {
-		return nil, errors.New("malformed command payload")
+		return nil, fmt.Errorf("malformed %s payload", what)
+	}
+	return payload, nil
+}
+
+// Verify checks an EdDSA compact JWS against the pinned key, and that it's for this device and not expired.
+func Verify(jws string, key ed25519.PublicKey, deviceID string, now time.Time) (*Claims, error) {
+	payload, err := VerifySigned(jws, key, typ, "command")
+	if err != nil {
+		return nil, err
 	}
 	var c Claims
 	if err := json.Unmarshal(payload, &c); err != nil || c.ID == "" {
@@ -122,6 +131,9 @@ func (r *Runner) Pin(key string) error {
 	}
 	return os.WriteFile(r.keyPath(), []byte(key), 0o600)
 }
+
+// Key is the organization's pinned command key (it also signs block-rule policies).
+func (r *Runner) Key() (ed25519.PublicKey, error) { return r.key() }
 
 func (r *Runner) key() (ed25519.PublicKey, error) {
 	raw, err := os.ReadFile(r.keyPath())

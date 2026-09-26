@@ -385,6 +385,7 @@
           "devices:actions",
           "devices:wipe",
           "devices:query",
+          "devices:enforce",
           "directory:sync",
           "api_keys:manage",
           "integrations:manage",
@@ -3577,6 +3578,7 @@
                       "devices:actions",
                       "devices:wipe",
                       "devices:query",
+                      "devices:enforce",
                       "directory:sync",
                       "api_keys:manage",
                       "integrations:manage",
@@ -3634,6 +3636,7 @@
                     "devices:actions",
                     "devices:wipe",
                     "devices:query",
+                    "devices:enforce",
                     "directory:sync",
                     "api_keys:manage",
                     "integrations:manage",
@@ -3706,6 +3709,7 @@
                 "devices:actions",
                 "devices:wipe",
                 "devices:query",
+                "devices:enforce",
                 "directory:sync",
                 "api_keys:manage",
                 "integrations:manage",
@@ -7865,6 +7869,178 @@
               "rows"
             ]
           }
+        ]
+      },
+      "EnforcementRule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "app",
+              "domain"
+            ]
+          },
+          "match": {
+            "type": "string",
+            "enum": [
+              "name",
+              "path",
+              "sha256",
+              "domain"
+            ]
+          },
+          "value": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "monitor",
+              "block"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "boolean"
+              },
+              "group_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "devices": {
+                "type": "integer"
+              },
+              "events_7d": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "devices",
+              "events_7d"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "match",
+          "value",
+          "mode",
+          "target",
+          "platforms",
+          "reason",
+          "enabled",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "stats"
+        ]
+      },
+      "EnforcementEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "rule_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule_name": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "terminated",
+              "would_terminate",
+              "domain_blocked",
+              "failed"
+            ]
+          },
+          "subject": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "device_id",
+          "hostname",
+          "rule_id",
+          "rule_name",
+          "action",
+          "subject",
+          "user",
+          "count",
+          "detail",
+          "occurred_at"
         ]
       },
       "DevicePage": {
@@ -18951,6 +19127,7 @@
                         "devices:actions",
                         "devices:wipe",
                         "devices:query",
+                        "devices:enforce",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -19103,6 +19280,7 @@
                         "devices:actions",
                         "devices:wipe",
                         "devices:query",
+                        "devices:enforce",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -32671,6 +32849,845 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LiveQueryDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/enforcement/rules": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "App and domain block rules",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EnforcementRule"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Add a block rule",
+        "description": "App rules terminate matching programs (monitor mode first reports what they'd stop); domain rules sinkhole a domain in the hosts file. Needs `devices:enforce` and a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "app",
+                      "domain"
+                    ]
+                  },
+                  "match": {
+                    "type": "string",
+                    "enum": [
+                      "name",
+                      "path",
+                      "sha256",
+                      "domain"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "monitor",
+                      "block"
+                    ],
+                    "default": "monitor"
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "all": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        },
+                        "required": [
+                          "all"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "group_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                            },
+                            "minItems": 1,
+                            "maxItems": 50
+                          }
+                        },
+                        "required": [
+                          "group_ids"
+                        ]
+                      }
+                    ],
+                    "default": {
+                      "all": true
+                    }
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "macos",
+                        "windows",
+                        "linux"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 3,
+                    "default": [
+                      "macos",
+                      "windows",
+                      "linux"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind",
+                  "match",
+                  "value"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnforcementRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/enforcement/rules/{id}": {
+      "patch": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Change a block rule (e.g. from monitor to block)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "app",
+                      "domain"
+                    ]
+                  },
+                  "match": {
+                    "type": "string",
+                    "enum": [
+                      "name",
+                      "path",
+                      "sha256",
+                      "domain"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "monitor",
+                      "block"
+                    ],
+                    "default": "monitor"
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "all": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        },
+                        "required": [
+                          "all"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "group_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                            },
+                            "minItems": 1,
+                            "maxItems": 50
+                          }
+                        },
+                        "required": [
+                          "group_ids"
+                        ]
+                      }
+                    ],
+                    "default": {
+                      "all": true
+                    }
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "macos",
+                        "windows",
+                        "linux"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 3,
+                    "default": [
+                      "macos",
+                      "windows",
+                      "linux"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnforcementRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Remove a block rule",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/enforcement/events": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "What devices blocked (or would have, in monitor mode)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": false,
+            "name": "device_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": false,
+            "name": "rule_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EnforcementEvent"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/enforcement": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "The block rules a device should enforce, and what it last reported",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "app",
+                              "domain"
+                            ]
+                          },
+                          "match": {
+                            "type": "string",
+                            "enum": [
+                              "name",
+                              "path",
+                              "sha256",
+                              "domain"
+                            ]
+                          },
+                          "value": {
+                            "type": "string"
+                          },
+                          "mode": {
+                            "type": "string",
+                            "enum": [
+                              "monitor",
+                              "block"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "match",
+                          "value",
+                          "mode"
+                        ]
+                      }
+                    },
+                    "expected_version": {
+                      "type": "string"
+                    },
+                    "applied_version": {
+                      "type": "string"
+                    },
+                    "in_sync": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "last_seen_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "rules",
+                    "expected_version",
+                    "applied_version",
+                    "in_sync",
+                    "status",
+                    "last_seen_at"
+                  ]
                 }
               }
             }

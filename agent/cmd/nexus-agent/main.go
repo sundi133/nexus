@@ -17,6 +17,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -31,6 +32,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
+	"github.com/votal-ai/nexus/agent/internal/enforce"
 	"github.com/votal-ai/nexus/agent/internal/identity"
 	"github.com/votal-ai/nexus/agent/internal/local"
 	"github.com/votal-ai/nexus/agent/internal/osquery"
@@ -226,8 +228,16 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			}
 		}
 	}
-	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin,
-		Commands: &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate)}, Log: log},
+	runner := &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate)}, Log: log}
+	ownHost := ""
+	if u, perr := url.Parse(e.Server); perr == nil {
+		ownHost = u.Hostname()
+	}
+	enforcer := &enforce.Enforcer{StateDir: store.Dir, DeviceID: e.DeviceID, Key: runner.Key, OwnHost: ownHost, Log: log,
+		Processes: enforce.ListProcesses, Kill: enforce.KillProcess, FlushDNS: enforce.FlushDNS}
+	enforcer.Load() // the last rules apply from boot, before the first check-in
+	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin, Enforcer: enforcer,
+		Commands: runner,
 		Osquery: func(ctx context.Context) osquery.Report {
 			return osquery.Collect(ctx, osquery.Locate(), runtime.GOOS, time.Now())
 		}}
@@ -235,6 +245,10 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		res, err := loop.Once(ctx, 0)
 		if err != nil {
 			return err
+		}
+		enforcer.Scan() // one pass with the rules this check-in brought
+		if len(enforcer.Report().Events) > 0 {
+			loop.MarkPending()
 		}
 		// Commands ran during this check-in: report them now, since there's no next one.
 		if loop.Pending() {
@@ -246,6 +260,18 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		return nil
 	}
 	log.Info("nexus agent started", "device", e.DeviceID, "server", e.Server, "version", version)
+	go func() { // the app-rule watcher
+		t := time.NewTicker(2 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				enforcer.Scan()
+			}
+		}
+	}()
 	upd, err := newUpdater(store, c, log)
 	if err != nil {
 		log.Warn("self-update unavailable", "err", err)

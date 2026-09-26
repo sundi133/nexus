@@ -46,8 +46,8 @@ export async function commandKey(tx: Tx, deps: Deps, orgId: string): Promise<{ p
   return (await commandKey(tx, deps, orgId))!;
 }
 
-async function sign(privatePem: string, claims: Record<string, unknown>) {
-  return new CompactSign(new TextEncoder().encode(JSON.stringify(claims))).setProtectedHeader({ alg: "EdDSA", typ: CMD_TYP }).sign(createPrivateKey(privatePem));
+export async function sign(privatePem: string, claims: Record<string, unknown>, typ = CMD_TYP) {
+  return new CompactSign(new TextEncoder().encode(JSON.stringify(claims))).setProtectedHeader({ alg: "EdDSA", typ }).sign(createPrivateKey(privatePem));
 }
 
 /** Commands waiting for this device, signed, for the check-in response. */

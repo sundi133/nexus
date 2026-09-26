@@ -7826,7 +7826,7 @@ export interface paths {
                         name: string;
                         /** @default  */
                         description?: string;
-                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                     };
                 };
             };
@@ -7995,7 +7995,7 @@ export interface paths {
                         name?: string;
                         /** @default  */
                         description?: string;
-                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                     };
                 };
             };
@@ -19427,6 +19427,574 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/enforcement/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** App and domain block rules */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["EnforcementRule"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add a block rule
+         * @description App rules terminate matching programs (monitor mode first reports what they'd stop); domain rules sinkhole a domain in the hosts file. Needs `devices:enforce` and a recent MFA.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** @enum {string} */
+                        kind: "app" | "domain";
+                        /** @enum {string} */
+                        match: "name" | "path" | "sha256" | "domain";
+                        value: string;
+                        /**
+                         * @default monitor
+                         * @enum {string}
+                         */
+                        mode?: "monitor" | "block";
+                        /**
+                         * @default {
+                         *       "all": true
+                         *     }
+                         */
+                        target?: {
+                            /** @enum {boolean} */
+                            all: true;
+                        } | {
+                            group_ids: string[];
+                        };
+                        /**
+                         * @default [
+                         *       "macos",
+                         *       "windows",
+                         *       "linux"
+                         *     ]
+                         */
+                        platforms?: ("macos" | "windows" | "linux")[];
+                        /** @default  */
+                        reason?: string;
+                        /** @default true */
+                        enabled?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EnforcementRule"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/enforcement/rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a block rule */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Change a block rule (e.g. from monitor to block) */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        /** @enum {string} */
+                        kind?: "app" | "domain";
+                        /** @enum {string} */
+                        match?: "name" | "path" | "sha256" | "domain";
+                        value?: string;
+                        /**
+                         * @default monitor
+                         * @enum {string}
+                         */
+                        mode?: "monitor" | "block";
+                        /**
+                         * @default {
+                         *       "all": true
+                         *     }
+                         */
+                        target?: {
+                            /** @enum {boolean} */
+                            all: true;
+                        } | {
+                            group_ids: string[];
+                        };
+                        /**
+                         * @default [
+                         *       "macos",
+                         *       "windows",
+                         *       "linux"
+                         *     ]
+                         */
+                        platforms?: ("macos" | "windows" | "linux")[];
+                        /** @default  */
+                        reason?: string;
+                        /** @default true */
+                        enabled?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["EnforcementRule"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/enforcement/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What devices blocked (or would have, in monitor mode) */
+        get: {
+            parameters: {
+                query?: {
+                    device_id?: string;
+                    rule_id?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["EnforcementEvent"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/{id}/enforcement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The block rules a device should enforce, and what it last reported */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            rules: {
+                                /**
+                                 * Format: uuid
+                                 * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                                 */
+                                id: string;
+                                name: string;
+                                /** @enum {string} */
+                                kind: "app" | "domain";
+                                /** @enum {string} */
+                                match: "name" | "path" | "sha256" | "domain";
+                                value: string;
+                                /** @enum {string} */
+                                mode: "monitor" | "block";
+                            }[];
+                            expected_version: string;
+                            applied_version: string;
+                            in_sync: boolean;
+                            status: string;
+                            last_seen_at: string | null;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -21083,7 +21651,7 @@ export interface components {
             created_at: string;
         };
         /** @enum {string} */
-        Permission: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+        Permission: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
         Factor: {
             /**
              * Format: uuid
@@ -22081,13 +22649,13 @@ export interface components {
             builtin: {
                 /** @enum {string} */
                 key: "owner" | "admin" | "helpdesk" | "security_analyst" | "readonly";
-                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                 scopable: boolean;
             }[];
             custom: components["schemas"]["CustomRole"][];
             permissions: {
                 /** @enum {string} */
-                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
                 /** @description Can be limited to groups in a scoped grant */
                 scopable: boolean;
                 in_custom_roles: boolean;
@@ -22101,7 +22669,7 @@ export interface components {
             id: string;
             name: string;
             description: string;
-            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
             holders: number;
             /**
              * Format: date-time
@@ -23270,6 +23838,57 @@ export interface components {
             rows: {
                 [key: string]: string;
             }[];
+        };
+        EnforcementRule: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "app" | "domain";
+            /** @enum {string} */
+            match: "name" | "path" | "sha256" | "domain";
+            value: string;
+            /** @enum {string} */
+            mode: "monitor" | "block";
+            target: {
+                all?: boolean;
+                group_ids?: string[];
+            };
+            platforms: string[];
+            reason: string;
+            enabled: boolean;
+            created_by: string | null;
+            created_at: string;
+            updated_at: string;
+            stats: {
+                devices: number;
+                events_7d: number;
+            };
+        };
+        EnforcementEvent: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            device_id: string;
+            hostname: string;
+            rule_id: string | null;
+            rule_name: string;
+            /** @enum {string} */
+            action: "terminated" | "would_terminate" | "domain_blocked" | "failed";
+            subject: string;
+            user: string;
+            count: number;
+            detail: string;
+            occurred_at: string;
         };
         DevicePage: {
             data: components["schemas"]["Device"][];

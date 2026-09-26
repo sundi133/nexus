@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { ConfirmAction } from "@/components/features/confirm-action";
 import { DeviceServers, TOOL_KIND } from "@/components/features/ai-bits";
+import { DeviceEnforcement } from "@/components/features/device-enforcement";
 import { DeviceInventory } from "@/components/features/device-inventory";
 import { CheckList, ComplianceBadge, OnlineDot, PLATFORM_LABEL, PlatformIcon } from "@/components/features/device-bits";
 import { CommandHistory, DeviceActions } from "@/components/features/device-actions";
@@ -178,10 +179,11 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
             </>
           )}
         </TabsContent>
-        <TabsContent value="actions">
+        <TabsContent value="actions" className="space-y-5">
           <Card className="overflow-hidden">
             <CommandHistory deviceId={d.id} />
           </Card>
+          <DeviceEnforcement deviceId={d.id} />
         </TabsContent>
         <TabsContent value="activity">
           <Card className="overflow-hidden">{activity.data?.data.length ? <ActivityList events={activity.data.data} /> : <EmptyState title="No activity yet" />}</Card>
