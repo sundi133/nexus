@@ -218,6 +218,15 @@ export default function OrganizationSettingsPage() {
                   <span className="block text-xs text-fg-muted">Adding, inviting, importing or syncing anyone else is refused.</span>
                 </span>
               </label>
+              <label className="flex items-start gap-2 text-[13px]">
+                <input type="checkbox" className="mt-0.5" disabled={!editable} checked={!!draft.process_events} onChange={(e) => setDraft({ ...draft, process_events: e.target.checked })} />
+                <span>
+                  Collect real-time process events from devices
+                  <span className="block text-xs text-fg-muted">
+                    Devices report every program they start, with command lines (secrets removed), so Nexus can spot AI tools running network tools. Uses the osquery bundled with the agent; kept 7 days. Tell employees before you turn it on.
+                  </span>
+                </span>
+              </label>
               {editable ? (
                 <div className="flex justify-end gap-2 border-t border-border pt-4">
                   <Button onClick={() => setDraft(settings.data!)} disabled={!dirty}>

@@ -65,6 +65,7 @@ import { registerAIRoutes } from "./devices/ai-routes.js";
 import { registerOsqueryRoutes } from "./devices/osquery.js";
 import { registerEnforcementRoutes } from "./devices/enforcement.js";
 import { registerRiskRoutes, scheduleRisk } from "./risk/routes.js";
+import { registerProcessEventRoutes, scheduleProcessEventRetention } from "./devices/process-events.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
 import { registerDeviceTrustRoutes } from "./access/device-trust.js";
 import { registerAccessPolicyRoutes } from "./access/routes.js";
@@ -133,6 +134,7 @@ export function createApp(deps: Deps) {
   const LARGE: [RegExp, number][] = [
     [/^\/v1\/users\/import$/, 6 * 1024 * 1024],
     [/^\/v1\/agent\/(checkin|enroll)$/, 8 * 1024 * 1024],
+    [/^\/v1\/agent\/events$/, 4 * 1024 * 1024],
     [/^\/v1\/config\/(plan|apply)$/, 4 * 1024 * 1024],
     [/^\/scim\/v2\//, 4 * 1024 * 1024],
   ];
@@ -230,6 +232,7 @@ export function createApp(deps: Deps) {
   registerOsqueryRoutes(app);
   registerEnforcementRoutes(app);
   registerRiskRoutes(app);
+  registerProcessEventRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -259,4 +262,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleAuditIntegrity(jobs, deps);
   scheduleAlerts(jobs, deps);
   scheduleRisk(jobs, deps);
+  scheduleProcessEventRetention(jobs, deps);
 }

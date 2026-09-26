@@ -135,13 +135,20 @@ type CheckinResult struct {
 	OsqueryInterval   int `json:"osquery_interval_seconds"`
 	// Enforcement is this device's block-rule policy, signed with the organization's command key.
 	Enforcement string `json:"enforcement"`
-	Compliance  string `json:"compliance"`
-	WebOrigin   string `json:"web_origin"`
+	// ProcessEvents says whether the organization collects real-time process events.
+	ProcessEvents bool   `json:"process_events"`
+	Compliance    string `json:"compliance"`
+	WebOrigin     string `json:"web_origin"`
 	// Update is set when the server's rollout says this device should update.
 	Update *release.Offer `json:"update"`
 	// Commands are signed actions for this device (lock, restart, refresh).
 	Commands   []command.Signed `json:"commands"`
 	CommandKey string           `json:"command_key"`
+}
+
+// Events uploads a batch of process events (signed like a check-in).
+func (c *Client) Events(ctx context.Context, payload any) error {
+	return c.post(ctx, "/v1/agent/events", payload, nil)
 }
 
 func (c *Client) Checkin(ctx context.Context, payload any) (*CheckinResult, error) {

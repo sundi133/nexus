@@ -33,6 +33,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/enforce"
+	"github.com/votal-ai/nexus/agent/internal/events"
 	"github.com/votal-ai/nexus/agent/internal/identity"
 	"github.com/votal-ai/nexus/agent/internal/local"
 	"github.com/votal-ai/nexus/agent/internal/osquery"
@@ -260,6 +261,23 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		return nil
 	}
 	log.Info("nexus agent started", "device", e.DeviceID, "server", e.Server, "version", version)
+	// Real-time process events, while the organization turns them on (each check-in says).
+	collector := &events.Collector{StateDir: store.Dir, GOOS: runtime.GOOS, Locate: osquery.Locate, IsRoot: func() bool { return requireAdmin() == nil }, Log: log}
+	collector.Upload = func(ctx context.Context, b events.Batch) error {
+		err := c.Events(ctx, b)
+		var p *client.Problem
+		if errors.As(err, &p) && p.Code == "events_off" {
+			collector.SetEnabled(false) // turned off since the last check-in
+			return nil
+		}
+		return err
+	}
+	prev := loop.OnCheckin
+	loop.OnCheckin = func(res *client.CheckinResult) {
+		prev(res)
+		collector.SetEnabled(res.ProcessEvents)
+	}
+	go collector.Run(ctx)
 	go func() { // the app-rule watcher
 		t := time.NewTicker(2 * time.Second)
 		defer t.Stop()

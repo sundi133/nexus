@@ -15,6 +15,8 @@ import { newId } from "../platform/ids.js";
 import { CHECKIN_INTERVAL_S, evaluateDevice, getPolicies, INVENTORY_INTERVAL_S } from "./service.js";
 import { AIInventory, classify, diffServers, loadAIContext, parseAI, type ReportedServer, serverTarget } from "./ai.js";
 import { EnforcementReport, recordEnforcement, signedPolicy } from "./enforcement.js";
+import { getSettings } from "../org/settings.js";
+import { ingestProcessEvents, ProcessEventsBody } from "./process-events.js";
 import { OSQUERY_INTERVAL_S, OsqueryReport, storeOsquery } from "./osquery.js";
 import { PostureFacts } from "./posture.js";
 import { releaseStore } from "./releases.js";
@@ -133,6 +135,30 @@ async function verifyProof(c: Context<Env>, token: string, key: Parameters<typeo
   return payload;
 }
 
+/** The device a signed agent request comes from (its proof checked against the device's key). */
+async function authenticateDevice(c: Context<Env>, raw: string) {
+  const proof = authHeader(c);
+  const kid = (JSON.parse(Buffer.from(proof.split(".")[0] ?? "", "base64url").toString() || "{}") as { kid?: string }).kid ?? "";
+  if (!/^[0-9a-f-]{36}$/.test(kid)) throw deviceError(401, "invalid_device_proof", "Missing device ID");
+  const dev = await c.get("deps").db.unscoped(async (tx) => (await sql<{ org_id: string; public_jwk: JWK }>`SELECT * FROM nexus_device_auth(${kid}::uuid)`.execute(tx)).rows[0]);
+  // Removed devices must stop: the agent treats this code as "unenrolled".
+  if (!dev) throw deviceError(401, "device_not_enrolled", "This device is not enrolled (it may have been removed)");
+  const payload = await verifyProof(c, proof, await importJWK(dev.public_jwk, "ES256"), raw);
+  return { dev, kid, payload };
+}
+
+/** Replay protection: a proof can be used once. */
+async function consumeProof(tx: Tx, orgId: string, kid: string, payload: { jti?: unknown; exp?: number }) {
+  await tx.deleteFrom("agent_nonces").where("device_id", "=", kid).where("expires_at", "<", new Date()).execute();
+  const fresh = await tx
+    .insertInto("agent_nonces")
+    .values({ jti: String(payload.jti), org_id: orgId, device_id: kid, expires_at: new Date((payload.exp ?? 0) * 1000) })
+    .onConflict((oc) => oc.doNothing())
+    .returning("jti")
+    .executeTakeFirst();
+  if (!fresh) throw deviceError(401, "replayed_device_proof", "This signed request was already used");
+}
+
 const authHeader = (c: Context<Env>) => {
   const h = c.req.header("authorization");
   if (!h?.startsWith("NexusDevice ")) throw deviceError(401, "device_auth_required", "Missing device signature");
@@ -229,6 +255,28 @@ export function registerAgentRoutes(app: App) {
 
   app.openAPIRegistry.registerPath({
     method: "post",
+    path: "/v1/agent/events",
+    tags: ["Agent"],
+    summary: "Report real-time process events (called by the Nexus agent every few seconds while the process_events setting is on)",
+    description: "Body `{status, dropped, events: [{time, pid, path, cmdline, user, parent_path, ancestors, responsible_path, signer}]}`, signed with the device key. Refused with 409 while the setting is off.",
+    responses: { 200: { description: "`{stored, detections}`" } },
+  });
+  app.post("/v1/agent/events", async (c) => { // body capped at 4 MB in app.ts
+    const deps = c.get("deps");
+    const raw = await c.req.text();
+    const { dev, kid, payload } = await authenticateDevice(c, raw);
+    const input = parse(ProcessEventsBody, raw);
+    const out = await deps.db.tenant(dev.org_id, async (tx) => {
+      await consumeProof(tx, dev.org_id, kid, payload);
+      if (!(await getSettings(tx, dev.org_id)).process_events) throw conflict("events_off", "Real-time process events are off for this organization");
+      const d = await tx.selectFrom("devices").select(["id", "org_id", "hostname"]).where("id", "=", kid).executeTakeFirstOrThrow();
+      return ingestProcessEvents(tx, d, input, c.get("meta"));
+    });
+    return c.json(out, 200);
+  });
+
+  app.openAPIRegistry.registerPath({
+    method: "post",
     path: "/v1/agent/checkin",
     tags: ["Agent"],
     summary: "Report posture and inventory (called by the Nexus agent every minute)",
@@ -240,28 +288,13 @@ export function registerAgentRoutes(app: App) {
     const deps = c.get("deps");
     const meta = c.get("meta");
     const raw = await c.req.text();
-    const proof = authHeader(c);
-    const kid = (JSON.parse(Buffer.from(proof.split(".")[0] ?? "", "base64url").toString() || "{}") as { kid?: string }).kid ?? "";
-    if (!/^[0-9a-f-]{36}$/.test(kid)) throw deviceError(401, "invalid_device_proof", "Missing device ID");
-    const dev = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; public_jwk: JWK }>`SELECT * FROM nexus_device_auth(${kid}::uuid)`.execute(tx)).rows[0]);
-    // Removed devices must stop: the agent treats this code as "unenrolled".
-    if (!dev) throw deviceError(401, "device_not_enrolled", "This device is not enrolled (it may have been removed)");
-    const payload = await verifyProof(c, proof, await importJWK(dev.public_jwk, "ES256"), raw);
+    const { dev, kid, payload } = await authenticateDevice(c, raw);
     const input = parse(CheckinBody, raw);
     const ai = input.inventory && "ai" in input.inventory ? AIInventory.safeParse(input.inventory.ai) : null;
     if (input.inventory && ai && !ai.success) delete input.inventory.ai;
 
     const out = await deps.db.tenant(dev.org_id, async (tx) => {
-      // Replay protection: a proof can be used once.
-      await tx.deleteFrom("agent_nonces").where("device_id", "=", kid).where("expires_at", "<", new Date()).execute();
-      const fresh = await tx
-        .insertInto("agent_nonces")
-        .values({ jti: String(payload.jti), org_id: dev.org_id, device_id: kid, expires_at: new Date((payload.exp ?? 0) * 1000) })
-        .onConflict((oc) => oc.doNothing())
-        .returning("jti")
-        .executeTakeFirst();
-      if (!fresh) throw deviceError(401, "replayed_device_proof", "This signed request was already used");
-
+      await consumeProof(tx, dev.org_id, kid, payload);
       const before = ai?.success ? parseAI((await tx.selectFrom("devices").select("inventory").where("id", "=", kid).executeTakeFirst())?.inventory) : null;
       const d = await tx
         .updateTable("devices")
@@ -292,7 +325,8 @@ export function registerAgentRoutes(app: App) {
       const key = await commandKey(tx, deps, dev.org_id);
       const update = await offerFor(tx, dev.org_id, d, releaseStore(deps.cfg), meta);
       const enforcement = await signedPolicy(tx, deps, d);
-      return { enforcement, checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, osquery_interval_seconds: OSQUERY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update, commands, command_key: key.publicKey };
+      const settings = await getSettings(tx, dev.org_id);
+      return { enforcement, process_events: settings.process_events, checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, osquery_interval_seconds: OSQUERY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update, commands, command_key: key.publicKey };
     });
     return c.json(out, 200);
   });

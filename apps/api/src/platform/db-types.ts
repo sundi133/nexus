@@ -221,6 +221,7 @@ export interface Database {
     osquery_version: string | null;
     enforcement_version: Generated<string>;
     enforcement_status: Generated<string>;
+    events_status: Generated<string>;
     osquery_collected_at: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
@@ -326,6 +327,23 @@ export interface Database {
     count: Generated<number>;
     detail: Generated<string>;
     occurred_at: Timestamp;
+    received_at: Generated<Date>;
+  };
+  device_process_events: {
+    id: string;
+    org_id: string;
+    device_id: string;
+    time: Timestamp;
+    pid: Generated<number>;
+    path: Generated<string>;
+    cmdline: Generated<string>;
+    user_name: Generated<string>;
+    parent_path: Generated<string>;
+    ancestors: Generated<string[]>;
+    responsible_path: Generated<string>;
+    signer: Generated<string>;
+    detection: string | null;
+    severity: "info" | "low" | "medium" | "high" | null;
     received_at: Generated<Date>;
   };
   risk_scores: {

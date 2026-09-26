@@ -12296,6 +12296,8 @@ export interface paths {
                         owners_require_passkey?: boolean;
                         /** @description How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept. */
                         audit_retention_days?: number;
+                        /** @description Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days. */
+                        process_events?: boolean;
                     };
                 };
             };
@@ -14368,6 +14370,43 @@ export interface paths {
             responses: {
                 /** @description Enrolled: `{device_id, organization, checkin_interval_seconds, web_origin}` — `web_origin` is the only site the local agent will attest to */
                 201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report real-time process events (called by the Nexus agent every few seconds while the process_events setting is on)
+         * @description Body `{status, dropped, events: [{time, pid, path, cmdline, user, parent_path, ancestors, responsible_path, signer}]}`, signed with the device key. Refused with 409 while the setting is off.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description `{stored, detections}` */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -20185,6 +20224,183 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/devices/{id}/process-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Programs a device started (real-time events), newest first */
+        get: {
+            parameters: {
+                query?: {
+                    detections?: boolean | null;
+                    q?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["ProcessEvent"][];
+                            status: string;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/detections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent detections across devices (AI tools running network tools or shells, programs run from temp folders) */
+        get: {
+            parameters: {
+                query?: {
+                    severity?: "info" | "low" | "medium" | "high";
+                    q?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["ProcessEvent"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -22640,6 +22856,8 @@ export interface components {
                 owners_require_passkey?: boolean;
                 /** @description How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept. */
                 audit_retention_days?: number;
+                /** @description Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days. */
+                process_events?: boolean;
             };
             groups?: {
                 name: string;
@@ -23239,6 +23457,8 @@ export interface components {
             owners_require_passkey: boolean;
             /** @description How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept. */
             audit_retention_days: number;
+            /** @description Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days. */
+            process_events: boolean;
         };
         PolicyImpact: {
             users_to_enroll: number;
@@ -24106,6 +24326,32 @@ export interface components {
             ai_clients: number;
             mcp_servers: number;
             agents: number;
+        };
+        ProcessEvent: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            device_id: string;
+            hostname: string;
+            time: string;
+            pid: number;
+            path: string;
+            cmdline: string;
+            user: string;
+            parent_path: string;
+            ancestors: string[];
+            responsible_path: string;
+            signer: string;
+            /** @enum {string|null} */
+            detection: "ai_network_tool" | "ai_shell" | "exec_from_temp" | null;
+            /** @enum {string|null} */
+            severity: "info" | "low" | "medium" | "high" | null;
         };
         DevicePage: {
             data: components["schemas"]["Device"][];

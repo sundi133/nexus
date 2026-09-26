@@ -2862,6 +2862,10 @@
                 "minimum": 30,
                 "maximum": 3650,
                 "description": "How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept."
+              },
+              "process_events": {
+                "type": "boolean",
+                "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
               }
             }
           },
@@ -4928,6 +4932,10 @@
             "minimum": 30,
             "maximum": 3650,
             "description": "How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept."
+          },
+          "process_events": {
+            "type": "boolean",
+            "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
           }
         },
         "required": [
@@ -4935,7 +4943,8 @@
           "session_ttl_hours",
           "restrict_to_verified_domains",
           "owners_require_passkey",
-          "audit_retention_days"
+          "audit_retention_days",
+          "process_events"
         ]
       },
       "PolicyImpact": {
@@ -8135,6 +8144,95 @@
           "ai_clients",
           "mcp_servers",
           "agents"
+        ]
+      },
+      "ProcessEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "cmdline": {
+            "type": "string"
+          },
+          "user": {
+            "type": "string"
+          },
+          "parent_path": {
+            "type": "string"
+          },
+          "ancestors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "responsible_path": {
+            "type": "string"
+          },
+          "signer": {
+            "type": "string"
+          },
+          "detection": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ai_network_tool",
+              "ai_shell",
+              "exec_from_temp",
+              null
+            ]
+          },
+          "severity": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "info",
+              "low",
+              "medium",
+              "high",
+              null
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "device_id",
+          "hostname",
+          "time",
+          "pid",
+          "path",
+          "cmdline",
+          "user",
+          "parent_path",
+          "ancestors",
+          "responsible_path",
+          "signer",
+          "detection",
+          "severity"
         ]
       },
       "DevicePage": {
@@ -24482,6 +24580,10 @@
                     "minimum": 30,
                     "maximum": 3650,
                     "description": "How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept."
+                  },
+                  "process_events": {
+                    "type": "boolean",
+                    "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
                   }
                 }
               }
@@ -26855,6 +26957,20 @@
         "responses": {
           "201": {
             "description": "Enrolled: `{device_id, organization, checkin_interval_seconds, web_origin}` — `web_origin` is the only site the local agent will attest to"
+          }
+        }
+      }
+    },
+    "/v1/agent/events": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Report real-time process events (called by the Nexus agent every few seconds while the process_events setting is on)",
+        "description": "Body `{status, dropped, events: [{time, pid, path, cmdline, user, parent_path, ancestors, responsible_path, signer}]}`, signed with the device key. Refused with 409 while the setting is off.",
+        "responses": {
+          "200": {
+            "description": "`{stored, detections}`"
           }
         }
       }
@@ -34052,6 +34168,261 @@
                     "person",
                     "nodes",
                     "edges"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/process-events": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Programs a device started (real-time events), newest first",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "required": false,
+            "name": "detections",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProcessEvent"
+                      }
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/detections": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Recent detections across devices (AI tools running network tools or shells, programs run from temp folders)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "info",
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "required": false,
+            "name": "severity",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProcessEvent"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
                   ]
                 }
               }

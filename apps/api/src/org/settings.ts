@@ -16,13 +16,16 @@ export const OrgSettings = z
       .min(30)
       .max(3650)
       .openapi({ description: "How long audit events are kept. Older events are removed once every enabled event destination (SIEM, archive) has received them; the chain of digests is kept." }),
+    process_events: z
+      .boolean()
+      .openapi({ description: "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days." }),
   })
   .openapi("OrgSettings");
 
 export type OrgSettings = z.infer<typeof OrgSettings>;
 
 // Secure by default: admins must use MFA from day one.
-export const DEFAULT_SETTINGS: OrgSettings = { mfa_policy: "admins", session_ttl_hours: 12, restrict_to_verified_domains: false, owners_require_passkey: false, audit_retention_days: 365 };
+export const DEFAULT_SETTINGS: OrgSettings = { mfa_policy: "admins", session_ttl_hours: 12, restrict_to_verified_domains: false, owners_require_passkey: false, audit_retention_days: 365, process_events: false };
 
 export async function getSettings(tx: Tx, orgId: string): Promise<OrgSettings> {
   const row = await tx.selectFrom("organizations").select("settings").where("id", "=", orgId).executeTakeFirstOrThrow();

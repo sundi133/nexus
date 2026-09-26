@@ -23,6 +23,7 @@ import {
   ScrollText,
   Server,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   TerminalSquare,
   Users,
@@ -85,6 +86,7 @@ export const NAV: NavSection[] = [
     title: "Insights",
     items: [
       { label: "Alerts", href: "/alerts", icon: BellRing },
+      { label: "Detections", href: "/detections", icon: ShieldAlert },
       { label: "Audit log", href: "/audit", icon: ScrollText, shortcut: "G A" },
       { label: "Reports", href: "/reports", icon: FileBarChart },
     ],

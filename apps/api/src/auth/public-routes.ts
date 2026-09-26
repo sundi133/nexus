@@ -15,7 +15,7 @@ export const PUBLIC_ROUTES: { method: string; path: RegExp; why: string }[] = [
   { method: "GET", path: /^\/v1\/invitations\/[^/]+$/, why: "open an invitation link" },
   { method: "POST", path: /^\/v1\/invitations\/accept$/, why: "accept an invitation" },
   { method: "POST", path: /^\/v1\/devices\/pair$/, why: "a phone redeems a pairing code" },
-  { method: "POST", path: /^\/v1\/agent\/(enroll|checkin)$/, why: "device-signed agent calls" },
+  { method: "POST", path: /^\/v1\/agent\/(enroll|checkin|events)$/, why: "device-signed agent calls" },
   { method: "GET", path: /^\/v1\/agent\/releases\/[^/]+\/[^/]+$/, why: "signed agent binaries" },
   { method: "GET", path: /^\/v1\/sso\//, why: "SSO decisions answer 'sign in first' themselves" },
   { method: "GET", path: /^\/v1\/openapi\.json$/, why: "API description" },

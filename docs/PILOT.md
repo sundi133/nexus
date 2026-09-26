@@ -90,7 +90,8 @@ Then:
 2. Connect **Intune or Jamf** under **Device management** so their compliance verdicts count.
 3. osquery comes with the agent ([OSQUERY.md](OSQUERY.md)): **Software** shows what's installed across the fleet, and **Live query** answers ad-hoc questions in about a minute.
 4. Try **Block rules** ([BLOCK-RULES.md](BLOCK-RULES.md)): add an app rule for an unapproved AI tool in monitor mode, watch what it would stop, then start blocking on the pilot group; block a shadow-AI domain.
-5. Add a **Conditional access** policy in *report-only* mode ("require a compliant device for app X") and read its 7-day impact before you enforce it.
+5. With employees informed, turn on **real-time process events** (Settings → Organization) for the pilot and watch **Detections** for AI tools running network tools ([PROCESS-EVENTS.md](PROCESS-EVENTS.md)).
+6. Add a **Conditional access** policy in *report-only* mode ("require a compliant device for app X") and read its 7-day impact before you enforce it.
 
 ## 6. Apps
 
