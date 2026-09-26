@@ -1,0 +1,99 @@
+<!--
+  Votal Nexus agent: Windows Installer package (WiX Toolset v5).
+
+  Built by build-msi.ps1. Everything is declarative, with no custom actions: Windows
+  Installer copies the binary, registers and starts the service, locks down the
+  state folder and, when TOKEN is given, leaves enroll.conf for the service to enroll with.
+
+    msiexec /i nexus-agent-x64.msi /qn SERVER=https://api.nexus.example.com TOKEN=nxe_...
+
+  Intune, Group Policy and other deployment tools pass the same two properties.
+  Uninstalling keeps C:\ProgramData\Nexus (the device key), so reinstalling
+  resumes the same device, like `nexus-agent uninstall` without purge.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Votal Nexus agent"
+           Manufacturer="Votal AI"
+           Version="$(Version)"
+           UpgradeCode="8772c628-68e5-49b8-9253-f95a15cd9980"
+           Scope="perMachine"
+           Compressed="yes">
+    <SummaryInformation Description="Reports device security posture to Votal Nexus" />
+    <!-- Newer builds replace older ones; the agent's own self-updates don't change what's registered. -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of the Nexus agent is already installed."
+                  AllowSameVersionUpgrades="yes"
+                  Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Enrollment, as passed on the msiexec command line. TOKEN is a secret: keep it out of logs. -->
+    <Property Id="SERVER" Secure="yes" />
+    <Property Id="TOKEN" Secure="yes" Hidden="yes" />
+    <Launch Condition="Installed OR NOT TOKEN OR SERVER" Message="Pass SERVER=https://… together with TOKEN=…" />
+
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPURLINFOABOUT" Value="https://votal.ai" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="Nexus">
+        <Component Id="Agent">
+          <File Id="AgentExe" Source="$(BinDir)\nexus-agent.exe" KeyPath="yes" />
+          <!-- The self-updater keeps .previous / .failed copies and staging files next to the binary. -->
+          <RemoveFile Id="UpdaterFiles" Name="*" On="uninstall" />
+          <ServiceInstall Id="AgentService"
+                          Name="NexusAgent"
+                          DisplayName="Votal Nexus agent"
+                          Description="Reports device security posture to Votal Nexus."
+                          Type="ownProcess"
+                          Start="auto"
+                          ErrorControl="normal"
+                          Account="LocalSystem"
+                          Arguments="run --state-dir &quot;[CommonAppDataFolder]Nexus&quot;"
+                          Vital="yes">
+            <!-- Restart on exit, including the deliberate exit after a self-update (the agent also sets this itself). -->
+            <ServiceConfigFailureActions OnInstall="yes" OnReinstall="yes" ResetPeriod="86400">
+              <Failure Action="restartService" Delay="5000" />
+              <Failure Action="restartService" Delay="5000" />
+              <Failure Action="restartService" Delay="5000" />
+            </ServiceConfigFailureActions>
+          </ServiceInstall>
+          <!-- [CommonAppDataFolder]Nexus, not [STATEFOLDER]: that ends in a backslash, which would escape the closing quote. -->
+          <ServiceControl Id="AgentServiceControl" Name="NexusAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+        </Component>
+        <?ifdef OsqueryDir?>
+        <!-- osquery, as osquery signed it (build-msi.ps1 -OsqueryDir). The agent finds it next to itself. -->
+        <Directory Id="OSQUERYFOLDER" Name="osquery">
+          <Component Id="Osquery">
+            <File Id="OsquerydExe" Source="$(OsqueryDir)\osqueryd.exe" KeyPath="yes" />
+            <File Id="OsqueryLicense" Source="$(OsqueryDir)\LICENSE-osquery.txt" />
+          </Component>
+        </Directory>
+        <?endif?>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="STATEFOLDER" Name="Nexus">
+        <!-- SYSTEM and Administrators only, not inherited: ProgramData is readable by every user by default,
+             and this folder holds the device key and, briefly, the enrollment token. -->
+        <Component Id="StateFolder" Guid="a4e150c9-22c1-4f17-98a4-98964ee0997c" Permanent="yes">
+          <CreateFolder>
+            <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)" />
+          </CreateFolder>
+        </Component>
+        <!-- Only with TOKEN: the service enrolls from this file, then deletes it. -->
+        <Component Id="EnrollConfig" Guid="1a75bfe4-1144-42e4-9744-d2e11efb0628" Condition="TOKEN">
+          <RegistryValue Root="HKLM" Key="SOFTWARE\Votal\Nexus Agent" Name="EnrollConfigWritten" Type="integer" Value="1" KeyPath="yes" />
+          <IniFile Id="EnrollServer" Action="addLine" Directory="STATEFOLDER" Name="enroll.conf" Section="Nexus" Key="server" Value="[SERVER]" />
+          <IniFile Id="EnrollToken" Action="addLine" Directory="STATEFOLDER" Name="enroll.conf" Section="Nexus" Key="token" Value="[TOKEN]" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Nexus agent">
+      <ComponentRef Id="Agent" />
+      <ComponentRef Id="StateFolder" />
+      <ComponentRef Id="EnrollConfig" />
+    </Feature>
+  </Package>
+</Wix>

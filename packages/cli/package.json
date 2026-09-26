@@ -1,0 +1,24 @@
+{
+  "name": "@nexus/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "nexus: the Votal Nexus command line (config as code, agents, alerts, audit)",
+  "type": "module",
+  "bin": { "nexus": "./dist/nexus.mjs" },
+  "main": "./src/cli.ts",
+  "exports": { ".": "./src/cli.ts" },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nexus/api-client": "workspace:*",
+    "@nexus/ldap-directory": "workspace:*",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "esbuild": "^0.28.2",
+    "typescript": "~5.9.3"
+  }
+}

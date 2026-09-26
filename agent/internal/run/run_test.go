@@ -1,0 +1,189 @@
+package run
+
+import (
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"testing"
+	"time"
+
+	"github.com/votal-ai/nexus/agent/internal/client"
+	"github.com/votal-ai/nexus/agent/internal/collect"
+	"github.com/votal-ai/nexus/agent/internal/command"
+	"github.com/votal-ai/nexus/agent/internal/osquery"
+	"github.com/votal-ai/nexus/agent/internal/release"
+	"github.com/votal-ai/nexus/agent/internal/update"
+)
+
+type fake struct {
+	calls    []map[string]any
+	failWith error
+	offer    *release.Offer
+	commands []command.Signed
+	key      string
+}
+
+func (f *fake) Checkin(_ context.Context, p any) (*client.CheckinResult, error) {
+	f.calls = append(f.calls, p.(map[string]any))
+	if f.failWith != nil {
+		return nil, f.failWith
+	}
+	cmds := f.commands
+	f.commands = nil
+	return &client.CheckinResult{CheckinInterval: 60, InventoryInterval: 900, Compliance: "compliant", Update: f.offer, Commands: cmds, CommandKey: f.key}, nil
+}
+
+func TestInventoryOnlyWhenChanged(t *testing.T) {
+	f := &fake{}
+	mem := uint64(8)
+	l := &Loop{Client: f, Version: "t", Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Collect: func(context.Context) collect.Snapshot {
+		return collect.Snapshot{Inventory: collect.Inventory{MemoryBytes: mem}}
+	}}
+	ctx := context.Background()
+	for i := 0; i < 2; i++ {
+		if _, err := l.Once(ctx, time.Hour); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mem = 16
+	_, _ = l.Once(ctx, time.Hour)
+	has := func(i int) bool { _, ok := f.calls[i]["inventory"]; return ok }
+	if !has(0) || has(1) || !has(2) {
+		t.Fatalf("inventory sent pattern: %v %v %v", has(0), has(1), has(2))
+	}
+	if f.calls[0]["posture"] == nil || f.calls[0]["device"].(map[string]any)["agent_version"] != "t" {
+		t.Fatal("posture and agent version must always be sent")
+	}
+}
+
+func TestStopsWhenDeviceRemoved(t *testing.T) {
+	f := &fake{failWith: client.ErrNotEnrolled}
+	l := &Loop{Client: f, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Collect: func(context.Context) collect.Snapshot { return collect.Snapshot{} }}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := l.Run(ctx); !errors.Is(err, client.ErrNotEnrolled) {
+		t.Fatalf("want ErrNotEnrolled, got %v", err)
+	}
+}
+
+type fakeUpdater struct {
+	result  *release.Result
+	cleared int
+	applied []string
+	health  []bool
+}
+
+func (u *fakeUpdater) Apply(_ context.Context, o release.Offer) error {
+	u.applied = append(u.applied, o.Version)
+	return update.ErrRestart
+}
+func (u *fakeUpdater) Health(ok bool) error          { u.health = append(u.health, ok); return nil }
+func (u *fakeUpdater) Result() *release.Result       { return u.result }
+func (u *fakeUpdater) ClearResult(r *release.Result) { u.cleared++; u.result = nil }
+
+func TestReportsUpdateResultsAndAppliesOffers(t *testing.T) {
+	f := &fake{}
+	u := &fakeUpdater{result: &release.Result{Version: "0.2.0", State: "rolled_back", Error: "boom"}}
+	l := &Loop{Client: f, Version: "0.1.0", Updater: u, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Collect: func(context.Context) collect.Snapshot { return collect.Snapshot{} }}
+	if _, err := l.Once(context.Background(), time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if r, ok := f.calls[0]["update_result"].(*release.Result); !ok || r.State != "rolled_back" || u.cleared != 1 {
+		t.Fatalf("update_result = %v, cleared %d", f.calls[0]["update_result"], u.cleared)
+	}
+	if _, err := l.Once(context.Background(), time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, sent := f.calls[1]["update_result"]; sent {
+		t.Fatal("result reported twice")
+	}
+
+	f.offer = &release.Offer{Version: "0.3.0"}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := l.Run(ctx); !errors.Is(err, update.ErrRestart) {
+		t.Fatalf("Run = %v, want ErrRestart", err)
+	}
+	if len(u.applied) != 1 || u.applied[0] != "0.3.0" || len(u.health) != 1 || !u.health[0] {
+		t.Fatalf("applied %v, health %v", u.applied, u.health)
+	}
+}
+
+// A command in one check-in's response is run, and its result goes back on the next check-in.
+func TestCommandResultsReportedNextCheckin(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	enc := base64.RawURLEncoding
+	hdr := enc.EncodeToString([]byte(`{"alg":"EdDSA","typ":"nexus-command+jwt"}`))
+	p, _ := json.Marshal(map[string]any{"jti": "c1", "sub": "dev-1", "act": "refresh", "exp": time.Now().Add(time.Hour).Unix()})
+	body := hdr + "." + enc.EncodeToString(p)
+	jws := body + "." + enc.EncodeToString(ed25519.Sign(priv, []byte(body)))
+
+	f := &fake{commands: []command.Signed{{ID: "c1", JWS: jws}}, key: enc.EncodeToString(pub)}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	l := &Loop{Client: f, Version: "t", Log: log, Collect: func(context.Context) collect.Snapshot { return collect.Snapshot{} },
+		Commands: &command.Runner{StateDir: t.TempDir(), DeviceID: "dev-1", Exec: command.Actions(), Log: log}}
+	ctx := context.Background()
+	if _, err := l.Once(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if !l.soon {
+		t.Fatal("should check in again right away to report")
+	}
+	if _, err := l.Once(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal(f.calls[1]["command_results"])
+	if string(got) != `[{"id":"c1","status":"done","output":"Reported"}]` {
+		t.Fatalf("second check-in reported %s", got)
+	}
+	if _, has := f.calls[1]["inventory"]; !has {
+		t.Fatal("a refresh should send full inventory")
+	}
+	if _, err := l.Once(ctx, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := f.calls[2]["command_results"]; has {
+		t.Fatal("results reported twice")
+	}
+}
+
+func TestOsqueryPackScheduling(t *testing.T) {
+	f := &fake{}
+	runs := 0
+	version := "5.13.1"
+	l := &Loop{Client: f, Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Collect: func(context.Context) collect.Snapshot { return collect.Snapshot{} },
+		OsqueryEvery: time.Hour,
+		Osquery: func(context.Context) osquery.Report {
+			runs++
+			return osquery.Report{Available: true, Version: version, Results: []osquery.Result{{Name: "software", Rows: osquery.Rows{{"name": "Slack"}}}}}
+		}}
+	ctx := context.Background()
+	sent := func(i int) bool { _, ok := f.calls[i]["osquery"]; return ok }
+
+	_, _ = l.Once(ctx, time.Hour) // first: collect and send
+	_, _ = l.Once(ctx, time.Hour) // not due: nothing
+	l.osqueryRan = time.Time{}    // due again, same results: collected, not sent
+	_, _ = l.Once(ctx, time.Hour)
+	version = "5.14.0" // changed: sent
+	l.osqueryRan = time.Time{}
+	_, _ = l.Once(ctx, time.Hour)
+	if runs != 3 || !sent(0) || sent(1) || sent(2) || !sent(3) {
+		t.Fatalf("runs=%d sent=%v %v %v %v", runs, sent(0), sent(1), sent(2), sent(3))
+	}
+
+	// A failed check-in keeps the report for the next one, without collecting again.
+	version = "5.15.0"
+	l.osqueryRan = time.Time{}
+	f.failWith = errors.New("offline")
+	_, _ = l.Once(ctx, time.Hour)
+	f.failWith = nil
+	_, _ = l.Once(ctx, time.Hour)
+	if runs != 4 || !sent(4) || !sent(5) {
+		t.Fatalf("retry: runs=%d sent=%v %v", runs, sent(4), sent(5))
+	}
+}

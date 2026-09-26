@@ -1,0 +1,9 @@
+# osquery bundled with the Nexus agent. Written by: fetch.sh update 5.23.1
+# Downloads must match these SHA-256 hashes exactly.
+version 5.23.1
+osquery-5.23.1_1.macos_arm64.tar.gz 5484f0b62e05a7b2fa9d6e43f038915ea2b7ce063d59bd671ede0cf8dd0552da
+osquery-5.23.1.windows_x86_64.zip 7bd411050ef6b5aae1b23956aec0dc5ce6e800c5656f0cd463ac70a6e1bdf30b
+osquery-5.23.1.windows_arm64.zip 0913d05cc3fc92dd9253c945caacde10a776408f267cc1cc853a05de24dba900
+osquery_5.23.1-1.linux_amd64.deb 1431a9a6394657eba3cdd3476a462a6fe9721fc3664a70f23efcf7e37816787a
+osquery_5.23.1-1.linux_arm64.deb 062df9b6432ca1b374e80b24b54f027e224f1300d8bf6338182ec40f41b7975d
+LICENSE-Apache-2.0 c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08
