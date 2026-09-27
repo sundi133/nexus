@@ -3,6 +3,8 @@ name: nexus
 services:
   postgres:
     image: postgres:16-alpine
+    # pg_stat_statements: per-query timings for performance work (SELECT * FROM pg_stat_statements).
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
     environment:
       POSTGRES_USER: nexus_owner
       POSTGRES_PASSWORD: nexus_owner

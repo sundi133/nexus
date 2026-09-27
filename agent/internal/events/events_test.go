@@ -239,3 +239,27 @@ func TestAncestryFromLaunchHistory(t *testing.T) {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+type busyErr time.Duration
+
+func (b busyErr) Error() string       { return "busy" }
+func (b busyErr) Wait() time.Duration { return time.Duration(b) }
+
+func TestUploadsPauseWhenTheServerIsBusy(t *testing.T) {
+	c, _, _ := setup(t, true)
+	calls := 0
+	c.Upload = func(context.Context, Batch) error { calls++; return busyErr(time.Hour) }
+	c.setStatus("running")
+	c.flush(context.Background())
+	c.flush(context.Background()) // within the Retry-After: not sent
+	if calls != 1 {
+		t.Fatalf("uploads = %d, want 1", calls)
+	}
+	c.mu.Lock()
+	c.paused = time.Now().Add(-time.Second)
+	c.mu.Unlock()
+	c.flush(context.Background())
+	if calls != 2 {
+		t.Fatalf("uploads after the pause = %d, want 2", calls)
+	}
+}

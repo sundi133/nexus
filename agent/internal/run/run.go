@@ -189,8 +189,11 @@ func (l *Loop) Run(ctx context.Context) error {
 		case errors.Is(err, client.ErrNotEnrolled):
 			return err
 		case err != nil:
-			l.Log.Warn("check-in failed; will retry", "err", err, "in", backoff)
 			wait, backoff = backoff, min(backoff*2, 5*time.Minute)
+			if ra := client.RetryAfter(err); ra > 0 {
+				wait = ra // the server is shedding load and said when to come back (already spread out)
+			}
+			l.Log.Warn("check-in failed; will retry", "err", err, "in", wait)
 		default:
 			backoff = 5 * time.Second
 			if res.CheckinInterval > 0 {

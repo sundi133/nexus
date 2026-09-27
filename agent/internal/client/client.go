@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,9 +25,32 @@ type Problem struct {
 	Status int    `json:"status"`
 	Code   string `json:"code"`
 	Title  string `json:"title"`
+	// RetryAfter is the server's Retry-After on a 429 or 503 (0 if none).
+	RetryAfter time.Duration `json:"-"`
 }
 
 func (p *Problem) Error() string { return fmt.Sprintf("%s (%d %s)", p.Title, p.Status, p.Code) }
+
+// Wait is RetryAfter, for packages that don't import this one.
+func (p *Problem) Wait() time.Duration { return p.RetryAfter }
+
+// RetryAfter is how long the server asked us to wait before trying again, or 0.
+func RetryAfter(err error) time.Duration {
+	var p *Problem
+	if errors.As(err, &p) {
+		return p.RetryAfter
+	}
+	return 0
+}
+
+// parseRetryAfter reads Retry-After in seconds (the form Nexus sends), capped at 10 minutes.
+func parseRetryAfter(h string) time.Duration {
+	n, err := strconv.Atoi(strings.TrimSpace(h))
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return min(time.Duration(n)*time.Second, 10*time.Minute)
+}
 
 // ErrNotEnrolled means the server no longer knows this device (e.g. an admin removed it).
 var ErrNotEnrolled = errors.New("device is not enrolled on the server")
@@ -88,6 +112,9 @@ func (c *Client) post(ctx context.Context, path string, in, out any) error {
 	}
 	if res.StatusCode >= 300 {
 		p := &Problem{Status: res.StatusCode}
+		if res.StatusCode == http.StatusTooManyRequests || res.StatusCode == http.StatusServiceUnavailable {
+			p.RetryAfter = parseRetryAfter(res.Header.Get("Retry-After"))
+		}
 		if json.Unmarshal(data, p) != nil || p.Title == "" {
 			p.Title = strings.TrimSpace(string(data))
 		}

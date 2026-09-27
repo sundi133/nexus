@@ -57,7 +57,7 @@ async function status(c: Context<Env>, tx: Tx, p: Principal): Promise<z.infer<ty
   const store = releaseStore(deps.cfg);
   const releases = await store.list();
   const settings = await getSettings(tx);
-  await evaluateRollout(tx, p.orgId, store, c.get("meta"));
+  await evaluateRollout(tx, p.orgId, store, c.get("meta"), undefined, { fresh: true });
   const r = await tx.selectFrom("agent_rollouts").selectAll().orderBy("created_at", "desc").executeTakeFirst();
   const devices = await fleet(tx);
 

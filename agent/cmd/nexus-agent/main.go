@@ -185,11 +185,25 @@ func enroll(ctx context.Context, store state.Store, server, token string) error 
 		return err
 	}
 	snap := deviceSnapshot(ctx)
-	res, err := c.Enroll(ctx, token, client.DeviceInfo{
+	info := client.DeviceInfo{
 		Hostname: snap.Device.Hostname, Platform: snap.Device.Platform, OSName: snap.Device.OSName,
 		OSVersion: snap.Device.OSVersion, OSBuild: snap.Device.OSBuild, Arch: snap.Device.Arch,
 		Model: snap.Device.Model, Serial: snap.Device.Serial, AgentVersion: version,
-	})
+	}
+	res, err := c.Enroll(ctx, token, info)
+	// A fleet-wide rollout can arrive all at once: when the server says it's busy, wait as asked
+	// (up to about 5 minutes in all) instead of failing the install.
+	for waited := time.Duration(0); client.RetryAfter(err) > 0 && waited < 5*time.Minute; {
+		ra := client.RetryAfter(err)
+		fmt.Fprintf(os.Stderr, "The server is busy; retrying enrollment in %s.\n", ra)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(ra):
+		}
+		waited += ra
+		res, err = c.Enroll(ctx, token, info)
+	}
 	if err != nil {
 		return fmt.Errorf("enrollment failed: %w", err)
 	}

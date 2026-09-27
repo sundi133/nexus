@@ -45,6 +45,7 @@ class Histogram {
 export const metrics = {
   httpRequests: new Counter("nexus_http_requests_total", "HTTP requests by route and status class"),
   httpDuration: new Histogram("nexus_http_request_duration_seconds", "HTTP request latency", [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5]),
+  agentShed: new Counter("nexus_agent_requests_shed_total", "Device agent requests turned away with 503 because the server was busy"),
   jobRuns: new Counter("nexus_job_runs_total", "Background job runs by kind and result"),
   jobDuration: new Histogram("nexus_job_duration_seconds", "Background job duration", [0.01, 0.05, 0.1, 0.5, 1, 5, 15, 60]),
 };

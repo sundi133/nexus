@@ -61,6 +61,36 @@ export async function fleet(tx: Tx): Promise<FleetDevice[]> {
 
 export const supports = (rel: AgentRelease, d: Pick<FleetDevice, "platform" | "arch">) => rel.artifacts.find((a) => a.os === GOOS[d.platform] && a.arch === d.arch) ?? null;
 
+// ---- Fleet-wide checks in SQL (check-ins run them; the fleet can be large) ------------------
+
+/** The agent version's numeric part as int[], compared numerically: "0.10.0-rc" → {0,10,0}. */
+const version = sql`string_to_array(substring(devices.agent_version from '^[0-9]+(?:\.[0-9]+)*'), '.')::int[]`;
+const target = (v: string) => sql`string_to_array(${v.replace(/[^0-9.].*$/, "")}, '.')::int[]`;
+const olderThan = (v: string) => sql<boolean>`${version} < ${target(v)}`;
+const atLeast = (v: string) => sql<boolean>`${version} >= ${target(v)}`;
+
+/** Active devices this release has a build for that run an older version. */
+function needingUpdate(tx: Tx, rel: AgentRelease) {
+  const platforms = Object.entries(GOOS) as [string, string][];
+  const pairs = rel.artifacts.flatMap((a) => platforms.filter(([, os]) => os === a.os).map(([platform]) => [platform, a.arch] as const));
+  return tx
+    .selectFrom("devices")
+    .select("devices.id")
+    .where("devices.status", "=", "active")
+    .where((eb) => (pairs.length ? eb.or(pairs.map(([p, a]) => eb.and([eb("devices.platform", "=", p as never), eb("devices.arch", "=", a)]))) : eb.val(false)))
+    .where(olderThan(rel.version));
+}
+
+// Check-ins re-run the fleet-wide parts of a rollout at most this often (per API instance); admin views run them fresh.
+const FLEET_CHECK_MS = 60_000;
+const NOBODY_NEEDS_MS = 5 * 60_000;
+const memo = new Map<string, number>();
+const recently = (key: string) => (memo.get(key) ?? 0) > Date.now();
+const remember = (key: string, ms: number) => {
+  if (memo.size > 10_000) memo.clear();
+  memo.set(key, Date.now() + ms);
+};
+
 /** Canaries: the admin's choice, else ~1% of the fleet (at least one), preferring recently seen devices. */
 async function pickCanaries(tx: Tx, rel: AgentRelease, explicit: string[] | undefined) {
   const devices = (await fleet(tx)).filter((d) => supports(rel, d));
@@ -109,7 +139,9 @@ export async function ensureAutoRollout(tx: Tx, orgId: string, store: ReleaseSto
   if (open && compareVersions(open.version, latest.version) >= 0) return;
   const seen = await tx.selectFrom("agent_rollouts").select("id").where("version", "=", latest.version).executeTakeFirst();
   if (seen) return; // an admin cancelled or finished it: don't restart it behind their back
-  if (!(await fleet(tx)).some((d) => supports(latest, d) && compareVersions(d.agent_version, latest.version) < 0)) return;
+  const nobody = `${orgId}:nobody-needs:${latest.version}`;
+  if (recently(nobody)) return;
+  if (!(await needingUpdate(tx, latest).limit(1).executeTakeFirst())) return remember(nobody, NOBODY_NEEDS_MS);
   // Concurrent check-ins may all get here: let one start it, the others re-check.
   await sql`SELECT pg_advisory_xact_lock(hashtextextended(${orgId + ":agent-rollout"}, 0))`.execute(tx);
   if (await tx.selectFrom("agent_rollouts").select("id").where("version", "=", latest.version).executeTakeFirst()) return;
@@ -120,7 +152,7 @@ export async function ensureAutoRollout(tx: Tx, orgId: string, store: ReleaseSto
  * Advances, halts or completes the open rollout based on what devices have
  * reported. Runs lazily (check-ins, admin views) — cheap queries on small tables.
  */
-export async function evaluateRollout(tx: Tx, orgId: string, store: ReleaseStore, meta: RequestMeta, now = new Date()): Promise<Rollout | null> {
+export async function evaluateRollout(tx: Tx, orgId: string, store: ReleaseStore, meta: RequestMeta, now = new Date(), opts: { fresh?: boolean } = {}): Promise<Rollout | null> {
   const r = await openRollout(tx);
   if (!r || r.status === "paused") return r;
 
@@ -151,23 +183,41 @@ export async function evaluateRollout(tx: Tx, orgId: string, store: ReleaseStore
     }
   }
   if (r.status !== "active") return r;
+  // The fleet-wide checks below scan devices: from check-ins, at most once a minute.
+  const key = `${r.id}:fleet-check`;
+  if (!opts.fresh && recently(key)) return r;
+  remember(key, FLEET_CHECK_MS);
 
-  const devices = await fleet(tx);
   const settings = await getSettings(tx);
   if (r.stage !== "all" && settings.advance_after_hours > 0 && now.getTime() - r.stage_started_at.getTime() >= settings.advance_after_hours * 3600_000) {
-    const healthy = devices.some((d) => inStage(r, d.id) && compareVersions(d.agent_version, r.version) >= 0);
-    if (healthy) return advance(tx, orgId, r, { meta }, now);
+    // Healthy: some device in the current stage runs the new version.
+    let q = tx.selectFrom("devices").select("devices.id").where("devices.status", "=", "active").where(atLeast(r.version));
+    if (r.stage === "canary") q = r.canary_device_ids.length ? q.where("devices.id", "in", r.canary_device_ids) : q.where(sql<boolean>`false`);
+    const upToDate = await q.limit(50_000).execute();
+    if (upToDate.some((d) => inStage(r, d.id))) return advance(tx, orgId, r, { meta }, now);
   }
   if (r.stage === "all") {
     const rel = await store.get(r.version);
-    const active = now.getTime() - ACTIVE_WINDOW_MS;
-    const updatedRows = await tx.selectFrom("device_updates").select("device_id").where("version", "=", r.version).where("state", "in", ["failed", "rolled_back"]).execute();
-    const failed = new Set(updatedRows.map((u) => u.device_id));
     // Devices with no build in this release, long silent, or that gave up on it can't hold it open.
-    const remaining = devices.filter(
-      (d) => rel && supports(rel, d) && (d.last_seen_at?.getTime() ?? 0) > active && compareVersions(d.agent_version, r.version) < 0 && !failed.has(d.id),
-    );
-    if (remaining.length === 0) {
+    const remaining = rel
+      ? await needingUpdate(tx, rel)
+          .where("devices.last_seen_at", ">", new Date(now.getTime() - ACTIVE_WINDOW_MS))
+          .where((eb) =>
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom("device_updates")
+                  .select("device_updates.device_id")
+                  .whereRef("device_updates.device_id", "=", "devices.id")
+                  .where("device_updates.version", "=", r.version)
+                  .where("device_updates.state", "in", ["failed", "rolled_back"]),
+              ),
+            ),
+          )
+          .limit(1)
+          .executeTakeFirst()
+      : undefined;
+    if (!remaining) {
       const done = await tx.updateTable("agent_rollouts").set({ status: "completed", updated_at: now }).where("id", "=", r.id).where("status", "=", "active").executeTakeFirst();
       if (done.numUpdatedRows > 0n) await audit(tx, orgId, { meta }, { type: "agent.rollout_completed", actor: system, target: { type: "agent_rollout", id: r.id, display: r.version } });
       return { ...r, status: "completed" };

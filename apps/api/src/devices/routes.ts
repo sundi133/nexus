@@ -266,6 +266,7 @@ export function registerDeviceRoutes(app: App) {
           .leftJoin("users", "users.id", "device_enrollment_tokens.assign_user_id")
           .selectAll("device_enrollment_tokens")
           .select("users.email")
+          .select((eb) => eb.selectFrom("devices").select((e) => e.fn.countAll<number>().as("n")).whereRef("devices.enrollment_token_id", "=", "device_enrollment_tokens.id").as("used"))
           .where("device_enrollment_tokens.assign_user_id", "is", null) // personal tokens aren't admin-managed
           .orderBy("device_enrollment_tokens.created_at", "desc")
           .limit(100)
@@ -276,7 +277,7 @@ export function registerDeviceRoutes(app: App) {
           data: rows.map((t) => ({
             id: t.id,
             name: t.name,
-            uses: t.uses,
+            uses: Number(t.used ?? 0),
             max_uses: t.max_uses,
             expires_at: iso(t.expires_at),
             revoked: !!t.revoked_at || t.expires_at < new Date(),

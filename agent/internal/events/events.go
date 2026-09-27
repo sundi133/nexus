@@ -119,6 +119,7 @@ type Collector struct {
 	stderr  *tail
 	started time.Time
 	lastUp  string
+	paused  time.Time      // don't upload before this: the server asked us to wait (Retry-After)
 	lineage map[int64]proc // recent launches: pid → program and parent, to trace ancestry after they exit
 }
 
@@ -481,12 +482,19 @@ func (c *Collector) flush(ctx context.Context) {
 	n := min(len(c.queue), 2000)
 	b := Batch{Status: c.status, Dropped: c.dropped, Events: append(make([]Event, 0, n), c.queue[:n]...)} // [] not null: the server wants a list
 	changed := c.status != c.lastUp
+	paused := time.Now().Before(c.paused)
 	c.mu.Unlock()
-	if n == 0 && !changed {
+	if (n == 0 && !changed) || paused {
 		return
 	}
 	if err := c.Upload(ctx, b); err != nil {
 		c.Log.Warn("uploading process events", "err", err)
+		var busy interface{ Wait() time.Duration } // the client's error when the server is shedding load
+		if errors.As(err, &busy) && busy.Wait() > 0 {
+			c.mu.Lock()
+			c.paused = time.Now().Add(busy.Wait())
+			c.mu.Unlock()
+		}
 		return
 	}
 	c.mu.Lock()
