@@ -52,3 +52,35 @@ export async function signInWithPasskey(email: string) {
   if (!res.ok) throw new ApiProblem(res.status, data);
   return data;
 }
+
+/** Asks the local Nexus agent to vouch for this computer (it answers only this console's origin). */
+async function attestHere(agentUrl: string, nonce: string) {
+  try {
+    const res = await fetch(`${agentUrl}/v1/attest`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ nonce }), signal: AbortSignal.timeout(4000) });
+    if (!res.ok) throw new Error(String(res.status));
+    return ((await res.json()) as { attestation: string }).attestation;
+  } catch {
+    throw new Error("The Nexus agent isn't answering on this computer. Sign in with your email instead.");
+  }
+}
+
+/** Sign in with this managed computer: its agent vouches for it, Touch ID or Windows Hello for you. */
+export async function signInWithDevice() {
+  const start = await unwrap(api.POST("/v1/auth/device/start"));
+  const attestation = await attestHere(start.agent_url, start.nonce);
+  const { ticket, options } = await unwrap(api.POST("/v1/auth/device/options", { body: { ticket: start.ticket, attestation } }));
+  const response = await startAuthentication({ optionsJSON: options as unknown as AuthOptions });
+  const res = await fetch("/bff/auth/device", { method: "POST", headers: { "content-type": "application/json", "x-nexus-csrf": "1" }, body: JSON.stringify({ ticket, response }) });
+  const data = await res.json();
+  if (!res.ok) throw new ApiProblem(res.status, data);
+  return data;
+}
+
+/** Sets up device sign-in on this computer: verify it, make a passkey here, and bind the two. */
+export async function setUpDeviceSignIn() {
+  const ch = await unwrap(api.POST("/v1/me/device-trust/challenge", {}));
+  const attestation = await attestHere(ch.agent_url, ch.nonce);
+  const device = await unwrap(api.POST("/v1/me/device-trust", { body: { challenge_id: ch.challenge_id, attestation } }));
+  const factor = (await registerPasskey(`${device.hostname} (device sign-in)`)) as { id: string };
+  return unwrap(api.POST("/v1/me/device-sign-in", { body: { factor_id: factor.id } }));
+}

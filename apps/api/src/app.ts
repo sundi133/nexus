@@ -8,6 +8,7 @@ import { registerAdeRoutes, scheduleAdeSyncs } from "./apple-mdm/ade.js";
 import { scheduleDeviceHealth } from "./devices/health.js";
 import { registerRemoteAssistRoutes } from "./remote-assist/routes.js";
 import { registerAssetRoutes } from "./assets/routes.js";
+import { registerDeviceSignInRoutes } from "./auth/device-sign-in.js";
 import { registerSaasLicenseRoutes } from "./saas/licenses.js";
 import { registerSaasRoutes } from "./saas/routes.js";
 import { registerVaultRoutes } from "./vault/routes.js";
@@ -311,6 +312,7 @@ export function createApp(deps: Deps) {
   registerSaasRoutes(app);
   registerSaasLicenseRoutes(app);
   registerAssetRoutes(app);
+  registerDeviceSignInRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);

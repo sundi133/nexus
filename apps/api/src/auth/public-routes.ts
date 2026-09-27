@@ -8,7 +8,7 @@
 export const PUBLIC_ROUTES: { method: string; path: RegExp; why: string }[] = [
   { method: "POST", path: /^\/v1\/signup$/, why: "create an organization" },
   { method: "POST", path: /^\/v1\/auth\/login$/, why: "sign in" },
-  { method: "POST", path: /^\/v1\/auth\/passkey(\/options)?$/, why: "passwordless sign-in" },
+  { method: "POST", path: /^\/v1\/auth\/(passkey(\/options)?|device(\/start|\/options)?)$/, why: "passwordless sign-in (a passkey, or a managed device)" },
   { method: "POST", path: /^\/v1\/auth\/password-reset(\/complete)?$/, why: "forgot password" },
   { method: "POST", path: /^\/v1\/auth\/federation\/(discover|start|complete)$/, why: "sign in through the organization's IdP" },
   { method: "GET", path: /^\/v1\/federation\/saml\/[^/]+\/metadata$/, why: "SAML metadata for the IdP admin" },

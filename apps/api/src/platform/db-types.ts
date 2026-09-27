@@ -100,6 +100,7 @@ export interface Database {
     created_at: Generated<Date>;
     last_totp_step: number | null;
     credential_id: string | null;
+    bound_device_id: string | null;
     sign_count: Generated<number>;
     transports: Generated<string[]>;
   };
