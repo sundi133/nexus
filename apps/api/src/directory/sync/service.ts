@@ -13,6 +13,8 @@ import { emailAdmission } from "../../org/domains.js";
 import { plan, PROVIDER_NAME, summarize, type Local, type Plan, type Remote } from "./plan.js";
 import { fetchDirectory, ProviderError } from "./providers.js";
 import { fetchLdap } from "./ldap.js";
+import { fetchBambooHR, fetchWorkday } from "./hr.js";
+import { offboard } from "../offboarding.js";
 import { isLastOwner, isPrivileged } from "../privileged.js";
 
 export const secretAad = (connectionId: string) => `directory_connection:${connectionId}`;
@@ -20,14 +22,14 @@ export const secretAad = (connectionId: string) => `directory_connection:${conne
 type Conn = {
   id: string;
   org_id: string;
-  provider: "google" | "entra" | "scim" | "ldap";
+  provider: "google" | "entra" | "scim" | "ldap" | "bamboohr" | "workday";
   name: string;
   config: unknown;
   secret: Buffer | null;
   enabled: boolean;
   sync_groups: boolean;
   group_filter: string[];
-  deprovision: "suspend" | "none";
+  deprovision: "suspend" | "offboard" | "none";
   invite_new_users: boolean;
   last_status: string;
 };
@@ -40,6 +42,8 @@ export function remoteFor(deps: Deps, conn: Pick<Conn, "id" | "provider" | "conf
   if (conn.provider === "scim" || !conn.secret) throw badRequest("scim_push", "A SCIM connection is updated by your identity provider; there's nothing for Nexus to fetch");
   const secret = deps.sealer.open(conn.secret, secretAad(conn.id)).toString();
   if (conn.provider === "ldap") return fetchLdap(deps, conn.config, secret, { groups: conn.sync_groups });
+  if (conn.provider === "bamboohr") return fetchBambooHR(deps.cfg, conn.config, secret, { groups: conn.sync_groups });
+  if (conn.provider === "workday") return fetchWorkday(deps.cfg, conn.config, secret, { groups: conn.sync_groups });
   return fetchDirectory(deps.cfg, conn.provider, conn.config, secret, { groups: conn.sync_groups });
 }
 
@@ -48,7 +52,7 @@ export async function loadLocal(tx: Tx, connectionId: string): Promise<Local> {
   const links = await tx.selectFrom("directory_links").select(["connection_id", "kind", "external_id", "local_id", "suspended_by_sync"]).execute();
   const foreign = new Set(links.filter((l) => l.connection_id !== connectionId).map((l) => `${l.kind}:${l.local_id}`));
   // Break-glass accounts are never managed by a directory: a bad sync must not lock the org out.
-  const users = (await tx.selectFrom("users").select(["id", "email", "given_name", "family_name", "title", "department", "status", "break_glass"]).execute())
+  const users = (await tx.selectFrom("users").select(["id", "email", "given_name", "family_name", "title", "department", "status", "break_glass", "manager_id"]).execute())
     .filter((u) => !foreign.has(`user:${u.id}`) && !u.break_glass)
     .map(({ break_glass: _b, ...u }) => u);
   const members = await tx.selectFrom("group_members").select(["group_id", "user_id"]).execute();
@@ -132,11 +136,47 @@ export async function applyPlan(tx: Tx, conn: Conn, p: Plan, meta: RequestMeta) 
     await tx.updateTable("directory_links").set({ suspended_by_sync: true }).where("connection_id", "=", conn.id).where("kind", "=", "user").where("local_id", "=", s.local_id).execute();
     await audit(tx, conn.org_id, { meta }, { type: "user.suspended", actor, target: { type: "user", id: s.local_id, display: s.email }, details: { reason: s.reason, sessions_revoked: sessions, connection_id: conn.id } });
   }
+  for (const o of p.offboard_users) {
+    if (await isLastOwner(tx, o.local_id)) {
+      skipped.push({ email: o.email, reason: "Not offboarding the organization's last owner" });
+      continue;
+    }
+    await offboard(tx, conn.org_id, o.local_id, { meta, actor: `${src} sync`, details: { connection_id: conn.id } }, o.reason);
+  }
   for (const r of p.reactivate_users) {
     const u = await tx.selectFrom("users").select("password_hash").where("id", "=", r.local_id).executeTakeFirstOrThrow();
     await tx.updateTable("users").set({ status: u.password_hash ? "active" : "staged", updated_at: new Date() }).where("id", "=", r.local_id).execute();
     await tx.updateTable("directory_links").set({ suspended_by_sync: false }).where("connection_id", "=", conn.id).where("kind", "=", "user").where("local_id", "=", r.local_id).execute();
     await audit(tx, conn.org_id, { meta }, { type: "user.activated", actor, target: { type: "user", id: r.local_id, display: r.email }, details: { reason: `Active again in ${src}`, connection_id: conn.id } });
+  }
+
+  // Managers, now that new people exist. Never a loop (A manages B manages A).
+  let managersSet = 0;
+  for (const m of p.managers) {
+    const me = userIds.get(m.external_id);
+    if (!me) continue;
+    const boss = m.manager_external_id ? userIds.get(m.manager_external_id) : null;
+    if (boss === undefined) {
+      skipped.push({ email: m.email, reason: `Manager ${m.to ?? m.manager_external_id} isn't synced, so not set` });
+      continue;
+    }
+    if (boss) {
+      let cur: string | null = boss;
+      let loop = false;
+      for (let i = 0; cur && i < 50; i++) {
+        if (cur === me) {
+          loop = true;
+          break;
+        }
+        cur = (await tx.selectFrom("users").select("manager_id").where("id", "=", cur).executeTakeFirst())?.manager_id ?? null;
+      }
+      if (loop) {
+        skipped.push({ email: m.email, reason: `Not making ${m.to} their manager: it would make a loop` });
+        continue;
+      }
+    }
+    await tx.updateTable("users").set({ manager_id: boss, updated_at: new Date() }).where("id", "=", me).execute();
+    managersSet++;
   }
 
   // Groups.
@@ -176,11 +216,12 @@ export async function applyPlan(tx: Tx, conn: Conn, p: Plan, meta: RequestMeta) 
     ...p.update_users.map((u) => u.local_id),
     ...p.suspend_users.map((u) => u.local_id),
     ...p.reactivate_users.map((u) => u.local_id),
+    ...p.managers.map((m) => userIds.get(m.external_id)).filter((x): x is string => !!x),
     ...p.membership.flatMap((m) => [...m.add.map((ext) => userIds.get(ext)).filter((x): x is string => !!x), ...m.remove]),
   ]);
   await touchUsers(tx, conn.org_id, affected);
   await touchGroups(tx, conn.org_id, p.membership.map((m) => groupIds.get(m.group_external_id)).filter((x): x is string => !!x));
-  const summary = { ...summarize(p), create_users: created, skipped: skipped.length };
+  const summary = { ...summarize(p), create_users: created, managers: managersSet, skipped: skipped.length };
   await audit(tx, conn.org_id, { meta }, { type: "directory.synced", actor, target: { type: "directory_connection", id: conn.id, display: conn.name }, details: summary });
   return { summary, skipped, invites };
 }
