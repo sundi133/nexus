@@ -2,9 +2,9 @@
 
 import type { Schemas } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AppWindow, Clock, KeyRound, Plus, ShieldCheck, Trash2, UsersRound } from "lucide-react";
+import { AppWindow, Ban, Clock, KeyRound, PackagePlus, Plus, ShieldCheck, Trash2, UsersRound } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,9 @@ type Item = Schemas["AccessCatalogItem"];
 type Req = Schemas["AccessRequest"];
 type Stage = Schemas["ApprovalStage"];
 
-const ICON = { app: AppWindow, group: UsersRound, role: ShieldCheck } as const;
+const ICON = { app: AppWindow, group: UsersRound, role: ShieldCheck, block_exception: Ban, software: PackagePlus } as const;
+const KIND_LABEL = { app: "An app", group: "A group", role: "An admin role", block_exception: "A blocked app", software: "Software" } as const;
+const KIND_TEXT = { app: "App access", group: "Group membership", role: "Temporary admin rights", block_exception: "Unblocked on your devices", software: "Installed on your devices" } as const;
 const STATUS: Record<Req["status"], { label: string; tone: Tone }> = {
   pending: { label: "Waiting for approval", tone: "warning" },
   active: { label: "Active", tone: "success" },
@@ -58,7 +60,7 @@ function Page() {
   const view = params.get("view") ?? "request";
   return (
     <>
-      <PageHeader title="Access requests" description="Ask for an app, a group or an admin role for as long as you need it. Approvers decide in stages, and access ends by itself." />
+      <PageHeader title="Access requests" description="Ask for an app, a group, an admin role, a blocked app or software on your devices, for as long as you need it. Approvers decide in stages, and access ends by itself." />
       <Tabs value={tabs.some((t) => t.value === view) ? view : "request"} onValueChange={(v) => router.replace(`/access-requests?view=${v}`)}>
         <TabsList tabs={tabs} />
         <TabsContent value="request">
@@ -84,6 +86,12 @@ function Page() {
 function RequestTab() {
   const catalog = useQuery({ queryKey: ["access-catalog"], queryFn: () => unwrap(api.GET("/v1/access/catalog")) });
   const [asking, setAsking] = useState<Item | null>(null);
+  // Arriving from a notification ("Chess was stopped… request access"): open that request.
+  const wanted = useSearchParams().get("request");
+  useEffect(() => {
+    const item = wanted ? catalog.data?.data.find((c) => c.id === wanted) : undefined;
+    if (item && !item.you.has_access && !item.you.open_request) setAsking(item);
+  }, [wanted, catalog.data]);
   if (catalog.isPending) return <Skeleton className="h-40" />;
   if (!catalog.data?.data.length) return <Card><EmptyState icon={<KeyRound />} title="Nothing is requestable yet" description="Admins choose which apps, groups and roles can be requested, in the Catalog tab." /></Card>;
   return (
@@ -97,7 +105,7 @@ function RequestTab() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-semibold capitalize">{c.name}</p>
-              <p className="text-xs text-fg-muted">{c.description || (c.resource_type === "role" ? "Temporary admin rights" : c.resource_type === "app" ? "App access" : "Group membership")}</p>
+              <p className="text-xs text-fg-muted">{c.description || KIND_TEXT[c.resource_type]}</p>
               <p className="mt-1 text-xs text-fg-subtle">
                 Up to {hours(c.max_hours)}
                 {c.allow_permanent ? " or permanently" : ""} · {c.you.eligible ? "pre-approved for you" : c.stages.length ? `${c.stages.length} approval${c.stages.length > 1 ? "s" : ""}` : "no approval needed"}
@@ -345,6 +353,10 @@ function CatalogTab() {
 }
 
 function CatalogDialog({ onClose }: { onClose: () => void }) {
+  const rulesQ = useQuery({ queryKey: ["enforcement-rules"], queryFn: () => unwrap(api.GET("/v1/enforcement/rules")) });
+  const pkgsQ = useQuery({ queryKey: ["software-packages"], queryFn: () => unwrap(api.GET("/v1/software-packages")) });
+  const blockRules = (rulesQ.data?.data ?? []).filter((r) => r.kind === "app").map((r) => ({ id: r.id, name: r.name }));
+  const packages = (pkgsQ.data?.data ?? []).map((p) => ({ id: p.id, name: p.name }));
   const qc = useQueryClient();
   const withStepUp = useStepUp();
   const { users, groups, apps } = useNames();
@@ -380,12 +392,12 @@ function CatalogDialog({ onClose }: { onClose: () => void }) {
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent title="Make something requestable" className="max-w-xl">
         <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
-          <div className="grid grid-cols-3 gap-2">
-            {(["app", "group", "role"] as const).map((t) => {
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {(["app", "group", "role", "block_exception", "software"] as const).map((t) => {
               const Icon = ICON[t];
               return (
                 <button key={t} type="button" onClick={() => (setType(t), setResource(""), t === "role" && (setMax(4), setStages([{ kind: "role", role: "owner" }])))} className={cn("flex items-center gap-2 rounded-md border p-2.5 text-[13px] font-medium", type === t ? "border-primary bg-primary-soft" : "border-border hover:bg-bg-subtle")}>
-                  <Icon className="size-4" /> {t === "app" ? "An app" : t === "group" ? "A group" : "An admin role"}
+                  <Icon className="size-4" /> {KIND_LABEL[t]}
                 </button>
               );
             })}
@@ -400,10 +412,14 @@ function CatalogDialog({ onClose }: { onClose: () => void }) {
               </Select>
             </Field>
           ) : (
-            <Field label={type === "app" ? "App" : "Group"} htmlFor="c-res">
+            <Field
+              label={type === "app" ? "App" : type === "group" ? "Group" : type === "block_exception" ? "Block rule" : "App from App deployment"}
+              htmlFor="c-res"
+              hint={type === "block_exception" ? "An approved request lifts this rule on the requester's devices." : type === "software" ? "An approved request installs it on the requester's devices." : undefined}
+            >
               <Select id="c-res" className="w-full" value={resource} onChange={(e) => setResource(e.target.value)}>
                 <option value="">Choose…</option>
-                {(type === "app" ? apps : groups).map((x) => (
+                {(type === "app" ? apps : type === "group" ? groups : type === "block_exception" ? blockRules : packages).map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.name}
                   </option>

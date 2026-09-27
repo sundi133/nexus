@@ -371,6 +371,13 @@ export interface Database {
     sent_at: NullableTimestamp;
     finished_at: NullableTimestamp;
   };
+  enforcement_exceptions: {
+    org_id: string;
+    rule_id: string;
+    user_id: string;
+    request_id: string | null;
+    created_at: Generated<Date>;
+  };
   device_accounts: {
     id: string;
     org_id: string;
@@ -416,6 +423,7 @@ export interface Database {
     package_id: string;
     action: "install" | "remove";
     group_id: string | null;
+    user_id: Generated<string | null>;
     created_by: string | null;
     created_at: Generated<Date>;
   };
@@ -681,7 +689,7 @@ export interface Database {
   access_catalog: {
     id: string;
     org_id: string;
-    resource_type: "app" | "group" | "role";
+    resource_type: "app" | "group" | "role" | "block_exception" | "software";
     resource_id: string | null;
     role: string | null;
     description: Generated<string>;
