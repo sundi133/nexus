@@ -20,6 +20,10 @@ export interface Database {
     settings: Json;
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
+    deletion_scheduled_for: Generated<Date | null>;
+    deletion_requested_by: Generated<string | null>;
+    deletion_requested_at: Generated<Date | null>;
+    deletion_reason: Generated<string | null>;
   };
   users: {
     id: string;

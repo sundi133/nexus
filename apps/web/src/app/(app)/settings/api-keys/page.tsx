@@ -23,6 +23,8 @@ const SCOPE_LABELS: Record<string, string> = {
   "users:read": "Read people",
   "users:write": "Create and edit people",
   "users:lifecycle": "Suspend, offboard and contain people",
+  "users:erase": "Permanently delete people and their personal data",
+  "data:export": "Export all of the organization's data",
   "groups:read": "Read groups",
   "groups:write": "Manage groups",
   "audit:read": "Read the audit log",
