@@ -42,6 +42,10 @@ export async function evaluateDevice(tx: Tx, device: DeviceForEval, policies: Po
     const row = await tx.selectFrom("devices").select("inventory").where("id", "=", device.id).executeTakeFirst();
     ctx.ai = { inventory: parseAI(row?.inventory), ctx: await loadAIContext(tx) };
   }
+  if (policies.some((p) => p.key === "os_updates" && p.enabled)) {
+    const u = await tx.selectFrom("devices").select(["updates_checked_at", "updates_error", "security_updates_pending", "security_updates_since"]).where("id", "=", device.id).executeTakeFirst();
+    if (u) ctx.updates = { checked_at: u.updates_checked_at, error: u.updates_error, security_pending: u.security_updates_pending, security_since: u.security_updates_since };
+  }
   const { checks: results, compliance, grace_until } = enforce(evaluate(device, facts, policies, ctx), policies, previous);
 
   // Most check-ins change nothing: rewrite the rows only when a result did.

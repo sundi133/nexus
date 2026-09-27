@@ -4,7 +4,11 @@ import { sql } from "kysely";
 import type { App, Deps, Env } from "../context.js";
 import { audit } from "../audit/record.js";
 import { RateLimiter } from "../auth/ratelimit.js";
+import { createLocalJWKSet, jwtVerify } from "jose";
 import { gatewayBase, verifyAgentToken, type AgentPrincipal } from "../ai-agents/tokens.js";
+import { publicJwks } from "../sso/keys.js";
+import { checkArguments, loadMcpDlp, type McpDlp, protectResult } from "./dlp.js";
+import { type UserCaller, verifyUserToken } from "./oauth.js";
 import type { Tx } from "../platform/db.js";
 import { issuerFor } from "../sso/apps.js";
 import { argsHash, authorize, type Condition, type Decision, type Rule, type Tool } from "./policy.js";
@@ -36,6 +40,13 @@ const limiter = (perMinute: number) => {
   return l;
 };
 const rateNoted = new Map<string, number>();
+
+/** An AI agent with its own identity, or a person through their own MCP client. */
+type GatewayCaller = ({ kind: "agent" } & AgentPrincipal) | UserCaller;
+const callerKey = (who: GatewayCaller) => (who.kind === "user" ? `user:${who.userId}` : who.agentId);
+const policyCaller = (who: GatewayCaller) => (who.kind === "user" ? { kind: "user" as const, userId: who.userId, groupIds: who.groupIds } : { kind: "agent" as const, agentId: who.agentId, tags: who.tags });
+const auditActor = (who: GatewayCaller) =>
+  who.kind === "user" ? { type: "user" as const, id: who.userId, display: who.email } : { type: "agent" as const, id: who.agentId, display: who.name };
 
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
 const rpcResult = (id: Rpc["id"], result: unknown) => ({ jsonrpc: "2.0", id, result });
@@ -91,7 +102,7 @@ export function registerMcpGateway(app: App) {
     const meta = c.get("meta");
     const { slug, server: serverSlug } = c.req.param();
     const header = c.req.header("authorization");
-    if (!header?.startsWith("Bearer ")) return unauthorized(c, deps, slug, serverSlug, "An agent access token is required");
+    if (!header?.startsWith("Bearer ")) return unauthorized(c, deps, slug, serverSlug, "An access token is required: sign in with your organization");
     const org = await orgBySlug(deps, slug);
     if (!org) return c.json(rpcError(null, -32000, "Unknown organization"), 404);
 
@@ -110,20 +121,20 @@ export function registerMcpGateway(app: App) {
     const ctx = await deps.db.tenant(org.org_id, async (tx) => {
       const server = await loadServer(tx, serverSlug);
       if (!server) return { kind: "no_server" as const };
-      const who = await verifyAgentToken(tx, deps, org.org_id, { token: header.slice(7), issuer: issuerFor(deps, slug), slug, serverUrl: serverUrl(deps, slug, serverSlug) });
+      const who = await verifyCaller(tx, deps, org.org_id, { token: header.slice(7), issuer: issuerFor(deps, slug), slug, serverUrl: serverUrl(deps, slug, serverSlug) });
       if ("error" in who) return { kind: "unauthorized" as const, error: who.error };
-      await touchAgent(tx, who.agentId);
-      return { kind: "ok" as const, server, who, rules: await rulesFor(tx, server.id), tools: await tx.selectFrom("mcp_tools").selectAll().where("server_id", "=", server.id).execute() };
+      if (who.kind === "agent") await touchAgent(tx, who.agentId);
+      return { kind: "ok" as const, server, who, rules: await rulesFor(tx, server.id), tools: await tx.selectFrom("mcp_tools").selectAll().where("server_id", "=", server.id).execute(), dlp: await loadMcpDlp(tx) };
     });
     if (ctx.kind === "no_server") return c.json(rpcError(msg.id, -32000, "Unknown MCP server"), 404);
     if (ctx.kind === "unauthorized") return unauthorized(c, deps, slug, serverSlug, ctx.error);
-    const { server, who, rules, tools } = ctx;
+    const { server, who, rules, tools, dlp } = ctx;
     if (server.status !== "active") return c.json(rpcError(msg.id, -32000, `${server.name} is disabled in Votal Nexus`), 503);
 
     // Notifications and responses from the client: acknowledged, nothing to return.
     if (msg.id === undefined || msg.id === null) return c.body(null, 202);
 
-    const caller = { agentId: who.agentId, tags: who.tags };
+    const caller = policyCaller(who);
     switch (msg.method) {
       case "initialize": {
         const asked = String(msg.params?.protocolVersion ?? "");
@@ -152,7 +163,7 @@ export function registerMcpGateway(app: App) {
         return c.json(rpcResult(msg.id, { tools: visible }));
       }
       case "tools/call":
-        return c.json(await callTool(deps, org.org_id, meta, server, who, tools, rules, msg));
+        return c.json(await callTool(deps, org.org_id, meta, server, who, tools, rules, dlp, msg));
       default:
         return c.json(rpcError(msg.id, -32601, `Method not found: ${msg.method}`));
     }
@@ -162,7 +173,17 @@ export function registerMcpGateway(app: App) {
 type ServerRow = NonNullable<Awaited<ReturnType<typeof loadServer>>>;
 type ToolRow = Tool & { id: string };
 
-async function callTool(deps: Deps, orgId: string, meta: Env["Variables"]["meta"], server: ServerRow, who: AgentPrincipal, tools: ToolRow[], rules: Rule[], msg: Rpc) {
+/** An agent's token or a person's: same signing keys and audience rules, different principals. */
+async function verifyCaller(tx: Tx, deps: Deps, orgId: string, a: { token: string; issuer: string; slug: string; serverUrl: string }): Promise<GatewayCaller | { error: string }> {
+  const jwks = createLocalJWKSet(await publicJwks(tx, deps, orgId));
+  const verified = await jwtVerify(a.token, jwks, { issuer: a.issuer, audience: [gatewayBase(deps, a.slug), a.serverUrl], typ: "at+jwt" }).catch(() => null);
+  if (!verified) return { error: "The access token is invalid, expired, or for another resource" };
+  if (verified.payload.nexus_principal === "user") return verifyUserToken(tx, verified.payload);
+  const agent = await verifyAgentToken(tx, deps, orgId, a);
+  return "error" in agent ? agent : { kind: "agent", ...agent };
+}
+
+async function callTool(deps: Deps, orgId: string, meta: Env["Variables"]["meta"], server: ServerRow, who: GatewayCaller, tools: ToolRow[], rules: Rule[], dlp: McpDlp, msg: Rpc) {
   const name = String(msg.params?.name ?? "");
   const args = (msg.params?.arguments ?? {}) as Record<string, unknown>;
   if (typeof args !== "object" || Array.isArray(args)) return rpcError(msg.id, -32602, "arguments must be an object");
@@ -174,7 +195,7 @@ async function callTool(deps: Deps, orgId: string, meta: Env["Variables"]["meta"
       audit(tx, orgId, { meta }, {
         type: decision.allow ? "mcp.tool_called" : "mcp.tool_denied",
         outcome: !decision.allow ? "denied" : extra.upstream && extra.upstream !== "ok" ? "failure" : "success",
-        actor: { type: "agent", id: who.agentId, display: who.name },
+        actor: auditActor(who),
         target: { type: "mcp_tool", id: tool?.id ?? null, display: `${server.slug}/${name}` },
         details: {
           server_id: server.id,
@@ -186,7 +207,7 @@ async function callTool(deps: Deps, orgId: string, meta: Env["Variables"]["meta"
           rule_id: decision.rule_id,
           args_hash: argsHash(args),
           args_keys: Object.keys(args).slice(0, 50),
-          token_jti: who.jti,
+          ...(who.kind === "agent" ? { token_jti: who.jti } : { via: who.clientName, grant_id: who.grantId }),
           ...extra,
         },
       }),
@@ -195,26 +216,42 @@ async function callTool(deps: Deps, orgId: string, meta: Env["Variables"]["meta"
   if (!tool) return rpcError(msg.id, -32602, `Unknown tool: ${name}`);
 
   // Rate limit per agent and server (MCP-07). The first refusal in a minute is traced, not every one.
-  if (!(await limiter(server.calls_per_minute).take(`${server.id}:${who.agentId}`))) {
-    const key = `${server.id}:${who.agentId}`;
+  if (!(await limiter(server.calls_per_minute).take(`${server.id}:${callerKey(who)}`))) {
+    const key = `${server.id}:${callerKey(who)}`;
     if (Date.now() - (rateNoted.get(key) ?? 0) > 60_000) {
       rateNoted.set(key, Date.now());
       await trace({ allow: false, reason: `Rate limit: ${server.calls_per_minute} calls a minute`, rule_id: null }, { rate_limited: true });
     }
-    return rpcError(msg.id, -32000, `Rate limit exceeded: ${server.calls_per_minute} calls a minute for this agent. Slow down and retry.`);
+    return rpcError(msg.id, -32000, `Rate limit exceeded: ${server.calls_per_minute} calls a minute. Slow down and retry.`);
   }
 
-  const decision = authorize(tool as Tool, rules, { agentId: who.agentId, tags: who.tags }, args);
+  const decision = authorize(tool as Tool, rules, policyCaller(who), args);
   if (!decision.allow) {
     await trace(decision, {});
     return rpcResult(msg.id, { content: [{ type: "text", text: `Votal Nexus denied this call: ${decision.reason}.` }], isError: true });
   }
 
+  // Data protection on what leaves: a secret in the arguments stops the call.
+  const argCheck = checkArguments(dlp, args);
+  if (argCheck.block) {
+    const refused = { allow: false, reason: `The arguments contain ${argCheck.block}`, rule_id: null };
+    await trace(refused, { dlp_arguments: argCheck.notes });
+    return rpcResult(msg.id, { content: [{ type: "text", text: `Votal Nexus stopped this call: the arguments contain ${argCheck.block}. Remove it and try again.` }], isError: true });
+  }
+
   try {
-    const result = await upstreamRequest(upstreamConfig(deps, server), "tools/call", { name, arguments: args });
+    const raw = await upstreamRequest(upstreamConfig(deps, server), "tools/call", { name, arguments: args });
+    // …and on what the AI is about to read: redacted before it gets it.
+    const protectedResult = protectResult(dlp, raw);
     const ms = Math.round(performance.now() - started);
-    await trace(decision, { latency_ms: ms, upstream: "ok", is_error: !!(result as { isError?: boolean })?.isError });
-    return rpcResult(msg.id, result);
+    await trace(decision, {
+      latency_ms: ms,
+      upstream: "ok",
+      is_error: !!(raw as { isError?: boolean })?.isError,
+      ...(argCheck.notes.length ? { dlp_arguments: argCheck.notes } : {}),
+      ...(protectedResult.notes.length ? { dlp_results: protectedResult.notes } : {}),
+    });
+    return rpcResult(msg.id, protectedResult.result);
   } catch (e) {
     const ms = Math.round(performance.now() - started);
     const ue = e instanceof UpstreamError ? e : null;

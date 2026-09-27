@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ActivityList } from "@/components/features/activity";
 import { ConfirmAction } from "@/components/features/confirm-action";
 import { DeviceServers, TOOL_KIND } from "@/components/features/ai-bits";
+import { DeviceAccounts } from "@/components/features/device-accounts";
 import { DeviceEnforcement } from "@/components/features/device-enforcement";
 import { DeviceInventory } from "@/components/features/device-inventory";
 import { DeviceProcesses } from "@/components/features/device-processes";
@@ -137,6 +138,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
               />
             </div>
           </Card>
+          <DeviceAccounts deviceId={d.id} hostname={d.hostname} />
         </TabsContent>
         <TabsContent value="processes">
           <DeviceProcesses deviceId={d.id} />

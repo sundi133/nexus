@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; width:300px; font:13px/1.45 -apple-system,Segoe UI,Inter,sans-serif; }
+  header { padding:12px 14px; border-bottom:1px solid #8884; font-weight:600; }
+  section { padding:12px 14px; }
+  .ok { color:#15803d; font-weight:600; } .warn { color:#b45309; font-weight:600; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:4px 10px; margin:10px 0 0; }
+  dt { color:#888; } dd { margin:0; overflow-wrap:anywhere; }
+  button { margin-top:12px; font:inherit; padding:5px 10px; border-radius:6px; border:1px solid #8886; background:transparent; cursor:pointer; }
+</style>
+</head>
+<body>
+<header>Votal Nexus</header>
+<section>
+  <div id="state">…</div>
+  <div id="detail"></div>
+  <dl>
+    <dt>Signed in as</dt><dd id="user"></dd>
+    <dt>Blocked apps</dt><dd id="blocked"></dd>
+    <dt>Version</dt><dd id="version"></dd>
+  </dl>
+  <button id="sync">Check for policy changes</button>
+</section>
+<script src="popup.js"></script>
+</body>
+</html>

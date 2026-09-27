@@ -15,7 +15,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/votal-ai/nexus/agent/internal/accounts"
 	"github.com/votal-ai/nexus/agent/internal/settings"
+	"github.com/votal-ai/nexus/agent/internal/software"
 )
 
 var b64 = base64.RawURLEncoding
@@ -283,5 +285,133 @@ func TestSettingsAppliedReportedAndKeysEscrowedOnce(t *testing.T) {
 	wait(3)
 	if r := f.e.Report(); len(r.RecoveryKeys) != 2 {
 		t.Fatalf("new keys not sent: %+v", r.RecoveryKeys)
+	}
+}
+
+func TestSoftwareFromThePolicyIsReconciledAndReported(t *testing.T) {
+	f := newFixture(t)
+	now := time.Unix(1_800_000_000, 0)
+	f.e.Now = func() time.Time { return now }
+	var mu sync.Mutex
+	var got [][]software.Item
+	f.e.ApplySoftware = func(items []software.Item) []software.Result {
+		mu.Lock()
+		defer mu.Unlock()
+		got = append(got, items)
+		out := []software.Result{}
+		for _, it := range items {
+			out = append(out, software.Result{ID: it.ID, Status: software.Installed})
+		}
+		return out
+	}
+	passes := func() int { mu.Lock(); defer mu.Unlock(); return len(got) }
+	wait := func(n int) {
+		t.Helper()
+		for i := 0; i < 200 && passes() < n; i++ {
+			time.Sleep(5 * time.Millisecond)
+		}
+		for i := 0; i < 200; i++ {
+			f.e.mu.Lock()
+			busy := f.e.softwareRunning
+			f.e.mu.Unlock()
+			if !busy {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		if passes() != n {
+			t.Fatalf("passes = %d, want %d", passes(), n)
+		}
+	}
+	if r := f.e.Report(); r.Software != nil {
+		t.Fatal("reported apps before any policy")
+	}
+	apps := []software.Item{{ID: "app-1", Name: "Zoom", Action: "install", Kind: "winget", Ref: "Zoom.Zoom"}}
+	if err := f.e.Apply(signPolicy(t, f.priv, policyTyp, Policy{Device: "dev-1", TS: 1, Ver: "v1", Software: apps})); err != nil {
+		t.Fatal(err)
+	}
+	wait(1)
+	if got[0][0].Ref != "Zoom.Zoom" {
+		t.Fatalf("applied %+v", got[0])
+	}
+	if r := f.e.Report(); len(r.Software) != 1 || r.Software[0].Status != software.Installed {
+		t.Fatalf("report %+v", r.Software)
+	}
+	wait(1) // not due again within the hour
+	now = now.Add(SettingsEvery)
+	f.e.Report()
+	wait(2) // hourly, so a removed app comes back
+}
+
+func signSecret(t *testing.T, priv ed25519.PrivateKey, typ string, claims map[string]any) string {
+	t.Helper()
+	h := b64.EncodeToString([]byte(`{"alg":"EdDSA","typ":"` + typ + `"}`))
+	body, _ := json.Marshal(claims)
+	msg := h + "." + b64.EncodeToString(body)
+	return msg + "." + b64.EncodeToString(ed25519.Sign(priv, []byte(msg)))
+}
+
+func TestPasswordsMustBeSignedForThisDeviceAndCurrent(t *testing.T) {
+	f := newFixture(t)
+	now := time.Unix(1_800_000_000, 0)
+	f.e.Now = func() time.Time { return now }
+	var mu sync.Mutex
+	var offered []string
+	passes := 0
+	f.e.OfferPassword = func(uid string, ver int, ct string) (bool, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		offered = append(offered, uid+":"+ct)
+		return true, nil
+	}
+	f.e.ApplyAccounts = func(want []accounts.Account) []accounts.Status {
+		mu.Lock()
+		defer mu.Unlock()
+		passes++
+		return []accounts.Status{{UserID: "u-1", Username: "eve", Status: "active", PasswordVersion: 1}}
+	}
+	if err := f.e.Apply(signPolicy(t, f.priv, policyTyp, Policy{Device: "dev-1", TS: 1, Ver: "v1", Accounts: []accounts.Account{{UserID: "u-1", Username: "eve", State: "active"}}})); err != nil {
+		t.Fatal(err)
+	}
+	_, other, _ := ed25519.GenerateKey(nil)
+	exp := now.Add(time.Hour).Unix()
+	f.e.OfferPasswords([]string{
+		signSecret(t, f.priv, secretTyp, map[string]any{"sub": "dev-1", "uid": "u-1", "ver": 1, "ct": "good", "exp": exp}),
+		signSecret(t, other, secretTyp, map[string]any{"sub": "dev-1", "uid": "u-1", "ver": 1, "ct": "forged", "exp": exp}),
+		signSecret(t, f.priv, secretTyp, map[string]any{"sub": "dev-2", "uid": "u-1", "ver": 1, "ct": "elsewhere", "exp": exp}),
+		signSecret(t, f.priv, secretTyp, map[string]any{"sub": "dev-1", "uid": "u-1", "ver": 1, "ct": "stale", "exp": now.Add(-time.Minute).Unix()}),
+		signSecret(t, f.priv, policyTyp, map[string]any{"sub": "dev-1", "uid": "u-1", "ver": 1, "ct": "wrongtype", "exp": exp}),
+	})
+	mu.Lock()
+	got := append([]string(nil), offered...)
+	mu.Unlock()
+	if len(got) != 1 || got[0] != "u-1:good" {
+		t.Fatalf("offered %q", got)
+	}
+	for i := 0; i < 200; i++ {
+		if r := f.e.Report(); len(r.Accounts) == 1 {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("accounts never reported")
+}
+
+func TestProtectionCoversTheOSButNotAppleUserApps(t *testing.T) {
+	for path, want := range map[string]bool{
+		"/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder":           true,
+		"/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow": true,
+		"/usr/libexec/trustd": true,
+		"/System/Applications/System Settings.app/Contents/MacOS/System Settings":                    true, // people need it to fix compliance
+		`C:\Windows\System32\svchost.exe`:                                                            true,
+		"/System/Applications/Chess.app/Contents/MacOS/Chess":                                        false,
+		"/System/Applications/Music.app/Contents/MacOS/Music":                                        false,
+		"/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal":                        false,
+		"/System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app/Contents/MacOS/Safari": false,
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":                               false,
+	} {
+		if got := protected(Proc{PID: 4242, Path: path}); got != want {
+			t.Errorf("protected(%s) = %v, want %v", path, got, want)
+		}
 	}
 }

@@ -5,12 +5,14 @@ import { installOutboundGuard } from "./platform/outbound.js";
 import { loadConfig, validateProd } from "./config.js";
 import { Db } from "./platform/db.js";
 import { JobRunner } from "./platform/jobs.js";
+import { startLdapServer } from "./protocols/ldap.js";
+import { startRadiusServer } from "./protocols/radius.js";
 import { lifecycle } from "./platform/lifecycle.js";
 import { sql } from "kysely";
 import { LATEST_MIGRATION, migrate } from "./platform/migrate.js";
 import { Realtime } from "./platform/realtime.js";
 import { Sealer } from "./platform/seal.js";
-import { SmtpMailer } from "./platform/mailer.js";
+import { LoggedMailer, ResendMailer, SmtpMailer } from "./platform/mailer.js";
 import { RecordingPushSender, RoutingPushSender } from "./platform/push.js";
 import { ApnsSender } from "./platform/push-apns.js";
 import { FcmSender } from "./platform/push-fcm.js";
@@ -27,7 +29,8 @@ if (cfg.env !== "prod") await migrate(cfg.databaseOwnerUrl, (m) => console.log(`
 // API requests get 30 s per query; workers run long jobs (deleting an organization, retention).
 const db = new Db(cfg.databaseUrl, { queryTimeoutMs: Number(process.env.NEXUS_DB_QUERY_TIMEOUT_MS) || (cfg.role === "api" ? 30_000 : 300_000) });
 const realtime = new Realtime(cfg.databaseUrl);
-const mailer = new SmtpMailer(cfg.smtpUrl, cfg.mailFrom);
+const mailer = new LoggedMailer(cfg.resendApiKey ? new ResendMailer(cfg.resendApiKey, cfg.mailFrom) : new SmtpMailer(cfg.smtpUrl, cfg.mailFrom));
+console.log(`[mail] sending through ${cfg.resendApiKey ? "Resend" : `SMTP (${new URL(cfg.smtpUrl).host})`} as ${cfg.mailFrom}`);
 // Real APNs/FCM when configured; otherwise pushes are logged (the app also gets challenges live over SSE).
 const push = new RoutingPushSender(
   {
@@ -52,12 +55,33 @@ useSharedRateLimits(deps.db);
 // Outbound HTTP checks the address it connects to (DNS rebinding) unless private access is allowed (dev).
 installOutboundGuard(deps.cfg.allowPrivateOutbound);
 const app = createApp(deps);
+// Declared before anything asynchronous can read it (the job loop starts after an await).
+let stopping = false;
 const jobs = runsWorker ? new JobRunner(deps) : null;
 if (jobs) {
   registerSchedules(jobs, deps);
   // In production a rollout's migration runs beside the new pods: don't run jobs against the old schema.
   // (Health keeps answering meanwhile.)
   void (cfg.env === "prod" ? waitForSchema(deps.db) : Promise.resolve()).then(() => !stopping && jobs.start());
+}
+
+// Nexus as an LDAP directory and a RADIUS server, when this deployment offers them.
+const extra: { close: () => Promise<void> }[] = [];
+if (runsApi && process.env.NEXUS_LDAP_PORT) {
+  const cert = process.env.NEXUS_LDAP_TLS_CERT;
+  const key = process.env.NEXUS_LDAP_TLS_KEY;
+  if (!(cert && key) && cfg.env === "prod") {
+    console.error("NEXUS_LDAP_PORT needs NEXUS_LDAP_TLS_CERT and NEXUS_LDAP_TLS_KEY in production (LDAPS: passwords cross the wire)");
+    process.exit(1);
+  }
+  const ldap = await startLdapServer(deps, { port: Number(process.env.NEXUS_LDAP_PORT), tls: cert && key ? { cert, key } : undefined });
+  extra.push(ldap);
+  console.log(`nexus ldap${cert ? "s" : " (no TLS: development only)"} listening on ${ldap.port}`);
+}
+if (runsApi && process.env.NEXUS_RADIUS_PORT) {
+  const radius = await startRadiusServer(deps, { port: Number(process.env.NEXUS_RADIUS_PORT) });
+  extra.push(radius);
+  console.log(`nexus radius listening on ${radius.port}/udp`);
 }
 
 const server = serve({ fetch: app.fetch, port: cfg.port }, (info) => {
@@ -74,7 +98,6 @@ server.on("error", (err: NodeJS.ErrnoException) => {
   throw err;
 });
 
-let stopping = false;
 const shutdown = async (signal: string) => {
   if (stopping) return;
   stopping = true;
@@ -93,6 +116,7 @@ const shutdown = async (signal: string) => {
   await closed;
   clearTimeout(cut);
   await jobs?.stop();
+  await Promise.all(extra.map((x) => x.close().catch(() => {})));
   if (runsApi) await realtime.stop();
   await db.close();
   clearTimeout(force);

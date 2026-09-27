@@ -3,6 +3,8 @@ import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { createLocalJWKSet, decodeJwt, jwtVerify } from "jose";
 import { agentClientCredentials } from "../ai-agents/tokens.js";
+import { decideMcpClient, exchangeCode, MCP_CLIENT_PREFIX, refreshGrant, registerClient } from "../mcp/oauth.js";
+import { RateLimiter } from "../auth/ratelimit.js";
 import { sql } from "kysely";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { App, Deps, Env, Principal } from "../context.js";
@@ -126,6 +128,8 @@ async function decide(deps: Deps, slug: string, q: Record<string, string>, princ
   const issuer = issuerFor(deps, slug);
 
   return deps.db.tenant(org.org_id, async (tx) => {
+    // People's own MCP clients (Cursor, Claude Desktop…) registered themselves: their own rules.
+    if (q.client_id?.startsWith(MCP_CLIENT_PREFIX)) return decideMcpClient(tx, deps, { orgId: org.org_id, slug, issuer, q, principal, meta });
     // Until client and redirect_uri are validated, never redirect anywhere (open-redirect protection).
     const client = q.client_id
       ? await tx.selectFrom("applications").selectAll().where("client_id", "=", q.client_id).where("protocol", "=", "oidc").executeTakeFirst()
@@ -213,6 +217,8 @@ async function decide(deps: Deps, slug: string, q: Record<string, string>, princ
   });
 }
 
+const registrations = new RateLimiter(20, 3600_000, "mcp-register"); // per organization and address, an hour
+
 export function registerOidcRoutes(app: App) {
   // Browser JS (SPAs) may fetch discovery, JWKS, token and userinfo cross-origin; none of them use cookies.
   app.use("/oidc/*", cors({ origin: "*", allowHeaders: ["Authorization", "Content-Type"], maxAge: 600 }));
@@ -256,8 +262,8 @@ export function registerOidcRoutes(app: App) {
     },
   );
 
-  app.get("/oidc/:slug/.well-known/openid-configuration", async (c) => {
-    const slug = c.req.param("slug");
+  const discovery = async (c: Context<Env>) => {
+    const slug = c.req.param("slug")!;
     const deps = c.get("deps");
     if (!(await orgBySlug(deps, slug))) return c.json({ error: "not_found" }, 404);
     const issuer = issuerFor(deps, slug);
@@ -270,7 +276,8 @@ export function registerOidcRoutes(app: App) {
       jwks_uri: `${issuer}/jwks`,
       response_types_supported: ["code"],
       response_modes_supported: ["query"],
-      grant_types_supported: ["authorization_code", "client_credentials"],
+      grant_types_supported: ["authorization_code", "client_credentials", "refresh_token"],
+      registration_endpoint: `${issuer}/register`, // MCP clients register themselves (RFC 7591)
       subject_types_supported: ["public"],
       id_token_signing_alg_values_supported: ["RS256"],
       token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post", "private_key_jwt", "none"],
@@ -283,6 +290,25 @@ export function registerOidcRoutes(app: App) {
       request_parameter_supported: false,
       claims_parameter_supported: false,
     });
+  };
+  // OpenID Connect discovery, and the same document under the OAuth name (RFC 8414) MCP clients look for.
+  app.get("/oidc/:slug/.well-known/openid-configuration", discovery);
+  app.get("/oidc/:slug/.well-known/oauth-authorization-server", discovery);
+
+  // Dynamic client registration (RFC 7591), for people's MCP clients: public clients, loopback
+  // or app-scheme redirects only, and nothing works until a person signs in with them.
+  app.post("/oidc/:slug/register", async (c) => {
+    const deps = c.get("deps");
+    const slug = c.req.param("slug");
+    const org = await orgBySlug(deps, slug);
+    if (!org) return c.json({ error: "invalid_request", error_description: "Unknown issuer" }, 400);
+    if (!(await registrations.take(`${org.org_id}:${c.get("meta").ip}`))) return c.json({ error: "slow_down", error_description: "Too many registrations; try again later" }, 429);
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body || typeof body !== "object") return c.json({ error: "invalid_client_metadata", error_description: "A JSON body is required" }, 400);
+    const r = await deps.db.tenant(org.org_id, (tx) => registerClient(tx, org.org_id, body));
+    if (!r.ok) return c.json({ error: r.e.error, error_description: r.e.description }, r.e.status);
+    c.header("Cache-Control", "no-store");
+    return c.json(r.body, 201);
   });
 
   app.get("/oidc/:slug/jwks", async (c) => {
@@ -314,7 +340,16 @@ export function registerOidcRoutes(app: App) {
       c.header("Pragma", "no-cache");
       return c.json(r.body);
     }
-    if (form.grant_type !== "authorization_code") return oauthError(c, 400, "unsupported_grant_type", "Only authorization_code is supported");
+    if (form.grant_type === "refresh_token" || (form.grant_type === "authorization_code" && form.client_id?.startsWith(MCP_CLIENT_PREFIX))) {
+      // People's MCP clients: public clients, PKCE on the code, rotating refresh tokens.
+      const a = { orgId: org.org_id, issuer: issuerFor(deps, slug), form, meta: c.get("meta") };
+      const r = await deps.db.tenant(org.org_id, (tx) => (form.grant_type === "refresh_token" ? refreshGrant(tx, deps, a) : exchangeCode(tx, deps, a)));
+      if (!r.ok) return oauthError(c, r.e.status, r.e.error, r.e.description);
+      c.header("Cache-Control", "no-store");
+      c.header("Pragma", "no-cache");
+      return c.json(r.body);
+    }
+    if (form.grant_type !== "authorization_code") return oauthError(c, 400, "unsupported_grant_type", "Only authorization_code, refresh_token and client_credentials are supported");
     const auth = clientAuth(c, form);
     if (!auth) return oauthError(c, 401, "invalid_client", "Client authentication is required");
     const issuer = issuerFor(deps, slug);

@@ -48,6 +48,7 @@ type Inventory struct {
 	ConsoleUser   string       `json:"console_user,omitempty"`
 	UptimeSeconds int64        `json:"uptime_seconds,omitempty"`
 	AI            *AIInventory `json:"ai,omitempty"`
+	Updates       any          `json:"updates,omitempty"` // pending OS updates (updates.Report), from a background check
 }
 
 type Device struct {

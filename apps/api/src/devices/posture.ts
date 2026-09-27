@@ -22,7 +22,7 @@ export const PostureFacts = z
   .openapi("PostureFacts");
 export type PostureFacts = z.infer<typeof PostureFacts>;
 
-export const CHECK_KEYS = ["disk_encryption", "firewall", "screen_lock", "os_version", "system_integrity", "mdm_compliant", "ai_mcp_governed"] as const;
+export const CHECK_KEYS = ["disk_encryption", "firewall", "screen_lock", "os_version", "system_integrity", "mdm_compliant", "ai_mcp_governed", "os_updates"] as const;
 export type CheckKey = (typeof CHECK_KEYS)[number];
 
 export const PolicyParams = {
@@ -46,6 +46,9 @@ export const PolicyParams = {
     allow_local: z.boolean().openapi({ description: "Allow MCP servers that run on the device (stdio)" }),
     allow_inline_secrets: z.boolean().openapi({ description: "Allow API keys and tokens written into MCP config files" }),
   }),
+  os_updates: z.object({
+    max_days: z.number().int().min(0).max(90).openapi({ description: "How many days a security update may wait before the device fails this check" }),
+  }),
 } as const;
 
 export type PolicyMode = "audit" | "enforce";
@@ -64,6 +67,8 @@ export const DEFAULT_POLICIES: Policy[] = [
   { key: "mdm_compliant", ...base, enabled: false, params: {} },
   // Off until an admin opts in; starts in audit mode so it reports without blocking anyone.
   { key: "ai_mcp_governed", ...base, enabled: false, mode: "audit", params: { allowed_hosts: [], allow_local: true, allow_inline_secrets: false } },
+  // Off until an admin opts in (it needs agents that report OS updates); starts in audit mode.
+  { key: "os_updates", ...base, enabled: false, mode: "audit", params: { max_days: 14 } },
 ];
 
 export const CHECK_INFO: Record<CheckKey, { title: string; why: string }> = {
@@ -77,6 +82,7 @@ export const CHECK_INFO: Record<CheckKey, { title: string; why: string }> = {
     title: "AI tools use approved MCP servers",
     why: "MCP servers let AI assistants act with your access. Going through the Nexus gateway puts every tool call under policy and in the audit log, and keeps tokens out of config files.",
   },
+  os_updates: { title: "Security updates installed", why: "Published security fixes tell attackers exactly what to exploit on devices that haven't installed them." },
 };
 
 const FIX: Record<CheckKey, Record<DevicePlatform, string>> = {
@@ -110,6 +116,11 @@ const FIX: Record<CheckKey, Record<DevicePlatform, string>> = {
     windows: "Connect your AI tools (Claude, Cursor, VS Code…) to MCP servers through the Nexus MCP gateway (IT can give you the URL), and remove API keys written into MCP config files.",
     linux: "Connect your AI tools (Claude, Cursor, VS Code…) to MCP servers through the Nexus MCP gateway (IT can give you the URL), and remove API keys written into MCP config files.",
   },
+  os_updates: {
+    macos: "Open System Settings → General → Software Update, install the updates, and restart if asked.",
+    windows: "Open Settings → Windows Update, install the updates, and restart if asked.",
+    linux: "Install the updates with your package manager (e.g. `sudo apt upgrade` or `sudo dnf upgrade`), then reboot if asked.",
+  },
   system_integrity: {
     macos: "System Integrity Protection is off. Ask IT: it can only be re-enabled from Recovery mode.",
     windows: "Secure Boot is off. Turn it on in the device firmware (UEFI) settings, or ask IT.",
@@ -139,7 +150,9 @@ const onOff = (status: "on" | "off" | "unknown"): CheckResult["status"] => (stat
 
 /** What the organization's MDMs say about a device (DEV + MDM signals). */
 export type MdmSignal = { source: string; managed: boolean; compliant: boolean | null; detail: string };
-export type EvalContext = { mdmConnected: boolean; mdm: MdmSignal | null; ai?: { inventory: AIInventory | null; ctx: AIContext } };
+/** What the agent last said about pending OS updates (columns on the device). */
+export type UpdatesState = { checked_at: Date | null; error: string | null; security_pending: number; security_since: Date | null };
+export type EvalContext = { mdmConnected: boolean; mdm: MdmSignal | null; ai?: { inventory: AIInventory | null; ctx: AIContext }; updates?: UpdatesState; now?: Date };
 
 export function evaluate(device: { platform: DevicePlatform; os_version: string; serial?: string }, facts: PostureFacts | null, policies: Policy[], ctx: EvalContext = { mdmConnected: false, mdm: null }): CheckResult[] {
   const out: CheckResult[] = [];
@@ -165,6 +178,10 @@ export function evaluate(device: { platform: DevicePlatform; os_version: string;
     }
     if (p.key === "ai_mcp_governed") {
       out.push(evaluateAI(p.params as z.infer<typeof PolicyParams.ai_mcp_governed>, ctx.ai));
+      continue;
+    }
+    if (p.key === "os_updates") {
+      out.push(evaluateUpdates(Number((p.params as { max_days?: number }).max_days ?? 14), ctx.updates, ctx.now ?? new Date()));
       continue;
     }
     if (!facts && p.key !== "os_version") {
@@ -210,6 +227,19 @@ export function evaluate(device: { platform: DevicePlatform; os_version: string;
     }
   }
   return out;
+}
+
+const days = (n: number) => `${n} day${n === 1 ? "" : "s"}`;
+
+export function evaluateUpdates(maxDays: number, u: UpdatesState | undefined, now: Date): CheckResult {
+  const key = "os_updates" as const;
+  if (!u?.checked_at) return { key, status: "unknown", detail: "The agent hasn't reported OS updates yet (it needs a recent agent version)" };
+  if (u.error) return { key, status: "unknown", detail: `Couldn't check for updates: ${u.error.slice(0, 200)}` };
+  if (!u.security_pending) return { key, status: "pass", detail: "No security updates pending" };
+  const waited = u.security_since ? Math.floor((now.getTime() - u.security_since.getTime()) / 86_400_000) : 0;
+  const n = `${u.security_pending} security update${u.security_pending === 1 ? "" : "s"}`;
+  if (waited > maxDays) return { key, status: "fail", detail: `${n} pending for ${days(waited)} (policy allows ${days(maxDays)})` };
+  return { key, status: "pass", detail: `${n} pending for ${waited ? days(waited) : "less than a day"} (due within ${days(maxDays)})` };
 }
 
 function evaluateAI(params: z.infer<typeof PolicyParams.ai_mcp_governed>, ai: EvalContext["ai"]): CheckResult {

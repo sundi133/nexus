@@ -38,6 +38,15 @@
         "cd apps/web && NEXUS_API_URL=http://localhost:8095 exec pnpm exec next dev --port 3105"
       ],
       "port": 3105
+    },
+    {
+      "name": "api-directory-services",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/api && NEXUS_PORT=8099 NEXUS_LDAP_PORT=1389 NEXUS_RADIUS_PORT=1812 exec pnpm dev"
+      ],
+      "port": 8099
     }
   ]
 }

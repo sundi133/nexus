@@ -75,6 +75,22 @@ migrations:
 agentReleases:
   existingClaim: ""
 
+# Nexus as an LDAP directory (LDAPS) and a RADIUS server, for legacy apps, VPNs and Wi-Fi.
+# They run in the API pods and need their own Service: a load balancer that passes TCP 636 and
+# UDP 1812 through (an HTTP ingress can't). Organizations turn them on in the console.
+directoryServices:
+  enabled: false
+  ldap:
+    port: 636              # on the Service (the pods listen on 1636)
+    tlsSecret: ""          # a kubernetes.io/tls Secret (tls.crt, tls.key) for LDAPS: required
+    publicAddress: ""      # shown to admins, e.g. ldaps://ldap.nexus.example.com:636
+  radius:
+    port: 1812
+    publicAddress: ""      # e.g. radius.nexus.example.com:1812 (UDP)
+  service:
+    type: LoadBalancer
+    annotations: {}        # e.g. service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
 ingress:
   enabled: false
   className: ""

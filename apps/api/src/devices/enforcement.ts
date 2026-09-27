@@ -11,6 +11,8 @@ import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, isoOrNull, json, problemResponses } from "../schemas.js";
 import { commandKey, sign } from "./commands.js";
 import { getPolicies } from "./service.js";
+import { type PolicySoftware, recordSoftware, SoftwareReport, softwareFor } from "./software-deploy.js";
+import { AccountsReport, accountsFor, type PolicyAccount, recordAccounts } from "./local-accounts.js";
 
 /**
  * Device enforcement (DEV-ENF): block apps and domains on devices.
@@ -39,8 +41,11 @@ const PROTECTED = new Set(
     "systemd", "init", "dbus-daemon", "networkmanager", "systemd-logind", "gdm", "sddm", "xorg",
     "csrss.exe", "wininit.exe", "winlogon.exe", "lsass.exe", "services.exe", "smss.exe", "svchost.exe", "explorer.exe", "dwm.exe", "system", "registry", "msmpeng.exe",
     "nexus-agent", "nexus-agent.exe", "osqueryd", "osqueryd.exe", "osqueryi", "osqueryi.exe",
+    "system settings", "system preferences", // people need these to fix what compliance asks of them
   ].map((s) => s.toLowerCase()),
 );
+// Apple's own user apps live under /System (Music, Chess, Mail, Terminal…; Safari in a Cryptex): rules may stop those.
+const SYSTEM_APPS = ["/system/applications/", "/system/cryptexes/app/system/applications/", "/system/volumes/preboot/cryptexes/app/system/applications/"];
 const PROTECTED_PATHS = ["/system/", "/usr/libexec/", "/sbin/", "c:\\windows\\system32\\", "/library/application support/nexus/", "c:\\program files\\nexus\\", "/opt/nexus/"];
 
 const Kind = z.enum(["app", "domain"]);
@@ -73,7 +78,9 @@ export function checkRule(r: { kind: "app" | "domain"; match: string; value: str
   if (!/^(\/|[a-zA-Z]:\\)/.test(v) || v.length > 1000) return { error: "Give a full path, like /Applications/Example.app/ or C:\\Program Files\\Example\\" };
   const lower = v.toLowerCase();
   if (lower === "/" || /^[a-z]:\\$/.test(lower)) return { error: "That would match every program" };
-  if (PROTECTED_PATHS.some((p) => lower.startsWith(p) || p.startsWith(lower))) return { error: "That folder holds the operating system or Nexus and can't be blocked" };
+  const systemApp = SYSTEM_APPS.some((p) => lower.startsWith(p) && lower.length > p.length);
+  if (!systemApp && PROTECTED_PATHS.some((p) => lower.startsWith(p) || p.startsWith(lower))) return { error: "That folder holds the operating system or Nexus and can't be blocked" };
+  if (/\/system settings\.app|\/system preferences\.app/.test(lower)) return { error: "System Settings can't be blocked: people need it to fix what device policies ask" };
   return { value: v };
 }
 
@@ -108,16 +115,25 @@ export async function settingsFor(tx: Tx): Promise<DeviceSettings> {
   return s;
 }
 
-export const policyVersion = (rules: PolicyRule[], settings: DeviceSettings = {}) =>
-  createHash("sha256").update(JSON.stringify(rules)).update(Object.keys(settings).length ? JSON.stringify(settings) : "").digest("hex").slice(0, 16);
+// Parts added later hash only when present, so existing devices' versions don't change.
+export const policyVersion = (rules: PolicyRule[], settings: DeviceSettings = {}, software: PolicySoftware[] = [], accounts: PolicyAccount[] = []) =>
+  createHash("sha256")
+    .update(JSON.stringify(rules))
+    .update(Object.keys(settings).length ? JSON.stringify(settings) : "")
+    .update(software.length ? JSON.stringify(software) : "")
+    .update(accounts.length ? JSON.stringify(accounts) : "")
+    .digest("hex")
+    .slice(0, 16);
 
 /** The device's current policy, signed, for the check-in response. */
 export async function signedPolicy(tx: Tx, deps: Deps, device: { id: string; org_id: string; platform: DevicePlatform; primary_user_id: string | null }) {
   const rules = await rulesFor(tx, device);
   const settings = await settingsFor(tx);
+  const software = await softwareFor(tx, device);
+  const accounts = await accountsFor(tx, device);
   const key = await commandKey(tx, deps, device.org_id);
   // ts orders policies: the agent refuses one older than what it already applied (a replayed response).
-  return sign(key.privatePem, { sub: device.id, ts: Date.now(), ver: policyVersion(rules, settings), rules, settings }, POLICY_TYP);
+  return sign(key.privatePem, { sub: device.id, ts: Date.now(), ver: policyVersion(rules, settings, software, accounts), rules, settings, software, accounts }, POLICY_TYP);
 }
 
 // ---- What agents report -------------------------------------------------------------------------
@@ -149,6 +165,10 @@ export const EnforcementReport = z.object({
     )
     .max(10)
     .default([]),
+  // Apps from the policy (null until the agent's first pass; absent from older agents).
+  software: SoftwareReport.nullable().optional(),
+  // People's local accounts (null until the agent's first pass; absent from older agents).
+  accounts: AccountsReport.nullable().optional(),
   recovery_keys: z
     .array(
       z.object({
@@ -166,6 +186,8 @@ export const recoveryKeyAad = (id: string) => `recovery_key:${id}`;
 export async function recordEnforcement(tx: Tx, deps: Deps, device: { id: string; org_id: string; hostname: string }, rep: z.infer<typeof EnforcementReport>, meta: RequestMeta) {
   await tx.updateTable("devices").set({ enforcement_version: rep.version, enforcement_status: rep.status }).where("id", "=", device.id).execute();
   await recordSettings(tx, device, rep.settings, meta);
+  if (rep.software) await recordSoftware(tx, device, rep.software, meta);
+  if (rep.accounts) await recordAccounts(tx, device, rep.accounts, meta);
   if (rep.recovery_keys.length) await escrowKeys(tx, deps, device, rep.recovery_keys, meta);
   if (!rep.events.length) return;
   const known = new Map((await tx.selectFrom("enforcement_rules").select(["id", "name"]).execute()).map((r) => [r.id, r.name]));
@@ -518,7 +540,7 @@ export function registerEnforcementRoutes(app: App) {
         const d = await tx.selectFrom("devices").select(["id", "platform", "primary_user_id", "enforcement_version", "enforcement_status", "last_seen_at"]).where("id", "=", id).executeTakeFirst();
         if (!d) throw notFound("Device");
         const rules = await rulesFor(tx, d);
-        const expected = policyVersion(rules, await settingsFor(tx));
+        const expected = policyVersion(rules, await settingsFor(tx), await softwareFor(tx, d), await accountsFor(tx, d));
         return { rules, expected_version: expected, applied_version: d.enforcement_version, in_sync: d.enforcement_version === expected, status: d.enforcement_status, last_seen_at: isoOrNull(d.last_seen_at) };
       });
       return c.json(out, 200);

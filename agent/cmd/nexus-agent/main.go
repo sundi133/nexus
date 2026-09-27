@@ -29,6 +29,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/votal-ai/nexus/agent/internal/accounts"
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
@@ -41,8 +42,10 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/run"
 	"github.com/votal-ai/nexus/agent/internal/service"
 	"github.com/votal-ai/nexus/agent/internal/settings"
+	"github.com/votal-ai/nexus/agent/internal/software"
 	"github.com/votal-ai/nexus/agent/internal/state"
 	"github.com/votal-ai/nexus/agent/internal/update"
+	"github.com/votal-ai/nexus/agent/internal/updates"
 )
 
 // Set at build time:
@@ -253,18 +256,85 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			}
 		}
 	}
-	runner := &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate)}, Log: log}
+	runner := &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate), "script": command.ScriptAction(store.Dir)}, Log: log}
 	ownHost := ""
 	if u, perr := url.Parse(e.Server); perr == nil {
 		ownHost = u.Hostname()
+	}
+	// Apps the organization assigns: installed and removed in the background, as root/SYSTEM.
+	apps := &software.Manager{Sys: software.Sys{GOOS: runtime.GOOS, Dir: filepath.Join(store.Dir, "downloads"), Download: software.Download,
+		Run: func(ctx context.Context, name string, args ...string) (string, error) {
+			out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+			return string(out), err
+		},
+		Has:    func(n string) bool { _, err := exec.LookPath(n); return err == nil },
+		Winget: func() string { return software.FindWinget(exec.LookPath) }}}
+	// People's local accounts, with passwords encrypted to this device's own key.
+	var users *accounts.Manager
+	encKey, kerr := accounts.LoadOrCreateKey(store.Dir)
+	if kerr != nil {
+		log.Warn("local accounts off: no encryption key", "err", kerr)
+	} else {
+		users = &accounts.Manager{StateDir: store.Dir, DeviceID: e.DeviceID, Key: encKey, Sys: accounts.Sys{GOOS: runtime.GOOS,
+			Run: func(ctx context.Context, stdin, name string, args ...string) (string, error) {
+				c := exec.CommandContext(ctx, name, args...)
+				if stdin != "" {
+					c.Stdin = strings.NewReader(stdin)
+				}
+				out, err := c.CombinedOutput()
+				return string(out), err
+			}}}
 	}
 	enforcer := &enforce.Enforcer{StateDir: store.Dir, DeviceID: e.DeviceID, Key: runner.Key, OwnHost: ownHost, Log: log,
 		Processes: enforce.ListProcesses, Kill: enforce.KillProcess, FlushDNS: enforce.FlushDNS,
 		ApplySettings: func(d settings.Desired) settings.Outcome {
 			return settings.Apply(settings.OS{Root: requireAdmin() == nil}, runtime.GOOS, d)
+		},
+		ApplySoftware: func(items []software.Item) []software.Result {
+			if err := requireAdmin(); err != nil {
+				out := make([]software.Result, 0, len(items))
+				for _, it := range items {
+					out = append(out, software.Result{ID: it.ID, Status: software.Unsupported, Detail: "the agent isn't running as root/SYSTEM", At: time.Now().UTC().Format(time.RFC3339)})
+				}
+				return out
+			}
+			return apps.Apply(context.Background(), items)
 		}}
+	if users != nil {
+		enforcer.OfferPassword = users.Offer
+		enforcer.ApplyAccounts = func(want []accounts.Account) []accounts.Status {
+			if err := requireAdmin(); err != nil {
+				out := make([]accounts.Status, 0, len(want))
+				for _, a := range want {
+					out = append(out, accounts.Status{UserID: a.UserID, Username: a.Username, Status: "failed", Detail: "the agent isn't running as root/SYSTEM"})
+				}
+				return out
+			}
+			return users.Apply(context.Background(), want)
+		}
+	}
 	enforcer.Load() // the last rules apply from boot, before the first check-in
-	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin, Enforcer: enforcer,
+	// OS updates: checked in the background every 6 hours (slow), reported with the inventory.
+	updateChecker := &updates.Checker{GOOS: runtime.GOOS, Every: 6 * time.Hour,
+		Run: func(ctx context.Context, name string, args ...string) (string, error) {
+			out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+			return string(out), err
+		},
+		Has: func(n string) bool { _, err := exec.LookPath(n); return err == nil }}
+	runner.ArgExec["updates"] = command.UpdatesAction(command.Actions()["restart"], updateChecker.Recheck)
+	collectWithUpdates := func(ctx context.Context) collect.Snapshot {
+		s := collect.Collect(ctx)
+		if r := updateChecker.Report(); r != nil {
+			s.Inventory.Updates = r
+		}
+		return s
+	}
+	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collectWithUpdates, OnCheckin: onCheckin, Enforcer: enforcer, EncKey: func() string {
+		if encKey == nil {
+			return ""
+		}
+		return accounts.PublicKey(encKey)
+	}(),
 		Commands: runner,
 		Osquery: func(ctx context.Context) osquery.Report {
 			return osquery.Collect(ctx, osquery.Locate(), runtime.GOOS, time.Now())

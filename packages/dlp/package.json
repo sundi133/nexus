@@ -1,0 +1,25 @@
+{
+  "name": "@nexus/dlp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sensitive-data detectors and redaction (shared by the browser extension and the MCP gateway)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.1"
+  },
+  "files": ["dist", "src"]
+}

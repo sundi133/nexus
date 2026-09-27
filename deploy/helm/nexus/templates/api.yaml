@@ -42,9 +42,24 @@ spec:
           env:
             - { name: NEXUS_ROLE, value: api }
             - { name: NEXUS_SHUTDOWN_DELAY_MS, value: {{ mul .Values.api.shutdownDelaySeconds 1000 | toString | quote }} }
+            {{- if .Values.directoryServices.enabled }}
+            # Unprivileged ports in the container (it runs as non-root, without capabilities); the Service maps 636 → 1636.
+            - { name: NEXUS_LDAP_PORT, value: "1636" }
+            - { name: NEXUS_RADIUS_PORT, value: "1812" }
+            - { name: NEXUS_LDAP_PUBLIC_ADDRESS, value: {{ .Values.directoryServices.ldap.publicAddress | quote }} }
+            - { name: NEXUS_RADIUS_PUBLIC_ADDRESS, value: {{ .Values.directoryServices.radius.publicAddress | quote }} }
+            - name: NEXUS_LDAP_TLS_CERT
+              valueFrom: { secretKeyRef: { name: {{ required "directoryServices.ldap.tlsSecret is required (LDAPS)" .Values.directoryServices.ldap.tlsSecret }}, key: tls.crt } }
+            - name: NEXUS_LDAP_TLS_KEY
+              valueFrom: { secretKeyRef: { name: {{ .Values.directoryServices.ldap.tlsSecret }}, key: tls.key } }
+            {{- end }}
             {{- include "nexus.env" . | nindent 12 }}
           ports:
             - { name: http, containerPort: 8080 }
+            {{- if .Values.directoryServices.enabled }}
+            - { name: ldaps, containerPort: 1636, protocol: TCP }
+            - { name: radius, containerPort: 1812, protocol: UDP }
+            {{- end }}
           startupProbe:
             httpGet: { path: /healthz, port: http }
             periodSeconds: 2
@@ -111,4 +126,28 @@ spec:
       resource:
         name: cpu
         target: { type: Utilization, averageUtilization: {{ .Values.api.autoscaling.targetCPUUtilizationPercentage }} }
+{{- end }}
+{{- if .Values.directoryServices.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-directory
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+  {{- with .Values.directoryServices.service.annotations }}
+  annotations: {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.directoryServices.service.type }}
+  # Keep clients' source addresses: RADIUS knows its clients by them.
+  {{- if eq .Values.directoryServices.service.type "LoadBalancer" }}
+  externalTrafficPolicy: Local
+  {{- end }}
+  selector:
+    {{- include "nexus.selector" (list . "api") | nindent 4 }}
+  ports:
+    - { name: ldaps, port: {{ .Values.directoryServices.ldap.port }}, targetPort: ldaps, protocol: TCP }
+    - { name: radius, port: {{ .Values.directoryServices.radius.port }}, targetPort: radius, protocol: UDP }
 {{- end }}

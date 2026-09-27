@@ -35,6 +35,8 @@ export interface Database {
     department: Generated<string>;
     status: Generated<UserStatus>;
     password_hash: string | null;
+    local_password_version: Generated<number>;
+    local_password_fp: string | null;
     attributes: Json;
     break_glass: Generated<boolean>;
     last_login_at: NullableTimestamp;
@@ -174,7 +176,9 @@ export interface Database {
     id: string;
     org_id: string;
     code_hash: Buffer;
-    app_id: string;
+    app_id: string | null;
+    mcp_client_id: Generated<string | null>;
+    resource: Generated<string | null>;
     user_id: string;
     session_id: string | null;
     redirect_uri: string;
@@ -229,6 +233,13 @@ export interface Database {
     settings_reported_at: Generated<Date | null>;
     events_status: Generated<string>;
     osquery_collected_at: NullableTimestamp;
+    enc_public_key: string | null;
+    updates_checked_at: NullableTimestamp;
+    updates_error: string | null;
+    updates_pending: Generated<number>;
+    security_updates_pending: Generated<number>;
+    updates_pending_since: NullableTimestamp;
+    security_updates_since: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
     last_ip: Generated<string>;
@@ -254,6 +265,193 @@ export interface Database {
     mode: Generated<"audit" | "enforce">;
     grace_hours: Generated<number>;
     updated_at: Timestamp;
+  };
+  directory_service_settings: {
+    org_id: string;
+    ldap_enabled: Generated<boolean>;
+    radius_enabled: Generated<boolean>;
+    radius_mfa: Generated<"required" | "if_enrolled" | "off">;
+    updated_at: Generated<Date>;
+  };
+  ldap_service_accounts: {
+    id: string;
+    org_id: string;
+    name: string;
+    secret_hash: string;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+    revoked_at: Date | null;
+  };
+  radius_clients: {
+    id: string;
+    org_id: string;
+    name: string;
+    address: string;
+    secret: Buffer;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+    revoked_at: Date | null;
+  };
+  device_scripts: {
+    id: string;
+    org_id: string;
+    name: string;
+    description: Generated<string>;
+    shell: "sh" | "bash" | "zsh" | "powershell";
+    body: string;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  device_accounts: {
+    id: string;
+    org_id: string;
+    device_id: string;
+    user_id: string;
+    username: string;
+    admin: Generated<boolean>;
+    take_over: Generated<boolean>;
+    status: Generated<"pending" | "waiting_password" | "active" | "disabled" | "failed">;
+    password_version: Generated<number>;
+    detail: Generated<string>;
+    reported_at: NullableTimestamp;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
+  password_deliveries: {
+    org_id: string;
+    device_id: string;
+    user_id: string;
+    version: number;
+    ciphertext: string;
+    created_at: Generated<Date>;
+    expires_at: Date;
+  };
+  software_packages: {
+    id: string;
+    org_id: string;
+    name: string;
+    description: Generated<string>;
+    platform: DevicePlatform;
+    kind: "winget" | "msi" | "pkg" | "apt" | "dnf";
+    ref: string;
+    url: Generated<string>;
+    sha256: Generated<string>;
+    args: Json<string[]>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  software_assignments: {
+    id: string;
+    org_id: string;
+    package_id: string;
+    action: "install" | "remove";
+    group_id: string | null;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
+  device_software: {
+    org_id: string;
+    device_id: string;
+    package_id: string;
+    status: "installed" | "absent" | "failed" | "unsupported";
+    detail: Generated<string>;
+    updated_at: Generated<Date>;
+  };
+  patch_policies: {
+    org_id: string;
+    enabled: Generated<boolean>;
+    scope: Generated<"security" | "all">;
+    deadline_days: Generated<number>;
+    restart: Generated<"never" | "if_needed">;
+    window_start: Generated<number>;
+    window_end: Generated<number>;
+    timezone: Generated<string>;
+    updated_by: string | null;
+    updated_at: Generated<Date>;
+  };
+  script_runs: {
+    id: string;
+    org_id: string;
+    script_id: string | null;
+    name: string;
+    shell: string;
+    body: string;
+    body_sha256: string;
+    reason: string;
+    target: Json;
+    device_count: number;
+    requested_by: string | null;
+    created_at: Generated<Date>;
+    expires_at: Date;
+  };
+  mcp_clients: {
+    id: string;
+    org_id: string;
+    client_id: string;
+    name: string;
+    redirect_uris: string[];
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+  };
+  mcp_grants: {
+    id: string;
+    org_id: string;
+    user_id: string;
+    client_id: string;
+    resource: string;
+    refresh_hash: Buffer;
+    previous_hash: Buffer | null;
+    created_at: Generated<Date>;
+    last_used_at: Generated<Date>;
+    expires_at: Date;
+    revoked_at: Date | null;
+  };
+  mcp_dlp_policies: {
+    org_id: string;
+    arguments: Json;
+    results: Json;
+    custom: Json<unknown[]>;
+    updated_at: Generated<Date>;
+    updated_by: string | null;
+  };
+  browser_tokens: {
+    id: string;
+    org_id: string;
+    name: string;
+    token_hash: Buffer;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+    revoked_at: Date | null;
+  };
+  browser_policies: {
+    org_id: string;
+    apps: Json;
+    dlp: Json;
+    uploads: "allow" | "warn" | "block";
+    message: string;
+    updated_at: Generated<Date>;
+    updated_by: string | null;
+  };
+  browser_events: {
+    id: string;
+    org_id: string;
+    at: Date;
+    received_at: Generated<Date>;
+    user_email: string;
+    user_id: string | null;
+    kind: "visit" | "dlp" | "upload";
+    action: "allowed" | "monitored" | "warned" | "continued" | "blocked";
+    app: string;
+    host: string;
+    detector: string;
+    count: number;
+    detail: string;
+    extension_version: string;
   };
   device_recovery_keys: {
     id: string;
@@ -292,7 +490,7 @@ export interface Database {
     id: string;
     org_id: string;
     device_id: string;
-    action: "refresh" | "lock" | "restart" | "wipe" | "osquery";
+    action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates";
     channel: "agent" | "mdm";
     status: Generated<"queued" | "sent" | "done" | "failed" | "expired" | "canceled">;
     reason: Generated<string>;
@@ -305,6 +503,7 @@ export interface Database {
     args: Json;
     result: Json<unknown> | null;
     query_id: string | null;
+    script_run_id: Generated<string | null>;
   };
   device_osquery: {
     org_id: string;
@@ -795,7 +994,7 @@ export interface Database {
     org_id: string;
     server_id: string;
     effect: "allow" | "deny";
-    subject_type: "all_agents" | "agent" | "agent_tag";
+    subject_type: "all_agents" | "agent" | "agent_tag" | "all_people" | "user" | "group";
     subject_id: string | null;
     subject_tag: string | null;
     tools: string[];

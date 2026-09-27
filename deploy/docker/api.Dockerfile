@@ -8,14 +8,17 @@ FROM base AS build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/api/package.json apps/api/
 COPY packages/ldap-directory/package.json packages/ldap-directory/
+COPY packages/dlp/package.json packages/dlp/
 # Test-only workspace dependencies (not shipped), so the workspace resolves:
 COPY packages/cli/package.json packages/cli/
 COPY packages/api-client/package.json packages/api-client/
 RUN pnpm install --frozen-lockfile --filter @nexus/api...
 COPY packages/ldap-directory packages/ldap-directory
+COPY packages/dlp packages/dlp
 COPY apps/api apps/api
 # Workspace packages run as their build in production (their source is for dev and tests).
 RUN pnpm --filter @nexus/ldap-directory build \
+ && pnpm --filter @nexus/dlp build \
  && pnpm --filter @nexus/api build \
  && pnpm --filter @nexus/api deploy --prod /out \
  && cp -r apps/api/dist apps/api/migrations /out/

@@ -99,7 +99,7 @@ const Doc = z
             .array(
               z.object({
                 effect: z.enum(["allow", "deny"]),
-                subject: z.string().max(150).openapi({ description: "all_agents, agent:<name> or tag:<tag>" }),
+                subject: z.string().max(350).openapi({ description: "all_agents, agent:<name>, tag:<tag>, all_people, user:<email> or group:<name>" }),
                 tools: z.array(z.string().max(128)).min(1),
                 risks: z.array(z.enum(RISKS)).nullable().default(null),
                 conditions: z.array(z.object({ argument: z.string().max(100), op: z.enum(["equals", "in", "not_in", "prefix"]), values: z.array(z.string().max(300)).min(1) })).default([]),
@@ -150,6 +150,8 @@ export async function exportConfig(tx: Tx, orgId: string): Promise<ConfigDoc> {
   const apps = new Map((await tx.selectFrom("applications").select(["id", "name"]).execute()).map((a) => [a.id, a.name]));
   const agents = await tx.selectFrom("ai_agents").selectAll().orderBy("name").execute();
   const agentNames = new Map(agents.map((a) => [a.id, a.name]));
+  const userEmails = users;
+  const groupNames = new Map(groupRows.map((g) => [g.id, g.name]));
   const servers = await tx.selectFrom("mcp_servers").selectAll().orderBy("slug").execute();
   const perms = await tx.selectFrom("mcp_permissions").selectAll().orderBy("created_at").execute();
   const policies = await tx.selectFrom("access_policies").selectAll().orderBy("created_at").execute();
@@ -209,7 +211,16 @@ export async function exportConfig(tx: Tx, orgId: string): Promise<ConfigDoc> {
         .filter((p) => p.server_id === s.id)
         .map((p) => ({
           effect: p.effect,
-          subject: p.subject_type === "all_agents" ? "all_agents" : p.subject_type === "agent_tag" ? `tag:${p.subject_tag}` : `agent:${agentNames.get(p.subject_id!) ?? p.subject_id}`,
+          subject:
+            p.subject_type === "all_agents" || p.subject_type === "all_people"
+              ? p.subject_type
+              : p.subject_type === "agent_tag"
+                ? `tag:${p.subject_tag}`
+                : p.subject_type === "user"
+                  ? `user:${userEmails.get(p.subject_id!) ?? p.subject_id}`
+                  : p.subject_type === "group"
+                    ? `group:${groupNames.get(p.subject_id!) ?? p.subject_id}`
+                    : `agent:${agentNames.get(p.subject_id!) ?? p.subject_id}`,
           tools: p.tools,
           risks: p.risks as NonNullable<ConfigDoc["mcp_servers"]>[number]["permissions"][number]["risks"],
           conditions: p.conditions as unknown as NonNullable<ConfigDoc["mcp_servers"]>[number]["permissions"][number]["conditions"],
@@ -467,19 +478,30 @@ async function syncMcpServers(c: Ctx, doc: ConfigDoc, want: NonNullable<ConfigDo
   const bySlug = new Map(rows.map((x) => [x.slug, x]));
   const agents = new Map((await c.tx.selectFrom("ai_agents").select(["id", "name"]).execute()).map((a) => [a.name.toLowerCase(), a.id]));
   const perms = await c.tx.selectFrom("mcp_permissions").selectAll().execute();
+  const people = new Map((await c.tx.selectFrom("users").select(["id", "email"]).execute()).map((u) => [u.email.toLowerCase(), u.id]));
+  const groupIds = new Map((await c.tx.selectFrom("groups").select(["id", "name"]).execute()).map((g) => [g.name.toLowerCase(), g.id]));
   const toSync: string[] = [];
   for (const w of want) {
     const where = `mcp_servers "${w.slug}"`;
     // Permissions, with subjects resolved.
     const wantPerms = w.permissions.map((p) => {
-      let subject = { subject_type: "all_agents" as "all_agents" | "agent" | "agent_tag", subject_id: null as string | null, subject_tag: null as string | null };
-      if (p.subject.startsWith("agent:")) {
+      let subject = { subject_type: "all_agents" as "all_agents" | "agent" | "agent_tag" | "all_people" | "user" | "group", subject_id: null as string | null, subject_tag: null as string | null };
+      if (p.subject === "all_people") subject = { subject_type: "all_people", subject_id: null, subject_tag: null };
+      else if (p.subject.startsWith("user:")) {
+        const id = people.get(p.subject.slice(5).toLowerCase());
+        if (!id) c.problems.push(`${where}: unknown person "${p.subject.slice(5)}"`);
+        subject = { subject_type: "user", subject_id: id ?? null, subject_tag: null };
+      } else if (p.subject.startsWith("group:")) {
+        const id = groupIds.get(p.subject.slice(6).toLowerCase());
+        if (!id) c.problems.push(`${where}: unknown group "${p.subject.slice(6)}"`);
+        subject = { subject_type: "group", subject_id: id ?? null, subject_tag: null };
+      } else if (p.subject.startsWith("agent:")) {
         const n = p.subject.slice(6).toLowerCase();
         const id = agents.get(n) ?? (!c.apply && declared.has(n) ? "(new agent)" : undefined);
         if (!id) c.problems.push(`${where}: unknown agent "${p.subject.slice(6)}"`);
         subject = { subject_type: "agent", subject_id: id ?? null, subject_tag: null };
       } else if (p.subject.startsWith("tag:")) subject = { subject_type: "agent_tag", subject_id: null, subject_tag: p.subject.slice(4).toLowerCase() };
-      else if (p.subject !== "all_agents") c.problems.push(`${where}: subject must be all_agents, agent:<name> or tag:<tag>, not "${p.subject}"`);
+      else if (p.subject !== "all_agents") c.problems.push(`${where}: subject must be all_agents, agent:<name>, tag:<tag>, all_people, user:<email> or group:<name>, not "${p.subject}"`);
       return { effect: p.effect, ...subject, tools: p.tools, risks: p.risks, conditions: p.conditions, description: p.description };
     });
     const cur = bySlug.get(w.slug);
@@ -517,7 +539,7 @@ async function syncMcpServers(c: Ctx, doc: ConfigDoc, want: NonNullable<ConfigDo
       }
     }
     // Permissions are a set per server: replaced together when they differ.
-    const norm = (xs: Record<string, unknown>[]) => xs.map((x) => canonical({ ...x, subject_id: x.subject_type === "agent" ? x.subject_id : null })).sort();
+    const norm = (xs: Record<string, unknown>[]) => xs.map((x) => canonical({ ...x, subject_id: ["agent", "user", "group"].includes(x.subject_type as string) ? x.subject_id : null })).sort();
     const have = cur ? perms.filter((p) => p.server_id === cur.id).map((p) => ({ effect: p.effect, subject_type: p.subject_type, subject_id: p.subject_id, subject_tag: p.subject_tag, tools: p.tools, risks: p.risks, conditions: p.conditions, description: p.description })) : [];
     if (canonical(norm(have)) !== canonical(norm(wantPerms))) {
       c.changes.push({ section: "mcp_servers", action: "update", key: `${w.slug} permissions`, changes: { permissions: { from: have.length, to: wantPerms.length } } });

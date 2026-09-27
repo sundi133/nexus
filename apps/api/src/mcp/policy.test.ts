@@ -100,3 +100,23 @@ describe("unusable argument values fail closed", () => {
     for (const path of ["docs/../secrets.env", "docs/%2e%2e/secrets", "docs\\..\\secrets", "docs//etc"]) expect(authorize(tool, [docsOnly], who, { path }).allow).toBe(false);
   });
 });
+
+describe("people and agents", () => {
+  const tool = { name: "lookup", status: "approved", risk: "read" as const, hash: "h", approved_hash: "h" };
+  const rule = (subject_type: string, subject_id: string | null = null) => ({ id: subject_type, effect: "allow" as const, subject_type: subject_type as "all_people", subject_id, subject_tag: null, tools: ["*"], risks: null, conditions: [] });
+  const person = { kind: "user" as const, userId: "u1", groupIds: ["g1"] };
+  const agent = { agentId: "a1", tags: [] };
+
+  it("never lets an agent rule cover a person, or a people rule cover an agent", () => {
+    expect(authorize(tool, [rule("all_agents")], person, {}).allow).toBe(false);
+    expect(authorize(tool, [rule("all_people")], agent, {}).allow).toBe(false);
+    expect(authorize(tool, [rule("user", "a1")], agent, {}).allow).toBe(false); // same id, wrong kind
+  });
+
+  it("matches people by themselves, their groups, or everyone", () => {
+    expect(authorize(tool, [rule("all_people")], person, {}).allow).toBe(true);
+    expect(authorize(tool, [rule("user", "u1")], person, {}).allow).toBe(true);
+    expect(authorize(tool, [rule("group", "g1")], person, {}).allow).toBe(true);
+    expect(authorize(tool, [rule("group", "g2")], person, {}).reason).toBe("No rule allows this person to use this tool");
+  });
+});
