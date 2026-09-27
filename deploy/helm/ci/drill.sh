@@ -86,7 +86,9 @@ load upgrade 90
 # Stands in for a new release: a new image tag with a new (backward-compatible) migration.
 helm upgrade "$REL" ../nexus -n "$NS" -f values.yaml --set image.api.tag=ci2 --wait --timeout 6m >/dev/null
 k wait --for=condition=complete job -l app.kubernetes.io/component=migrate --timeout 120s >/dev/null
-[ "$(k get jobs -l app.kubernetes.io/component=migrate -o name | wc -l | tr -d ' ')" = 2 ] && pass "a migration Job per release" || fail "migration jobs"
+# Helm replaces the previous release's Job with this one's (a Job per release, named per image and revision).
+JOBS=$(k get jobs -l app.kubernetes.io/component=migrate -o jsonpath='{.items[*].metadata.name}')
+[[ "$JOBS" == *-2 ]] && [ "$(echo "$JOBS" | wc -w | tr -d ' ')" = 1 ] && pass "the new release's migration Job ran ($JOBS)" || fail "migration jobs: $JOBS"
 k logs -l app.kubernetes.io/component=migrate --tail 50 | grep -q "applied 9999_drill.sql" && pass "the new release's migration applied" || fail "new migration not applied"
 result upgrade && pass "upgrade: no failed requests"
 
