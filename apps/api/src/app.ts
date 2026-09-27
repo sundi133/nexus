@@ -1,3 +1,4 @@
+import { registerDirectoryServiceRoutes } from "./protocols/routes.js";
 import { registerMcpPeopleRoutes } from "./mcp/people-routes.js";
 import { registerBrowserRoutes } from "./browser/routes.js";
 import { registerRetentionRoutes, scheduleRetention } from "./data/retention.js";
@@ -280,6 +281,7 @@ export function createApp(deps: Deps) {
   registerRetentionRoutes(app);
   registerBrowserRoutes(app);
   registerMcpPeopleRoutes(app);
+  registerDirectoryServiceRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);

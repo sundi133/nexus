@@ -43,6 +43,8 @@ Production refuses to start on unsafe settings. It lists every problem at once, 
 | `NEXUS_DB_POOL_SIZE` | Database connections per API process (default 20). Keep processes × pool size under the database's connection limit |
 | `NEXUS_DB_CONNECT_TIMEOUT_MS` | How long to wait for a new database connection before failing the request (default 5000), so a database failover produces quick errors instead of hung requests |
 | `NEXUS_SHUTDOWN_DELAY_MS` | After SIGTERM, how long an API process keeps serving while readiness fails, so the load balancer can remove it (default 5000 in production) |
+| `NEXUS_LDAP_PORT`, `NEXUS_LDAP_TLS_CERT`, `NEXUS_LDAP_TLS_KEY`, `NEXUS_RADIUS_PORT` | Offer LDAP (LDAPS) and RADIUS from the API processes; see [LDAP-RADIUS.md](LDAP-RADIUS.md) |
+| `NEXUS_DB_QUERY_TIMEOUT_MS` | How long one database query may take before it fails and its connection is replaced (default 30 s for API processes, 5 min for workers), so a database that vanished can't wedge the pool |
 | `NEXUS_ORG_DELETION_GRACE_DAYS` | Days between an owner scheduling the organization's deletion and it happening (default 30). See [DATA-GOVERNANCE.md](DATA-GOVERNANCE.md) |
 | `NEXUS_KEEPALIVE_TIMEOUT_MS` | Idle keep-alive timeout (default 65000). Keep it above your load balancer's idle timeout, which is 60 s on AWS ALB |
 | `NEXUS_AGENT_CONCURRENCY` | Device agent requests (enroll, check-in, process events) running at once per process (default 70% of the pool, 14). The rest of the pool stays free for people and integrations |

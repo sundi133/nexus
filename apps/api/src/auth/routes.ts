@@ -159,7 +159,7 @@ function totpStep(secretBase32: string, code: string): number | null {
 }
 
 /** Verifies a TOTP code against the user's verified factors; returns the matching factor ID. */
-async function verifyUserTotp(tx: Tx, deps: Deps, userId: string, code: string) {
+export async function verifyUserTotp(tx: Tx, deps: Deps, userId: string, code: string) {
   const factors = await tx
     .selectFrom("auth_factors")
     .select(["id", "secret_sealed", "last_totp_step"])

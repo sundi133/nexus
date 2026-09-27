@@ -65,6 +65,12 @@ jobs:
       - name: API tests (incl. security guards)
         env: { NEXUS_TEST_S3_ENDPOINT: "http://127.0.0.1:9010", NEXUS_TEST_LDAP_HOST: localhost, NEXUS_TEST_LDAP_CA: /tmp/ldap-certs/ca.crt }
         run: pnpm --filter @nexus/api test
+      - name: LDAP and RADIUS with the standard clients (OpenLDAP ldapsearch, FreeRADIUS radclient)
+        run: |
+          sudo apt-get install -y -qq ldap-utils freeradius-utils >/dev/null
+          (cd apps/api && NEXUS_PORT=8099 NEXUS_LDAP_PORT=1389 NEXUS_RADIUS_PORT=1812 pnpm exec tsx --conditions=development src/main.ts > /tmp/directory-api.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf localhost:8099/readyz >/dev/null && break; sleep 1; done
+          deploy/ops/interop-ldap-radius.sh || { tail -40 /tmp/directory-api.log; exit 1; }
       - name: Backup and restore test (on the data the tests left behind)
         env: { DATABASE_URL: "postgres://nexus_owner:nexus_owner@localhost:55432/nexus_test" }
         run: |
@@ -234,7 +240,8 @@ jobs:
           helm template t deploy/helm/nexus -f deploy/helm/ci/values.yaml \
             --set ingress.enabled=true,ingress.consoleHost=nexus.example.com,ingress.apiHost=api.nexus.example.com \
             --set networkPolicy.enabled=true,serviceMonitor.enabled=true,api.autoscaling.enabled=true \
-            --set agentReleases.existingClaim=releases,secret.existingSecret=nexus > all.yaml
+            --set agentReleases.existingClaim=releases,secret.existingSecret=nexus \
+            --set directoryServices.enabled=true,directoryServices.ldap.tlsSecret=nexus-ldap-tls > all.yaml
           ./kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.29.0 default.yaml all.yaml
           # Required values are enforced.
           if helm template t deploy/helm/nexus >/dev/null 2>&1; then echo "rendered without publicUrl/secret"; exit 1; fi
