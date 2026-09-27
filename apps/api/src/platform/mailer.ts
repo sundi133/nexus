@@ -20,6 +20,51 @@ export class SmtpMailer implements Mailer {
   }
 }
 
+/**
+ * Resend (https://resend.com) over its HTTP API. The sender's domain must be verified in Resend;
+ * until it is, Resend only accepts onboarding@resend.dev as the sender, and only to the Resend
+ * account's own address.
+ */
+export class ResendMailer implements Mailer {
+  constructor(
+    private readonly apiKey: string,
+    private readonly from: string,
+    private readonly fetchImpl: typeof fetch = fetch,
+  ) {}
+  async send(mail: Mail) {
+    const res = await this.fetchImpl("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({ from: this.from, to: [mail.to], subject: mail.subject, html: mail.html, text: mail.text }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(`Resend refused the email (HTTP ${res.status}): ${body?.message ?? res.statusText}`);
+    }
+  }
+}
+
+/**
+ * Logs mail that couldn't be sent. Callers often ignore send failures on purpose (a password
+ * reset answers the same either way), so without this they'd be invisible to operators.
+ */
+export class LoggedMailer implements Mailer {
+  constructor(
+    private readonly inner: Mailer,
+    private readonly log: (line: string) => void = (l) => console.error(l),
+  ) {}
+  async send(mail: Mail) {
+    try {
+      await this.inner.send(mail);
+    } catch (e) {
+      // The recipient's domain only: the address is personal data, and the subject says what it was.
+      this.log(JSON.stringify({ level: "error", msg: "email not sent", to_domain: mail.to.split("@")[1] ?? "", subject: mail.subject, error: (e as Error).message }));
+      throw e;
+    }
+  }
+}
+
 /** Captures mail in memory (tests). */
 export class MemoryMailer implements Mailer {
   readonly sent: Mail[] = [];

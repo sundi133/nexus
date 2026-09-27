@@ -16,6 +16,7 @@ export type Config = {
   rpName: string;
   smtpUrl: string; // Mailpit locally; a real provider (SES, Postmark) in prod
   mailFrom: string;
+  resendApiKey: string; // when set, email goes through Resend's API instead of SMTP
   sessionTtlMs: number;
   pendingMfaTtlMs: number;
   // Signed agent releases (DEV-07): <dir>/<version>/release.json + binaries. A CDN origin in prod.
@@ -58,8 +59,9 @@ export function validateProd(cfg: Config, env = process.env): string[] {
   const problems: string[] = [];
   // Not NEXUS_DATABASE_OWNER_URL: the running API never needs the schema owner; only the migrate and
   // reseal commands do, so an orchestrator can keep those credentials out of the API's pods.
-  const need = ["NEXUS_DATABASE_URL", "NEXUS_PUBLIC_URL", "NEXUS_API_PUBLIC_URL", "NEXUS_SMTP_URL", "NEXUS_MAIL_FROM", "NEXUS_METRICS_TOKEN"];
+  const need = ["NEXUS_DATABASE_URL", "NEXUS_PUBLIC_URL", "NEXUS_API_PUBLIC_URL", "NEXUS_MAIL_FROM", "NEXUS_METRICS_TOKEN"];
   for (const k of need) if (!env[k]) problems.push(`${k} is required`);
+  if (!env.NEXUS_SMTP_URL && !cfg.resendApiKey) problems.push("Email needs NEXUS_SMTP_URL or NEXUS_RESEND_API_KEY");
   if (!env.NEXUS_SEAL_KEY && !env.NEXUS_SEAL_KEYS) problems.push("NEXUS_SEAL_KEY (or NEXUS_SEAL_KEYS for rotation) is required");
   for (const [k, v] of [["NEXUS_PUBLIC_URL", cfg.publicUrl], ["NEXUS_API_PUBLIC_URL", cfg.apiPublicUrl]] as const) {
     if (!v.startsWith("https://")) problems.push(`${k} must be https (got ${v})`);
@@ -102,6 +104,7 @@ export function loadConfig(env = process.env): Config {
     rpName: "Votal Nexus",
     smtpUrl: env.NEXUS_SMTP_URL ?? "smtp://localhost:51025",
     mailFrom: env.NEXUS_MAIL_FROM ?? "Votal Nexus <no-reply@nexus.local>",
+    resendApiKey: env.NEXUS_RESEND_API_KEY ?? env.RESEND_API_KEY ?? "",
     sessionTtlMs: 12 * 60 * 60 * 1000,
     pendingMfaTtlMs: 5 * 60 * 1000,
     agentReleasesDir: env.NEXUS_AGENT_RELEASES_DIR ?? fileURLToPath(new URL("../../../agent/dist/releases", import.meta.url)),

@@ -12,7 +12,7 @@ import { sql } from "kysely";
 import { LATEST_MIGRATION, migrate } from "./platform/migrate.js";
 import { Realtime } from "./platform/realtime.js";
 import { Sealer } from "./platform/seal.js";
-import { SmtpMailer } from "./platform/mailer.js";
+import { LoggedMailer, ResendMailer, SmtpMailer } from "./platform/mailer.js";
 import { RecordingPushSender, RoutingPushSender } from "./platform/push.js";
 import { ApnsSender } from "./platform/push-apns.js";
 import { FcmSender } from "./platform/push-fcm.js";
@@ -29,7 +29,8 @@ if (cfg.env !== "prod") await migrate(cfg.databaseOwnerUrl, (m) => console.log(`
 // API requests get 30 s per query; workers run long jobs (deleting an organization, retention).
 const db = new Db(cfg.databaseUrl, { queryTimeoutMs: Number(process.env.NEXUS_DB_QUERY_TIMEOUT_MS) || (cfg.role === "api" ? 30_000 : 300_000) });
 const realtime = new Realtime(cfg.databaseUrl);
-const mailer = new SmtpMailer(cfg.smtpUrl, cfg.mailFrom);
+const mailer = new LoggedMailer(cfg.resendApiKey ? new ResendMailer(cfg.resendApiKey, cfg.mailFrom) : new SmtpMailer(cfg.smtpUrl, cfg.mailFrom));
+console.log(`[mail] sending through ${cfg.resendApiKey ? "Resend" : `SMTP (${new URL(cfg.smtpUrl).host})`} as ${cfg.mailFrom}`);
 // Real APNs/FCM when configured; otherwise pushes are logged (the app also gets challenges live over SSE).
 const push = new RoutingPushSender(
   {
