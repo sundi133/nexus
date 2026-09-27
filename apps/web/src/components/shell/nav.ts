@@ -1,5 +1,6 @@
 import {
   Activity,
+  Apple,
   AppWindow,
   BellRing,
   Ban,
@@ -60,6 +61,7 @@ export const NAV: NavSection[] = [
     items: [
       { label: "All devices", href: "/devices", icon: Laptop, shortcut: "G D" },
       { label: "Device management", href: "/mdm", icon: Server },
+      { label: "Apple MDM", href: "/apple-mdm", icon: Apple },
       { label: "Device policies", href: "/device-policies", icon: Wrench },
       { label: "Software", href: "/software", icon: PackageSearch },
       { label: "OS updates", href: "/updates", icon: RefreshCcwDot },
