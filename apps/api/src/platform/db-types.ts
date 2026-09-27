@@ -358,6 +358,36 @@ export interface Database {
     last_seen_at: NullableTimestamp;
     created_at: Generated<Date>;
   };
+  apple_ade_settings: {
+    org_id: string;
+    key: Buffer;
+    cert: string;
+    token: Buffer | null;
+    token_expires_at: NullableTimestamp;
+    server_name: Generated<string>;
+    abm_org_name: Generated<string>;
+    enroll_secret: string;
+    profile_uuid: string | null;
+    profile: Json<Record<string, unknown>>;
+    auto_assign: Generated<boolean>;
+    cursor: string | null;
+    last_sync_at: NullableTimestamp;
+    last_error: Generated<string>;
+    updated_at: Generated<Date>;
+  };
+  apple_ade_devices: {
+    org_id: string;
+    serial: string;
+    model: Generated<string>;
+    description: Generated<string>;
+    color: Generated<string>;
+    os: Generated<string>;
+    profile_status: Generated<string>;
+    profile_uuid: Generated<string>;
+    assigned_at: NullableTimestamp;
+    deleted: Generated<boolean>;
+    updated_at: Generated<Date>;
+  };
   apple_mdm_profiles: {
     id: string;
     org_id: string;

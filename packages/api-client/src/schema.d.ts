@@ -26303,6 +26303,583 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/apple-mdm/ade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Apple Business Manager connection */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AppleAdeStatus"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/apple-mdm/ade/public-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the key for Apple Business Manager and get its public certificate
+         * @description Upload the returned certificate (.pem) in Apple Business Manager when you add or edit this MDM server; ABM encrypts the server token to it. Making a new key disconnects the current token.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            certificate: string;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/apple-mdm/ade/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Connect with the server token from Apple Business Manager
+         * @description The .p7m file's contents. Nexus opens it with its key, checks it with Apple, defines its enrollment profile and syncs the Macs assigned to this server.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                        /** @default {} */
+                        profile?: {
+                            /** @default Votal Nexus */
+                            profile_name?: string;
+                            /** @default  */
+                            department?: string;
+                            /** @default  */
+                            support_phone_number?: string;
+                            /** @default  */
+                            support_email_address?: string;
+                            /**
+                             * @description Let people remove device management in System Settings
+                             * @default false
+                             */
+                            is_mdm_removable?: boolean;
+                            /**
+                             * @default [
+                             *       "Siri",
+                             *       "Diagnostics",
+                             *       "ScreenTime",
+                             *       "AppleID",
+                             *       "Payment"
+                             *     ]
+                             */
+                            skip_setup_items?: ("Location" | "Restore" | "AppleID" | "TOS" | "Siri" | "Diagnostics" | "Privacy" | "ScreenTime" | "Appearance" | "FileVault" | "iCloudDiagnostics" | "iCloudStorage" | "TouchId" | "Payment" | "Accessibility" | "TrueToneDisplay" | "UnlockWithWatch" | "Wallpaper")[];
+                            /**
+                             * @description Assign this profile to every Mac Apple Business Manager assigns to Nexus
+                             * @default true
+                             */
+                            auto_assign?: boolean;
+                        };
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AppleAdeStatus"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/apple-mdm/ade/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change the Setup Assistant enrollment profile */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @default Votal Nexus */
+                        profile_name?: string;
+                        /** @default  */
+                        department?: string;
+                        /** @default  */
+                        support_phone_number?: string;
+                        /** @default  */
+                        support_email_address?: string;
+                        /**
+                         * @description Let people remove device management in System Settings
+                         * @default false
+                         */
+                        is_mdm_removable?: boolean;
+                        /**
+                         * @default [
+                         *       "Siri",
+                         *       "Diagnostics",
+                         *       "ScreenTime",
+                         *       "AppleID",
+                         *       "Payment"
+                         *     ]
+                         */
+                        skip_setup_items?: ("Location" | "Restore" | "AppleID" | "TOS" | "Siri" | "Diagnostics" | "Privacy" | "ScreenTime" | "Appearance" | "FileVault" | "iCloudDiagnostics" | "iCloudStorage" | "TouchId" | "Payment" | "Accessibility" | "TrueToneDisplay" | "UnlockWithWatch" | "Wallpaper")[];
+                        /**
+                         * @description Assign this profile to every Mac Apple Business Manager assigns to Nexus
+                         * @default true
+                         */
+                        auto_assign?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AppleAdeStatus"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/apple-mdm/ade/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync Macs from Apple Business Manager now */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            changes: number;
+                            assigned: number;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/apple-mdm/ade/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Macs assigned to Nexus in Apple Business Manager */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                serial: string;
+                                model: string;
+                                description: string;
+                                color: string;
+                                profile_status: string;
+                                enrolled: boolean;
+                                updated_at: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -30855,6 +31432,47 @@ export interface components {
                 failed: number;
             };
             updated_at: string;
+        };
+        AppleAdeStatus: {
+            key_ready: boolean;
+            connected: boolean;
+            server_name: string;
+            abm_org_name: string;
+            token_expires_at: string | null;
+            devices: number;
+            last_sync_at: string | null;
+            last_error: string;
+            profile: {
+                /** @default Votal Nexus */
+                profile_name: string;
+                /** @default  */
+                department: string;
+                /** @default  */
+                support_phone_number: string;
+                /** @default  */
+                support_email_address: string;
+                /**
+                 * @description Let people remove device management in System Settings
+                 * @default false
+                 */
+                is_mdm_removable: boolean;
+                /**
+                 * @default [
+                 *       "Siri",
+                 *       "Diagnostics",
+                 *       "ScreenTime",
+                 *       "AppleID",
+                 *       "Payment"
+                 *     ]
+                 */
+                skip_setup_items: ("Location" | "Restore" | "AppleID" | "TOS" | "Siri" | "Diagnostics" | "Privacy" | "ScreenTime" | "Appearance" | "FileVault" | "iCloudDiagnostics" | "iCloudStorage" | "TouchId" | "Payment" | "Accessibility" | "TrueToneDisplay" | "UnlockWithWatch" | "Wallpaper")[];
+                /**
+                 * @description Assign this profile to every Mac Apple Business Manager assigns to Nexus
+                 * @default true
+                 */
+                auto_assign: boolean;
+            } | null;
+            enroll_url: string | null;
         };
         DevicePage: {
             data: components["schemas"]["Device"][];

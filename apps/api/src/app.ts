@@ -4,6 +4,7 @@ import { registerLocalAccountRoutes } from "./devices/local-accounts.js";
 import { registerAppleMdmProtocol } from "./apple-mdm/protocol.js";
 import { registerAppleMdmRoutes } from "./apple-mdm/routes.js";
 import { registerAppleMdmProfileRoutes } from "./apple-mdm/profiles.js";
+import { registerAdeRoutes, scheduleAdeSyncs } from "./apple-mdm/ade.js";
 import { registerScriptRoutes } from "./devices/scripts.js";
 import { registerDirectoryServiceRoutes } from "./protocols/routes.js";
 import { registerMcpPeopleRoutes } from "./mcp/people-routes.js";
@@ -298,6 +299,7 @@ export function createApp(deps: Deps) {
   registerAppleMdmProtocol(app);
   registerAppleMdmRoutes(app);
   registerAppleMdmProfileRoutes(app);
+  registerAdeRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -332,4 +334,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleOrgDeletions(jobs, deps);
   scheduleRetention(jobs, deps);
   schedulePatching(jobs, deps);
+  scheduleAdeSyncs(jobs, deps);
 }

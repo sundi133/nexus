@@ -10269,6 +10269,131 @@
           "updated_at"
         ]
       },
+      "AppleAdeStatus": {
+        "type": "object",
+        "properties": {
+          "key_ready": {
+            "type": "boolean"
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "server_name": {
+            "type": "string"
+          },
+          "abm_org_name": {
+            "type": "string"
+          },
+          "token_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "devices": {
+            "type": "integer"
+          },
+          "last_sync_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "profile": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "profile_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "default": "Votal Nexus"
+              },
+              "department": {
+                "type": "string",
+                "maxLength": 100,
+                "default": ""
+              },
+              "support_phone_number": {
+                "type": "string",
+                "maxLength": 40,
+                "default": ""
+              },
+              "support_email_address": {
+                "type": "string",
+                "maxLength": 200,
+                "default": ""
+              },
+              "is_mdm_removable": {
+                "type": "boolean",
+                "default": false,
+                "description": "Let people remove device management in System Settings"
+              },
+              "skip_setup_items": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "Location",
+                    "Restore",
+                    "AppleID",
+                    "TOS",
+                    "Siri",
+                    "Diagnostics",
+                    "Privacy",
+                    "ScreenTime",
+                    "Appearance",
+                    "FileVault",
+                    "iCloudDiagnostics",
+                    "iCloudStorage",
+                    "TouchId",
+                    "Payment",
+                    "Accessibility",
+                    "TrueToneDisplay",
+                    "UnlockWithWatch",
+                    "Wallpaper"
+                  ]
+                },
+                "default": [
+                  "Siri",
+                  "Diagnostics",
+                  "ScreenTime",
+                  "AppleID",
+                  "Payment"
+                ]
+              },
+              "auto_assign": {
+                "type": "boolean",
+                "default": true,
+                "description": "Assign this profile to every Mac Apple Business Manager assigns to Nexus"
+              }
+            }
+          },
+          "enroll_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key_ready",
+          "connected",
+          "server_name",
+          "abm_org_name",
+          "token_expires_at",
+          "devices",
+          "last_sync_at",
+          "last_error",
+          "profile",
+          "enroll_url"
+        ]
+      },
       "DevicePage": {
         "type": "object",
         "properties": {
@@ -44035,6 +44160,687 @@
                           "name",
                           "status",
                           "detail",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Apple Business Manager connection",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleAdeStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/public-key": {
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Make the key for Apple Business Manager and get its public certificate",
+        "description": "Upload the returned certificate (.pem) in Apple Business Manager when you add or edit this MDM server; ABM encrypts the server token to it. Making a new key disconnects the current token.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "certificate": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "certificate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/token": {
+      "put": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Connect with the server token from Apple Business Manager",
+        "description": "The .p7m file's contents. Nexus opens it with its key, checks it with Apple, defines its enrollment profile and syncs the Macs assigned to this server.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 50,
+                    "maxLength": 200000
+                  },
+                  "profile": {
+                    "type": "object",
+                    "properties": {
+                      "profile_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100,
+                        "default": "Votal Nexus"
+                      },
+                      "department": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "default": ""
+                      },
+                      "support_phone_number": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "default": ""
+                      },
+                      "support_email_address": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "default": ""
+                      },
+                      "is_mdm_removable": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Let people remove device management in System Settings"
+                      },
+                      "skip_setup_items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "Location",
+                            "Restore",
+                            "AppleID",
+                            "TOS",
+                            "Siri",
+                            "Diagnostics",
+                            "Privacy",
+                            "ScreenTime",
+                            "Appearance",
+                            "FileVault",
+                            "iCloudDiagnostics",
+                            "iCloudStorage",
+                            "TouchId",
+                            "Payment",
+                            "Accessibility",
+                            "TrueToneDisplay",
+                            "UnlockWithWatch",
+                            "Wallpaper"
+                          ]
+                        },
+                        "default": [
+                          "Siri",
+                          "Diagnostics",
+                          "ScreenTime",
+                          "AppleID",
+                          "Payment"
+                        ]
+                      },
+                      "auto_assign": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Assign this profile to every Mac Apple Business Manager assigns to Nexus"
+                      }
+                    },
+                    "default": {}
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleAdeStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/profile": {
+      "put": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Change the Setup Assistant enrollment profile",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "profile_name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "default": "Votal Nexus"
+                  },
+                  "department": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "support_phone_number": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "default": ""
+                  },
+                  "support_email_address": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "is_mdm_removable": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Let people remove device management in System Settings"
+                  },
+                  "skip_setup_items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "Location",
+                        "Restore",
+                        "AppleID",
+                        "TOS",
+                        "Siri",
+                        "Diagnostics",
+                        "Privacy",
+                        "ScreenTime",
+                        "Appearance",
+                        "FileVault",
+                        "iCloudDiagnostics",
+                        "iCloudStorage",
+                        "TouchId",
+                        "Payment",
+                        "Accessibility",
+                        "TrueToneDisplay",
+                        "UnlockWithWatch",
+                        "Wallpaper"
+                      ]
+                    },
+                    "default": [
+                      "Siri",
+                      "Diagnostics",
+                      "ScreenTime",
+                      "AppleID",
+                      "Payment"
+                    ]
+                  },
+                  "auto_assign": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Assign this profile to every Mac Apple Business Manager assigns to Nexus"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleAdeStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/sync": {
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Sync Macs from Apple Business Manager now",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "changes": {
+                      "type": "integer"
+                    },
+                    "assigned": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "changes",
+                    "assigned"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/devices": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Macs assigned to Nexus in Apple Business Manager",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "serial": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "profile_status": {
+                            "type": "string"
+                          },
+                          "enrolled": {
+                            "type": "boolean"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "serial",
+                          "model",
+                          "description",
+                          "color",
+                          "profile_status",
+                          "enrolled",
                           "updated_at"
                         ]
                       }

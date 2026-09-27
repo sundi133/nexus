@@ -63,6 +63,19 @@ async function linkAgentDevice(tx: Tx, mdmId: string, serial: string) {
   if (agent) await tx.updateTable("apple_mdm_devices").set({ device_id: agent.id }).where("id", "=", mdmId).execute();
 }
 
+/** A fresh device identity and the enrollment profile carrying it (enrollment links and ADE). */
+export async function issueProfile(tx: Tx, deps: Deps, orgId: string, linkId: string | null, meta: RequestMeta, who: { actor: string; target: { type: string; id: string; display?: string } }) {
+  const s = await tx.selectFrom("apple_mdm_settings").select(["push_topic"]).where("org_id", "=", orgId).executeTakeFirst();
+  if (!s?.push_topic) throw new ApiError(409, "mdm_not_ready", "Device management isn't set up yet: an admin must add the Apple push certificate first.");
+  const { name } = await tx.selectFrom("organizations").select("name").where("id", "=", orgId).executeTakeFirstOrThrow();
+  const ca = await ensureCa(tx, deps, orgId);
+  const identity = await issueIdentity(ca, `Nexus MDM ${randomBytes(6).toString("hex")}`);
+  const password = randomBytes(18).toString("base64url");
+  await tx.insertInto("apple_mdm_identities").values({ fingerprint: identity.fingerprint, org_id: orgId, link_id: linkId }).execute();
+  await audit(tx, orgId, META(meta), { type: "apple_mdm.profile_downloaded", actor: { type: "system", id: null, display: who.actor }, target: who.target, details: { identity: identity.fingerprint.slice(0, 16) } });
+  return enrollmentProfile({ orgName: name, orgId, apiUrl: deps.cfg.apiPublicUrl, topic: s.push_topic, p12: pkcs12(identity, ca.certPem, password), p12Password: password });
+}
+
 export function registerAppleMdmProtocol(app: App) {
   // Devices aren't authenticated until the signature is checked: cap bodies first (app lists can be large).
   app.use("/mdm/apple/*", bodyLimit({ maxSize: 4 * 1024 * 1024, onError: () => { throw new ApiError(413, "payload_too_large", "Request body is too large"); } }));
@@ -73,16 +86,8 @@ export function registerAppleMdmProtocol(app: App) {
     const link = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; link_id: string }>`SELECT * FROM nexus_apple_mdm_link(${hashToken(c.req.param("token"))})`.execute(tx)).rows[0]);
     if (!link) throw new ApiError(404, "link_invalid", "This enrollment link is invalid, expired or revoked. Ask IT for a new one.");
     const profile = await deps.db.tenant(link.org_id, async (tx) => {
-      const s = await tx.selectFrom("apple_mdm_settings").select(["push_topic"]).where("org_id", "=", link.org_id).executeTakeFirst();
-      if (!s?.push_topic) throw new ApiError(409, "mdm_not_ready", "Device management isn't set up yet: an admin must add the Apple push certificate first.");
-      const { name } = await tx.selectFrom("organizations").select("name").where("id", "=", link.org_id).executeTakeFirstOrThrow();
-      const ca = await ensureCa(tx, deps, link.org_id);
-      const identity = await issueIdentity(ca, `Nexus MDM ${randomBytes(6).toString("hex")}`);
-      const password = randomBytes(18).toString("base64url");
-      await tx.insertInto("apple_mdm_identities").values({ fingerprint: identity.fingerprint, org_id: link.org_id, link_id: link.link_id }).execute();
       await tx.updateTable("apple_mdm_enroll_links").set((eb) => ({ uses: eb("uses", "+", 1) })).where("id", "=", link.link_id).execute();
-      await audit(tx, link.org_id, META(meta), { type: "apple_mdm.profile_downloaded", actor: { type: "system", id: null, display: `Enrollment link from ${meta.ip || "unknown address"}` }, target: { type: "apple_mdm_link", id: link.link_id }, details: { identity: identity.fingerprint.slice(0, 16) } });
-      return enrollmentProfile({ orgName: name, orgId: link.org_id, apiUrl: deps.cfg.apiPublicUrl, topic: s.push_topic, p12: pkcs12(identity, ca.certPem, password), p12Password: password });
+      return issueProfile(tx, deps, link.org_id, link.link_id, meta, { actor: `Enrollment link from ${meta.ip || "unknown address"}`, target: { type: "apple_mdm_link", id: link.link_id } });
     });
     return new Response(new Uint8Array(profile), { headers: { "content-type": "application/x-apple-aspen-config", "content-disposition": 'attachment; filename="Nexus device management.mobileconfig"', "cache-control": "no-store" } });
   });
