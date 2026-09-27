@@ -1023,7 +1023,9 @@
             "enum": [
               "app",
               "group",
-              "role"
+              "role",
+              "block_exception",
+              "software"
             ]
           },
           "resource_id": {
@@ -1233,7 +1235,9 @@
                 "enum": [
                   "app",
                   "group",
-                  "role"
+                  "role",
+                  "block_exception",
+                  "software"
                 ]
               },
               "id": {
@@ -9777,6 +9781,21 @@
                     "null"
                   ]
                 },
+                "user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f",
+                  "description": "One person's devices (an approved request)"
+                },
+                "user_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "created_at": {
                   "type": "string"
                 }
@@ -9786,6 +9805,8 @@
                 "action",
                 "group_id",
                 "group_name",
+                "user_id",
+                "user_email",
                 "created_at"
               ]
             }
@@ -14548,7 +14569,7 @@
         "tags": [
           "Access requests"
         ],
-        "summary": "Make an app, group or admin role requestable (requires recent MFA)",
+        "summary": "Make an app, group, admin role, blocked-app exception or software requestable (requires recent MFA)",
         "security": [
           {
             "bearer": []
@@ -14566,7 +14587,9 @@
                     "enum": [
                       "app",
                       "group",
-                      "role"
+                      "role",
+                      "block_exception",
+                      "software"
                     ]
                   },
                   "resource_id": {

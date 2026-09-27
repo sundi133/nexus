@@ -2871,7 +2871,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Make an app, group or admin role requestable (requires recent MFA) */
+        /** Make an app, group, admin role, blocked-app exception or software requestable (requires recent MFA) */
         post: {
             parameters: {
                 query?: never;
@@ -2883,7 +2883,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        resource_type: "app" | "group" | "role";
+                        resource_type: "app" | "group" | "role" | "block_exception" | "software";
                         /**
                          * Format: uuid
                          * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
@@ -27524,7 +27524,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            resource_type: "app" | "group" | "role";
+            resource_type: "app" | "group" | "role" | "block_exception" | "software";
             /**
              * Format: uuid
              * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
@@ -27583,7 +27583,7 @@ export interface components {
             id: string;
             resource: {
                 /** @enum {string} */
-                type: "app" | "group" | "role";
+                type: "app" | "group" | "role" | "block_exception" | "software";
                 /**
                  * Format: uuid
                  * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
@@ -30088,6 +30088,13 @@ export interface components {
                  */
                 group_id: string | null;
                 group_name: string | null;
+                /**
+                 * Format: uuid
+                 * @description One person's devices (an approved request)
+                 * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                 */
+                user_id: string | null;
+                user_email: string | null;
                 created_at: string;
             }[];
             counts: {
