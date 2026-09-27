@@ -949,7 +949,8 @@
               "restart",
               "wipe",
               "osquery",
-              "script"
+              "script",
+              "updates"
             ]
           },
           "channel": {
@@ -3068,7 +3069,8 @@
                     "os_version",
                     "system_integrity",
                     "mdm_compliant",
-                    "ai_mcp_governed"
+                    "ai_mcp_governed",
+                    "os_updates"
                   ]
                 },
                 "enabled": {
@@ -9446,6 +9448,176 @@
           "pending"
         ]
       },
+      "PatchPolicy": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "security",
+              "all"
+            ],
+            "description": "Install security updates only, or everything pending"
+          },
+          "deadline_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 90,
+            "description": "Days an update may wait before the policy installs it (0: as soon as it's seen)"
+          },
+          "restart": {
+            "type": "string",
+            "enum": [
+              "never",
+              "if_needed"
+            ],
+            "description": "Restart after installing when the OS asks for it (the signed-in person gets a warning first)"
+          },
+          "window_start": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23,
+            "description": "Maintenance window start hour (local time in `timezone`)"
+          },
+          "window_end": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23,
+            "description": "Maintenance window end hour; may wrap past midnight; equal to start means any time"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "enabled",
+          "scope",
+          "deadline_days",
+          "restart",
+          "window_start",
+          "window_end",
+          "timezone"
+        ]
+      },
+      "DeviceUpdatesRow": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "os_version": {
+            "type": "string"
+          },
+          "last_seen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "checked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending": {
+            "type": "integer"
+          },
+          "security_pending": {
+            "type": "integer"
+          },
+          "pending_since": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "security_since": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Past the patch policy's deadline"
+          },
+          "last_install": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "output": {
+                "type": "string"
+              },
+              "automatic": {
+                "type": "boolean"
+              },
+              "requested_by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "type": "string"
+              },
+              "finished_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "output",
+              "automatic",
+              "requested_by",
+              "created_at",
+              "finished_at"
+            ]
+          }
+        },
+        "required": [
+          "device_id",
+          "hostname",
+          "platform",
+          "os_version",
+          "last_seen_at",
+          "checked_at",
+          "error",
+          "pending",
+          "security_pending",
+          "pending_since",
+          "security_since",
+          "overdue",
+          "last_install"
+        ]
+      },
       "DevicePage": {
         "type": "object",
         "properties": {
@@ -9814,7 +9986,8 @@
               "os_version",
               "system_integrity",
               "mdm_compliant",
-              "ai_mcp_governed"
+              "ai_mcp_governed",
+              "os_updates"
             ]
           },
           "title": {
@@ -10018,7 +10191,8 @@
               "os_version",
               "system_integrity",
               "mdm_compliant",
-              "ai_mcp_governed"
+              "ai_mcp_governed",
+              "os_updates"
             ]
           },
           "title": {
@@ -39286,6 +39460,660 @@
         }
       }
     },
+    "/v1/patch-policy": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "The organization's patch policy",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/PatchPolicy"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "updated_at"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Change the patch policy",
+        "description": "Installs OS updates automatically, as signed commands, once they've been pending longer than `deadline_days`, on online devices inside the maintenance window. Needs `devices:updates` and a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchPolicy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/PatchPolicy"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "updated_at"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/device-updates": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Pending OS updates across the fleet",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "devices": {
+                          "type": "integer"
+                        },
+                        "reporting": {
+                          "type": "integer"
+                        },
+                        "up_to_date": {
+                          "type": "integer"
+                        },
+                        "with_security": {
+                          "type": "integer"
+                        },
+                        "overdue": {
+                          "type": "integer"
+                        },
+                        "failing_checks": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "devices",
+                        "reporting",
+                        "up_to_date",
+                        "with_security",
+                        "overdue",
+                        "failing_checks"
+                      ]
+                    },
+                    "policy": {
+                      "$ref": "#/components/schemas/PatchPolicy"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DeviceUpdatesRow"
+                      }
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "policy",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/updates": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A device's pending OS updates and recent installs",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checked_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "available": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "maxLength": 300
+                          },
+                          "version": {
+                            "type": "string",
+                            "maxLength": 200
+                          },
+                          "security": {
+                            "type": "boolean"
+                          },
+                          "restart": {
+                            "type": "boolean"
+                          },
+                          "upgrade": {
+                            "type": "boolean",
+                            "description": "A major OS upgrade (e.g. the next macOS): shown, but never installed by patching"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "security",
+                          "restart"
+                        ]
+                      },
+                      "maxItems": 2000
+                    },
+                    "installs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          },
+                          "output": {
+                            "type": "string"
+                          },
+                          "automatic": {
+                            "type": "boolean"
+                          },
+                          "requested_by": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "finished_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "output",
+                          "automatic",
+                          "requested_by",
+                          "created_at",
+                          "finished_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "checked_at",
+                    "error",
+                    "available",
+                    "installs"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/device-updates/install": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Install pending OS updates now",
+        "description": "Queues a signed install on the chosen devices that have updates pending (security only, or all). Each runs it on its next check-in (offline devices within a day) and restarts afterwards only if `restart` is `if_needed` and the OS asks for it. Needs `devices:updates` and a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "device_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid",
+                          "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                        },
+                        "maxItems": 1000
+                      },
+                      "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                      },
+                      "all": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    }
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "security",
+                      "all"
+                    ],
+                    "default": "security"
+                  },
+                  "restart": {
+                    "type": "string",
+                    "enum": [
+                      "never",
+                      "if_needed"
+                    ],
+                    "default": "never"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "target",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "queued": {
+                      "type": "integer"
+                    },
+                    "skipped_up_to_date": {
+                      "type": "integer"
+                    },
+                    "skipped_not_reporting": {
+                      "type": "integer"
+                    },
+                    "skipped_in_progress": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "queued",
+                    "skipped_up_to_date",
+                    "skipped_not_reporting",
+                    "skipped_in_progress"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/devices": {
       "get": {
         "tags": [
@@ -40249,7 +41077,8 @@
                 "os_version",
                 "system_integrity",
                 "mdm_compliant",
-                "ai_mcp_governed"
+                "ai_mcp_governed",
+                "os_updates"
               ]
             },
             "required": true,

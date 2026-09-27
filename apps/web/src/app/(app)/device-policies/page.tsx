@@ -1,6 +1,7 @@
 "use client";
 
 import type { Schemas } from "@nexus/api-client";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -131,6 +132,21 @@ function PolicyCard({ policy, editable }: { policy: Policy; editable: boolean })
                   </option>
                 ))}
               </Select>
+            </div>
+          ) : null}
+          {enabled && policy.key === "os_updates" ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
+              Security updates may wait
+              <Select value={String(params.max_days ?? 14)} disabled={!editable} onChange={(e) => setParams({ ...params, max_days: Number(e.target.value) })} aria-label="Days a security update may wait">
+                {[0, 1, 3, 7, 14, 30, 60].map((d) => (
+                  <option key={d} value={d}>
+                    {d === 0 ? "no time" : `${d} day${d === 1 ? "" : "s"}`}
+                  </option>
+                ))}
+              </Select>
+              <Link href="/updates" className="text-xs text-fg-muted hover:underline">
+                See pending updates and the patch policy
+              </Link>
             </div>
           ) : null}
           {enabled && FIX_ON_DEVICE[policy.key] ? (

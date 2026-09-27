@@ -23,7 +23,7 @@ export const PERMISSIONS = [
   "devices:read",
   "devices:write", // enroll/remove devices, assign users, device policies
   "policies:write", // conditional access policies
-  "devices:updates", // agent software rollouts (fleet-wide changes, so not helpdesk)
+  "devices:updates", // agent rollouts and OS patching (fleet-wide changes, so not helpdesk)
   "devices:actions", // refresh, lock and restart a device
   "devices:wipe", // erase a device through its MDM (irreversible)
   "devices:query", // run live osquery queries on devices (reads anything osquery can see)

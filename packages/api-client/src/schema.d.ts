@@ -23383,6 +23383,472 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/patch-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The organization's patch policy */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PatchPolicy"] & {
+                            updated_at: string | null;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        /**
+         * Change the patch policy
+         * @description Installs OS updates automatically, as signed commands, once they've been pending longer than `deadline_days`, on online devices inside the maintenance window. Needs `devices:updates` and a recent MFA.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PatchPolicy"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PatchPolicy"] & {
+                            updated_at: string | null;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/device-updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending OS updates across the fleet */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            summary: {
+                                devices: number;
+                                reporting: number;
+                                up_to_date: number;
+                                with_security: number;
+                                overdue: number;
+                                failing_checks: number;
+                            };
+                            policy: components["schemas"]["PatchPolicy"];
+                            data: components["schemas"]["DeviceUpdatesRow"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/devices/{id}/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A device's pending OS updates and recent installs */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            checked_at: string | null;
+                            error: string | null;
+                            available: {
+                                name: string;
+                                version?: string;
+                                security: boolean;
+                                restart: boolean;
+                                /** @description A major OS upgrade (e.g. the next macOS): shown, but never installed by patching */
+                                upgrade?: boolean;
+                            }[];
+                            installs: {
+                                status: string;
+                                output: string;
+                                automatic: boolean;
+                                requested_by: string | null;
+                                created_at: string;
+                                finished_at: string | null;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/device-updates/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install pending OS updates now
+         * @description Queues a signed install on the chosen devices that have updates pending (security only, or all). Each runs it on its next check-in (offline devices within a day) and restarts afterwards only if `restart` is `if_needed` and the OS asks for it. Needs `devices:updates` and a recent MFA.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        target: {
+                            device_ids?: string[];
+                            /**
+                             * Format: uuid
+                             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                             */
+                            group_id?: string;
+                            /** @enum {boolean} */
+                            all?: true;
+                        };
+                        /**
+                         * @default security
+                         * @enum {string}
+                         */
+                        scope?: "security" | "all";
+                        /**
+                         * @default never
+                         * @enum {string}
+                         */
+                        restart?: "never" | "if_needed";
+                        reason: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            queued: number;
+                            skipped_up_to_date: number;
+                            skipped_not_reporting: number;
+                            skipped_in_progress: number;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -24204,7 +24670,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed";
+                    key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed" | "os_updates";
                 };
                 cookie?: never;
             };
@@ -25216,7 +25682,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script";
+            action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates";
             /** @enum {string} */
             channel: "agent" | "mdm";
             /** @enum {string} */
@@ -25887,7 +26353,7 @@ export interface components {
             }[];
             device_policies?: {
                 /** @enum {string} */
-                check: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed";
+                check: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed" | "os_updates";
                 enabled: boolean;
                 /**
                  * @default enforce
@@ -27693,6 +28159,53 @@ export interface components {
             failed: number;
             pending: number;
         };
+        PatchPolicy: {
+            enabled: boolean;
+            /**
+             * @description Install security updates only, or everything pending
+             * @enum {string}
+             */
+            scope: "security" | "all";
+            /** @description Days an update may wait before the policy installs it (0: as soon as it's seen) */
+            deadline_days: number;
+            /**
+             * @description Restart after installing when the OS asks for it (the signed-in person gets a warning first)
+             * @enum {string}
+             */
+            restart: "never" | "if_needed";
+            /** @description Maintenance window start hour (local time in `timezone`) */
+            window_start: number;
+            /** @description Maintenance window end hour; may wrap past midnight; equal to start means any time */
+            window_end: number;
+            timezone: string;
+        };
+        DeviceUpdatesRow: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            device_id: string;
+            hostname: string;
+            platform: string;
+            os_version: string;
+            last_seen_at: string | null;
+            checked_at: string | null;
+            error: string | null;
+            pending: number;
+            security_pending: number;
+            pending_since: string | null;
+            security_since: string | null;
+            /** @description Past the patch policy's deadline */
+            overdue: boolean;
+            last_install: {
+                status: string;
+                output: string;
+                automatic: boolean;
+                requested_by: string | null;
+                created_at: string;
+                finished_at: string | null;
+            } | null;
+        };
         DevicePage: {
             data: components["schemas"]["Device"][];
             next_cursor: string | null;
@@ -27787,7 +28300,7 @@ export interface components {
         };
         DeviceCheck: {
             /** @enum {string} */
-            key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed";
+            key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed" | "os_updates";
             title: string;
             why: string;
             /** @enum {string} */
@@ -27834,7 +28347,7 @@ export interface components {
         };
         DevicePolicy: {
             /** @enum {string} */
-            key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed";
+            key: "disk_encryption" | "firewall" | "screen_lock" | "os_version" | "system_integrity" | "mdm_compliant" | "ai_mcp_governed" | "os_updates";
             title: string;
             why: string;
             enabled: boolean;

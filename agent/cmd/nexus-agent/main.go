@@ -43,6 +43,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/settings"
 	"github.com/votal-ai/nexus/agent/internal/state"
 	"github.com/votal-ai/nexus/agent/internal/update"
+	"github.com/votal-ai/nexus/agent/internal/updates"
 )
 
 // Set at build time:
@@ -264,7 +265,22 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			return settings.Apply(settings.OS{Root: requireAdmin() == nil}, runtime.GOOS, d)
 		}}
 	enforcer.Load() // the last rules apply from boot, before the first check-in
-	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin, Enforcer: enforcer,
+	// OS updates: checked in the background every 6 hours (slow), reported with the inventory.
+	updateChecker := &updates.Checker{GOOS: runtime.GOOS, Every: 6 * time.Hour,
+		Run: func(ctx context.Context, name string, args ...string) (string, error) {
+			out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+			return string(out), err
+		},
+		Has: func(n string) bool { _, err := exec.LookPath(n); return err == nil }}
+	runner.ArgExec["updates"] = command.UpdatesAction(command.Actions()["restart"], updateChecker.Recheck)
+	collectWithUpdates := func(ctx context.Context) collect.Snapshot {
+		s := collect.Collect(ctx)
+		if r := updateChecker.Report(); r != nil {
+			s.Inventory.Updates = r
+		}
+		return s
+	}
+	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collectWithUpdates, OnCheckin: onCheckin, Enforcer: enforcer,
 		Commands: runner,
 		Osquery: func(ctx context.Context) osquery.Report {
 			return osquery.Collect(ctx, osquery.Locate(), runtime.GOOS, time.Now())

@@ -18,6 +18,7 @@ import { EnforcementReport, recordEnforcement, signedPolicy } from "./enforcemen
 import { getSettings } from "../org/settings.js";
 import { ingestProcessEvents, ProcessEventsBody } from "./process-events.js";
 import { OSQUERY_INTERVAL_S, OsqueryReport, storeOsquery } from "./osquery.js";
+import { recordUpdates, UpdatesReport } from "./patching.js";
 import { PostureFacts } from "./posture.js";
 import { releaseStore } from "./releases.js";
 import { offerFor, recordResult } from "./updates.js";
@@ -300,6 +301,8 @@ export function registerAgentRoutes(app: App) {
     const input = parse(CheckinBody, raw);
     const ai = input.inventory && "ai" in input.inventory ? AIInventory.safeParse(input.inventory.ai) : null;
     if (input.inventory && ai && !ai.success) delete input.inventory.ai;
+    const updates = input.inventory && "updates" in input.inventory ? UpdatesReport.safeParse(input.inventory.updates) : null;
+    if (input.inventory && updates && !updates.success) delete input.inventory.updates;
 
     const out = await deps.db.tenant(dev.org_id, async (tx) => {
       await consumeProof(tx, dev.org_id, kid, payload);
@@ -318,6 +321,7 @@ export function registerAgentRoutes(app: App) {
         .returning(["id", "org_id", "hostname", "platform", "arch", "os_version", "agent_version", "last_seen_at", "posture", "compliance", "primary_user_id", "compliance_grace_until", "serial"])
         .executeTakeFirstOrThrow();
       if (ai?.success) await auditAIChanges(tx, d, before, ai.data, meta);
+      if (updates?.success) await recordUpdates(tx, d.id, updates.data); // before evaluating: the os_updates check reads it
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
       if (input.update_result) await recordResult(tx, dev.org_id, d, input.update_result, meta);
       if (input.command_results?.length) await recordCommandResults(tx, d, input.command_results, meta);

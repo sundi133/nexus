@@ -1,3 +1,4 @@
+import { registerPatchingRoutes, schedulePatching } from "./devices/patching.js";
 import { registerScriptRoutes } from "./devices/scripts.js";
 import { registerDirectoryServiceRoutes } from "./protocols/routes.js";
 import { registerMcpPeopleRoutes } from "./mcp/people-routes.js";
@@ -284,6 +285,7 @@ export function createApp(deps: Deps) {
   registerMcpPeopleRoutes(app);
   registerDirectoryServiceRoutes(app);
   registerScriptRoutes(app);
+  registerPatchingRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -317,4 +319,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleNoncePruning(jobs, deps);
   scheduleOrgDeletions(jobs, deps);
   scheduleRetention(jobs, deps);
+  schedulePatching(jobs, deps);
 }
