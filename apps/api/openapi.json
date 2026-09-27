@@ -409,6 +409,7 @@
           "devices:enforce",
           "devices:recovery_keys",
           "devices:scripts",
+          "devices:software",
           "directory:sync",
           "api_keys:manage",
           "integrations:manage",
@@ -3616,6 +3617,7 @@
                       "devices:enforce",
                       "devices:recovery_keys",
                       "devices:scripts",
+                      "devices:software",
                       "directory:sync",
                       "api_keys:manage",
                       "integrations:manage",
@@ -3678,6 +3680,7 @@
                     "devices:enforce",
                     "devices:recovery_keys",
                     "devices:scripts",
+                    "devices:software",
                     "directory:sync",
                     "api_keys:manage",
                     "integrations:manage",
@@ -3755,6 +3758,7 @@
                 "devices:enforce",
                 "devices:recovery_keys",
                 "devices:scripts",
+                "devices:software",
                 "directory:sync",
                 "api_keys:manage",
                 "integrations:manage",
@@ -9616,6 +9620,166 @@
           "security_since",
           "overdue",
           "last_install"
+        ]
+      },
+      "SoftwarePackage": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "winget",
+              "msi",
+              "pkg",
+              "apt",
+              "dnf"
+            ],
+            "description": "winget / msi (Windows), pkg (macOS), apt / dnf (Linux)"
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "winget ID, MSI ProductCode, pkg receipt ID, or package name: how the agent finds it"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "default": "",
+            "description": "msi / pkg: the installer's https URL"
+          },
+          "sha256": {
+            "type": "string",
+            "maxLength": 64,
+            "default": "",
+            "description": "msi / pkg: the installer's SHA-256 (the agent refuses a download that doesn't match)"
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "pattern": "^[^\\r\\n\\0]*$"
+            },
+            "maxItems": 20,
+            "default": [],
+            "description": "Extra installer arguments (MSI properties, winget or package-manager options)"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "macos",
+              "windows",
+              "linux"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "install",
+                    "remove"
+                  ]
+                },
+                "group_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                },
+                "group_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "action",
+                "group_id",
+                "group_name",
+                "created_at"
+              ]
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "targeted": {
+                "type": "integer"
+              },
+              "installed": {
+                "type": "integer"
+              },
+              "absent": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "unsupported": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "targeted",
+              "installed",
+              "absent",
+              "failed",
+              "unsupported",
+              "pending"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "ref",
+          "id",
+          "platform",
+          "created_at",
+          "updated_at",
+          "assignments",
+          "counts"
         ]
       },
       "DevicePage": {
@@ -20863,6 +21027,7 @@
                         "devices:enforce",
                         "devices:recovery_keys",
                         "devices:scripts",
+                        "devices:software",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -21020,6 +21185,7 @@
                         "devices:enforce",
                         "devices:recovery_keys",
                         "devices:scripts",
+                        "devices:software",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -40056,6 +40222,809 @@
                     "skipped_up_to_date",
                     "skipped_not_reporting",
                     "skipped_in_progress"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/software-packages": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "The app catalog, with assignments and where each app stands",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SoftwarePackage"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Add an app to the catalog",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "winget",
+                      "msi",
+                      "pkg",
+                      "apt",
+                      "dnf"
+                    ],
+                    "description": "winget / msi (Windows), pkg (macOS), apt / dnf (Linux)"
+                  },
+                  "ref": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "winget ID, MSI ProductCode, pkg receipt ID, or package name: how the agent finds it"
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": "",
+                    "description": "msi / pkg: the installer's https URL"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "default": "",
+                    "description": "msi / pkg: the installer's SHA-256 (the agent refuses a download that doesn't match)"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "pattern": "^[^\\r\\n\\0]*$"
+                    },
+                    "maxItems": 20,
+                    "default": [],
+                    "description": "Extra installer arguments (MSI properties, winget or package-manager options)"
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind",
+                  "ref"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwarePackage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/software-packages/{id}": {
+      "put": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Change an app (devices pick up the change at their next check-in)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "winget",
+                      "msi",
+                      "pkg",
+                      "apt",
+                      "dnf"
+                    ],
+                    "description": "winget / msi (Windows), pkg (macOS), apt / dnf (Linux)"
+                  },
+                  "ref": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "winget ID, MSI ProductCode, pkg receipt ID, or package name: how the agent finds it"
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": "",
+                    "description": "msi / pkg: the installer's https URL"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "default": "",
+                    "description": "msi / pkg: the installer's SHA-256 (the agent refuses a download that doesn't match)"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "pattern": "^[^\\r\\n\\0]*$"
+                    },
+                    "maxItems": 20,
+                    "default": [],
+                    "description": "Extra installer arguments (MSI properties, winget or package-manager options)"
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind",
+                  "ref"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwarePackage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Remove an app from the catalog (it stays installed where it is)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/software-packages/{id}/assignments": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Install or remove an app on every device on its platform, or on a group's devices",
+        "description": "A group's devices are those whose primary user is in the group. When install and remove both apply to a device, install wins.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "install",
+                      "remove"
+                    ]
+                  },
+                  "group_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "default": null,
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f",
+                    "description": "null: every device on the app's platform"
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoftwarePackage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/software-packages/{id}/assignments/{assignment_id}": {
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Stop an assignment (installed copies stay)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "assignment_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/software-packages/{id}/devices": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Where an app stands on each device it's assigned to",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "device_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          },
+                          "hostname": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "install",
+                              "remove"
+                            ]
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "device_id",
+                          "hostname",
+                          "action",
+                          "status",
+                          "detail",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
                   ]
                 }
               }

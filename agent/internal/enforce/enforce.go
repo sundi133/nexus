@@ -26,6 +26,7 @@ import (
 
 	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/settings"
+	"github.com/votal-ai/nexus/agent/internal/software"
 )
 
 const policyTyp = "nexus-policy+jwt"
@@ -45,6 +46,7 @@ type Policy struct {
 	Ver      string           `json:"ver"`
 	Rules    []Rule           `json:"rules"`
 	Settings settings.Desired `json:"settings"` // device settings to enforce (firewall, screen lock, BitLocker)
+	Software []software.Item  `json:"software"` // apps to install or remove
 }
 
 // Event is reported on the next check-in; repeats are counted, not repeated.
@@ -64,6 +66,7 @@ type Report struct {
 	Events       []Event                `json:"events"`
 	Settings     []settings.Result      `json:"settings"`
 	RecoveryKeys []settings.RecoveryKey `json:"recovery_keys,omitempty"` // only when they changed
+	Software     []software.Result      `json:"software"`                // null until the first pass
 }
 
 // Proc is a running process.
@@ -88,6 +91,8 @@ type Enforcer struct {
 	Now       func() time.Time
 	// ApplySettings makes the device match the policy's settings (settings.Apply on this OS).
 	ApplySettings func(settings.Desired) settings.Outcome
+	// ApplySoftware installs and removes the policy's apps (software.Manager.Apply).
+	ApplySoftware func([]software.Item) []software.Result
 
 	mu        sync.Mutex
 	monitored map[string]bool // rule|pid already reported in monitor mode
@@ -101,6 +106,10 @@ type Enforcer struct {
 	settingsAt      time.Time
 	settingsRes     []settings.Result
 	pendingKeys     []settings.RecoveryKey
+
+	softwareRunning bool
+	softwareAt      time.Time
+	softwareRes     []software.Result
 }
 
 // SettingsEvery is how often settings are re-asserted, so ones someone turned off come back.
@@ -134,6 +143,7 @@ func (e *Enforcer) Load() {
 	e.mu.Unlock()
 	e.applyDomains()
 	e.settingsSoon()
+	e.softwareSoon()
 }
 
 // Apply verifies a signed policy from a check-in and, when it's new, applies it.
@@ -177,9 +187,11 @@ func (e *Enforcer) Apply(jws string) error {
 	e.applyDomains()
 	e.Log.Info("block rules applied", "version", p.Ver, "rules", len(p.Rules))
 	e.mu.Lock()
-	e.settingsAt = time.Time{} // a new policy: apply its settings now
+	e.settingsAt = time.Time{} // a new policy: apply its settings and apps now
+	e.softwareAt = time.Time{}
 	e.mu.Unlock()
 	e.settingsSoon()
+	e.softwareSoon()
 	return nil
 }
 
@@ -212,6 +224,35 @@ func (e *Enforcer) runSettings(want settings.Desired) {
 	if len(out.RecoveryKeys) > 0 && settings.KeysDigest(out.RecoveryKeys) != e.escrowed() {
 		e.pendingKeys = out.RecoveryKeys
 	}
+}
+
+// softwareSoon reconciles the policy's apps in the background when due (new policy, startup, or
+// hourly, so an app someone removed comes back). Installs can take many minutes.
+func (e *Enforcer) softwareSoon() {
+	e.mu.Lock()
+	if e.ApplySoftware == nil || e.policy == nil || e.softwareRunning || (!e.softwareAt.IsZero() && e.now().Sub(e.softwareAt) < SettingsEvery) {
+		e.mu.Unlock()
+		return
+	}
+	want := append([]software.Item(nil), e.policy.Software...)
+	e.softwareRunning = true
+	e.mu.Unlock()
+	go func() {
+		out := e.ApplySoftware(want)
+		for _, r := range out {
+			if r.Status == software.Failed || strings.HasSuffix(r.Detail, "by Nexus") {
+				e.Log.Info("app", "id", r.ID, "status", r.Status, "detail", r.Detail)
+			}
+		}
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		e.softwareRunning = false
+		e.softwareAt = e.now()
+		if out == nil {
+			out = []software.Result{}
+		}
+		e.softwareRes = out
+	}()
 }
 
 func (e *Enforcer) settingsBusy() bool {
@@ -550,6 +591,7 @@ func (e *Enforcer) addEvent(ev Event) {
 func (e *Enforcer) Report() Report {
 	r := e.report()
 	e.settingsSoon() // re-assert settings hourly
+	e.softwareSoon() // …and apps
 	return r
 }
 
@@ -557,6 +599,9 @@ func (e *Enforcer) report() Report {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	r := Report{Status: e.status, Events: []Event{}, Settings: append([]settings.Result{}, e.settingsRes...), RecoveryKeys: e.pendingKeys}
+	if e.softwareRes != nil {
+		r.Software = append([]software.Result{}, e.softwareRes...)
+	}
 	if e.policy != nil {
 		r.Version = e.policy.Ver
 	}
