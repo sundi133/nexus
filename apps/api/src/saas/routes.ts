@@ -7,7 +7,8 @@ import { requirePermission, requireRecentMfa } from "../auth/guard.js";
 import type { Tx } from "../platform/db.js";
 import { badRequest, notFound } from "../platform/errors.js";
 import { bearer, body, iso, json, problemResponses } from "../schemas.js";
-import { SAAS_APPS, SAAS_BY_KEY, SAAS_CATEGORIES, slug } from "./catalog.js";
+import { SAAS_APPS, SAAS_BY_KEY, SAAS_CATEGORIES } from "./catalog.js";
+import { ssoApps } from "./usage.js";
 
 /**
  * SaaS management (docs/SAAS.md): which apps people use (from the browser extension, while
@@ -56,16 +57,6 @@ async function usage(tx: Tx, days: number, appKey?: string) {
     .groupBy("app_key");
   if (appKey) q = q.where("app_key", "=", appKey);
   return new Map((await q.execute()).map((r) => [r.app_key, r as Usage]));
-}
-
-/** Nexus SSO applications, matched to catalog apps by their template or their name. */
-async function ssoApps(tx: Tx) {
-  const rows = await tx.selectFrom("applications").select(["id", "name", "catalog_key"]).execute();
-  const out = new Map<string, { id: string; name: string }>();
-  for (const r of rows) {
-    for (const k of [r.catalog_key ? slug(r.catalog_key) : "", slug(r.name)]) if (k && SAAS_BY_KEY.has(k) && !out.has(k)) out.set(k, { id: r.id, name: r.name });
-  }
-  return out;
 }
 
 async function decisions(tx: Tx) {

@@ -10,7 +10,8 @@ import { useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
 import { Card, CardHeader, EmptyState, ErrorBanner, PageHeader, Skeleton, StatusPill, type Tone } from "@/components/ui/misc";
-import { Dialog, DialogContent, SheetContent } from "@/components/ui/overlay";
+import { SaasLicenses } from "@/components/features/saas-licenses";
+import { Dialog, DialogContent, SheetContent, Tabs, TabsContent, TabsList } from "@/components/ui/overlay";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import { api, unwrap } from "@/lib/api";
 import { useCan } from "@/lib/queries";
@@ -26,7 +27,11 @@ const STATUS: Record<Status, { tone: Tone; label: string }> = {
   approved: { tone: "success", label: "Approved" },
   unapproved: { tone: "danger", label: "Unapproved" },
 };
-const ACTION_LABEL = { allow: "Allowed, counted", warn: "Browsers warn", block: "Browsers block" } as const;
+const ACTION_LABEL = {
+  allow: "Allowed, counted",
+  warn: "Browsers warn",
+  block: "Browsers block",
+} as const;
 
 /** SaaS management: which apps people use, which are approved, and what browsers do about the rest. */
 export default function SaasPage() {
@@ -35,95 +40,115 @@ export default function SaasPage() {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<SaasApp | null>(null);
-  const list = useQuery({ queryKey: ["saas-apps"], queryFn: () => unwrap(api.GET("/v1/saas/apps", { params: { query: { days: 30 } } })), refetchInterval: 60_000 });
+  const list = useQuery({
+    queryKey: ["saas-apps"],
+    queryFn: () => unwrap(api.GET("/v1/saas/apps", { params: { query: { days: 30 } } })),
+    refetchInterval: 60_000,
+  });
   const s = list.data?.summary;
   const rows = (list.data?.data ?? []).filter((a) => (!filter || a.status === filter) && (!q || a.name.toLowerCase().includes(q.toLowerCase()) || a.category.toLowerCase().includes(q.toLowerCase())));
 
   return (
     <>
-      <PageHeader title="SaaS apps" description="The work apps people use, found by the Nexus browser extension. Approve them, or warn about and block the ones you don't want company data in." />
-      <ErrorBanner error={list.error} />
-      {list.isPending ? (
-        <Skeleton className="h-40" />
-      ) : (
-        <>
-          {can("devices:enforce") ? <DiscoveryCard on={!!s?.discovery} /> : null}
-          <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Tile label="Apps in use" value={s?.apps ?? 0} hint="last 30 days" />
-            <Tile label="People" value={s?.people ?? 0} hint="using at least one" />
-            <Tile label="Not reviewed" value={s?.unreviewed ?? 0} hint="in use, no decision yet" tone={s?.unreviewed ? "warning" : undefined} onClick={() => setFilter("unreviewed")} />
-            <Tile label="Password sign-ins" value={s?.password_apps ?? 0} hint="apps on SSO that people still sign in to with a password" tone={s?.password_apps ? "warning" : undefined} />
-          </div>
-          <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-              <Input className="max-w-xs" placeholder="Search apps or categories" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search apps" />
-              <Select value={filter} onChange={(e) => setFilter(e.target.value as Status | "")} aria-label="Status">
-                <option value="">All statuses</option>
-                <option value="unreviewed">Not reviewed</option>
-                <option value="approved">Approved</option>
-                <option value="unapproved">Unapproved</option>
-              </Select>
-            </div>
-            {!rows.length ? (
-              <EmptyState
-                icon={<Cloud />}
-                title={s?.discovery ? "No apps found yet" : "Discovery is off"}
-                description={s?.discovery ? "Apps show up as people use them in browsers with the Nexus extension." : "Turn on SaaS discovery above to see which work apps people use."}
-              />
-            ) : (
-              <Table>
-                <THead>
-                  <TR>
-                    <TH>App</TH>
-                    <TH>People</TH>
-                    <TH>Sign-in</TH>
-                    <TH>Status</TH>
-                    <TH>Last used</TH>
-                    <TH />
-                  </TR>
-                </THead>
-                <tbody>
-                  {rows.map((a) => (
-                    <TR key={a.key} className="cursor-pointer" onClick={() => setOpen(a.key)}>
-                      <TD>
-                        <p className="font-medium">{a.name}</p>
-                        <p className="text-xs text-fg-muted">{a.category}</p>
-                      </TD>
-                      <TD>{a.people}</TD>
-                      <TD>
-                        {a.sso ? (
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            <Link2 className="size-3.5 text-success" /> SSO
-                            {a.password_people ? <span className="text-warning">· {people(a.password_people)} use a password</span> : null}
-                          </span>
-                        ) : a.password_people ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
-                            <KeyRound className="size-3.5" /> Password
-                          </span>
-                        ) : (
-                          <span className="text-xs text-fg-subtle">—</span>
-                        )}
-                      </TD>
-                      <TD>
-                        <StatusPill tone={STATUS[a.status].tone}>{STATUS[a.status].label}</StatusPill>
-                        {a.status === "unapproved" ? <span className="ml-2 text-xs text-fg-muted">{ACTION_LABEL[a.action]}</span> : null}
-                      </TD>
-                      <TD className="whitespace-nowrap text-fg-muted">{a.last_seen ? timeAgo(a.last_seen) : "—"}</TD>
-                      <TD onClick={(e) => e.stopPropagation()}>
-                        {can("apps:write") ? (
-                          <Button size="sm" onClick={() => setReviewing(a)}>
-                            Review
-                          </Button>
-                        ) : null}
-                      </TD>
-                    </TR>
-                  ))}
-                </tbody>
-              </Table>
-            )}
-          </Card>
-        </>
-      )}
+      <PageHeader
+        title="SaaS apps"
+        description="The work apps people use, found by the Nexus browser extension. Approve them, or warn about and block the ones you don't want company data in, and see which paid seats are used."
+      />
+      <Tabs defaultValue="apps">
+        <TabsList
+          tabs={[
+            { value: "apps", label: "Apps in use" },
+            { value: "licenses", label: "Licenses" },
+          ]}
+        />
+        <TabsContent value="licenses">
+          <SaasLicenses />
+        </TabsContent>
+        <TabsContent value="apps">
+          <ErrorBanner error={list.error} />
+          {list.isPending ? (
+            <Skeleton className="h-40" />
+          ) : (
+            <>
+              {can("devices:enforce") ? <DiscoveryCard on={!!s?.discovery} /> : null}
+              <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Tile label="Apps in use" value={s?.apps ?? 0} hint="last 30 days" />
+                <Tile label="People" value={s?.people ?? 0} hint="using at least one" />
+                <Tile label="Not reviewed" value={s?.unreviewed ?? 0} hint="in use, no decision yet" tone={s?.unreviewed ? "warning" : undefined} onClick={() => setFilter("unreviewed")} />
+                <Tile label="Password sign-ins" value={s?.password_apps ?? 0} hint="apps on SSO that people still sign in to with a password" tone={s?.password_apps ? "warning" : undefined} />
+              </div>
+              <Card className="overflow-hidden">
+                <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+                  <Input className="max-w-xs" placeholder="Search apps or categories" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search apps" />
+                  <Select value={filter} onChange={(e) => setFilter(e.target.value as Status | "")} aria-label="Status">
+                    <option value="">All statuses</option>
+                    <option value="unreviewed">Not reviewed</option>
+                    <option value="approved">Approved</option>
+                    <option value="unapproved">Unapproved</option>
+                  </Select>
+                </div>
+                {!rows.length ? (
+                  <EmptyState
+                    icon={<Cloud />}
+                    title={s?.discovery ? "No apps found yet" : "Discovery is off"}
+                    description={s?.discovery ? "Apps show up as people use them in browsers with the Nexus extension." : "Turn on SaaS discovery above to see which work apps people use."}
+                  />
+                ) : (
+                  <Table>
+                    <THead>
+                      <TR>
+                        <TH>App</TH>
+                        <TH>People</TH>
+                        <TH>Sign-in</TH>
+                        <TH>Status</TH>
+                        <TH>Last used</TH>
+                        <TH />
+                      </TR>
+                    </THead>
+                    <tbody>
+                      {rows.map((a) => (
+                        <TR key={a.key} className="cursor-pointer" onClick={() => setOpen(a.key)}>
+                          <TD>
+                            <p className="font-medium">{a.name}</p>
+                            <p className="text-xs text-fg-muted">{a.category}</p>
+                          </TD>
+                          <TD>{a.people}</TD>
+                          <TD>
+                            {a.sso ? (
+                              <span className="inline-flex items-center gap-1 text-xs">
+                                <Link2 className="size-3.5 text-success" /> SSO
+                                {a.password_people ? <span className="text-warning">· {people(a.password_people)} use a password</span> : null}
+                              </span>
+                            ) : a.password_people ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
+                                <KeyRound className="size-3.5" /> Password
+                              </span>
+                            ) : (
+                              <span className="text-xs text-fg-subtle">—</span>
+                            )}
+                          </TD>
+                          <TD>
+                            <StatusPill tone={STATUS[a.status].tone}>{STATUS[a.status].label}</StatusPill>
+                            {a.status === "unapproved" ? <span className="ml-2 text-xs text-fg-muted">{ACTION_LABEL[a.action]}</span> : null}
+                          </TD>
+                          <TD className="whitespace-nowrap text-fg-muted">{a.last_seen ? timeAgo(a.last_seen) : "—"}</TD>
+                          <TD onClick={(e) => e.stopPropagation()}>
+                            {can("apps:write") ? (
+                              <Button size="sm" onClick={() => setReviewing(a)}>
+                                Review
+                              </Button>
+                            ) : null}
+                          </TD>
+                        </TR>
+                      ))}
+                    </tbody>
+                  </Table>
+                )}
+              </Card>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
         {open ? <AppSheet appKey={open} onReview={(a) => setReviewing(a)} /> : null}
       </Dialog>
@@ -145,7 +170,10 @@ function Tile({ label, value, hint, tone, onClick }: { label: string; value: num
 function DiscoveryCard({ on }: { on: boolean }) {
   const qc = useQueryClient();
   const withStepUp = useStepUp();
-  const policy = useQuery({ queryKey: ["browser-policy"], queryFn: () => unwrap(api.GET("/v1/browser/policy")) });
+  const policy = useQuery({
+    queryKey: ["browser-policy"],
+    queryFn: () => unwrap(api.GET("/v1/browser/policy")),
+  });
   const toggle = useMutation({
     mutationFn: () => {
       const p = policy.data!;
@@ -166,7 +194,9 @@ function DiscoveryCard({ on }: { on: boolean }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["saas-apps"] });
       qc.invalidateQueries({ queryKey: ["browser-policy"] });
-      toast.success(on ? "SaaS discovery is off" : "SaaS discovery is on", { description: "Browsers pick it up within a minute." });
+      toast.success(on ? "SaaS discovery is off" : "SaaS discovery is on", {
+        description: "Browsers pick it up within a minute.",
+      });
     },
   });
   return (
@@ -174,8 +204,8 @@ function DiscoveryCard({ on }: { on: boolean }) {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">SaaS discovery is {on ? "on" : "off"}</p>
         <p className="text-[13px] text-fg-muted">
-          Browsers with the Nexus extension count visits to {on ? "the" : "about 1,700"} known work apps, and sign-ins with a password, per person per day. Nothing else about browsing is
-          reported: no addresses, pages or anything typed. People see this in the extension. Set up the extension under{" "}
+          Browsers with the Nexus extension count visits to {on ? "the" : "about 1,700"} known work apps, and sign-ins with a password, per person per day. Nothing else about browsing is reported: no
+          addresses, pages or anything typed. People see this in the extension. Set up the extension under{" "}
           <Link href="/ai-browsers" className="text-primary hover:underline">
             AI in browsers
           </Link>
@@ -192,7 +222,15 @@ function DiscoveryCard({ on }: { on: boolean }) {
 
 function AppSheet({ appKey, onReview }: { appKey: string; onReview: (a: SaasApp) => void }) {
   const can = useCan();
-  const one = useQuery({ queryKey: ["saas-app", appKey], queryFn: () => unwrap(api.GET("/v1/saas/apps/{key}", { params: { path: { key: appKey }, query: { days: 30 } } })) });
+  const one = useQuery({
+    queryKey: ["saas-app", appKey],
+    queryFn: () =>
+      unwrap(
+        api.GET("/v1/saas/apps/{key}", {
+          params: { path: { key: appKey }, query: { days: 30 } },
+        }),
+      ),
+  });
   const a = one.data?.app;
   return (
     <SheetContent title={a?.name ?? "App"}>
@@ -237,9 +275,7 @@ function AppSheet({ appKey, onReview }: { appKey: string; onReview: (a: SaasApp)
             ) : null}
             <p className="text-xs text-fg-subtle">Seen on {a.hosts.join(", ")}</p>
             <div>
-              <p className="mb-2 font-medium">
-                {people(one.data!.people.length)} in the last 30 days
-              </p>
+              <p className="mb-2 font-medium">{people(one.data!.people.length)} in the last 30 days</p>
               <ul className="divide-y divide-border rounded-md border border-border">
                 {one.data!.people.map((p) => (
                   <li key={p.email} className="flex items-center gap-2 px-3 py-2">
@@ -276,11 +312,26 @@ function ReviewDialog({ app, onClose }: { app: SaasApp; onClose: () => void }) {
   const [action, setAction] = useState(app.action);
   const [notes, setNotes] = useState(app.notes);
   const save = useMutation({
-    mutationFn: () => withStepUp(() => unwrap(api.PUT("/v1/saas/apps/{key}", { params: { path: { key: app.key } }, body: { status, action: status === "unapproved" ? action : "allow", owner_id: app.owner?.id ?? null, notes } }))),
+    mutationFn: () =>
+      withStepUp(() =>
+        unwrap(
+          api.PUT("/v1/saas/apps/{key}", {
+            params: { path: { key: app.key } },
+            body: {
+              status,
+              action: status === "unapproved" ? action : "allow",
+              owner_id: app.owner?.id ?? null,
+              notes,
+            },
+          }),
+        ),
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["saas-apps"] });
       qc.invalidateQueries({ queryKey: ["saas-app", app.key] });
-      toast.success(`${app.name}: ${STATUS[status].label.toLowerCase()}`, { description: status === "unapproved" && action !== "allow" ? "Browsers pick it up within a minute." : undefined });
+      toast.success(`${app.name}: ${STATUS[status].label.toLowerCase()}`, {
+        description: status === "unapproved" && action !== "allow" ? "Browsers pick it up within a minute." : undefined,
+      });
       onClose();
     },
   });

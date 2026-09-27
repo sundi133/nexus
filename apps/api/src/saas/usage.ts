@@ -1,6 +1,6 @@
 import { sql } from "kysely";
 import type { Tx } from "../platform/db.js";
-import { SAAS_BY_KEY } from "./catalog.js";
+import { SAAS_BY_KEY, slug } from "./catalog.js";
 
 type SaasEvent = { at: string; kind: string; action: string; app: string; count: number };
 
@@ -51,3 +51,14 @@ export async function recordSaasEvents(tx: Tx, orgId: string, who: { email: stri
       .execute();
   }
 }
+
+/** Nexus SSO applications, matched to catalog apps by their template or their name. */
+export async function ssoApps(tx: Tx) {
+  const rows = await tx.selectFrom("applications").select(["id", "name", "catalog_key"]).execute();
+  const out = new Map<string, { id: string; name: string }>();
+  for (const r of rows) {
+    for (const k of [r.catalog_key ? slug(r.catalog_key) : "", slug(r.name)]) if (k && SAAS_BY_KEY.has(k) && !out.has(k)) out.set(k, { id: r.id, name: r.name });
+  }
+  return out;
+}
+

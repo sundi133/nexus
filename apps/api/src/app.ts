@@ -6,6 +6,7 @@ import { registerAppleMdmRoutes } from "./apple-mdm/routes.js";
 import { registerAppleMdmProfileRoutes } from "./apple-mdm/profiles.js";
 import { registerAdeRoutes, scheduleAdeSyncs } from "./apple-mdm/ade.js";
 import { registerRemoteAssistRoutes } from "./remote-assist/routes.js";
+import { registerSaasLicenseRoutes } from "./saas/licenses.js";
 import { registerSaasRoutes } from "./saas/routes.js";
 import { registerVaultRoutes } from "./vault/routes.js";
 import { registerScriptRoutes } from "./devices/scripts.js";
@@ -306,6 +307,7 @@ export function createApp(deps: Deps) {
   registerVaultRoutes(app);
   registerRemoteAssistRoutes(app);
   registerSaasRoutes(app);
+  registerSaasLicenseRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);

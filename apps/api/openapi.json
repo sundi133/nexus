@@ -10765,6 +10765,162 @@
           "sso"
         ]
       },
+      "SaasLicense": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "app_key": {
+            "type": "string"
+          },
+          "app_name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "seats": {
+            "type": "integer"
+          },
+          "unit_cost": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billing": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "annual"
+            ]
+          },
+          "annual_cost": {
+            "type": "number"
+          },
+          "renews_on": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "renews_soon": {
+            "type": "boolean"
+          },
+          "seat_source": {
+            "type": "string",
+            "enum": [
+              "sso",
+              "list"
+            ]
+          },
+          "owner": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "holders": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "integer"
+          },
+          "inactive": {
+            "type": "integer"
+          },
+          "departed": {
+            "type": "integer"
+          },
+          "unassigned": {
+            "type": "integer",
+            "description": "Seats paid for that nobody holds"
+          },
+          "reclaimable": {
+            "type": "integer",
+            "description": "Unassigned seats, plus seats held by people who left or haven't used the app"
+          },
+          "reclaimable_annual": {
+            "type": "number"
+          },
+          "activity_from": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "browser",
+                "sso"
+              ]
+            },
+            "description": "Where use is seen. Empty: use can't be judged, so no seat counts as inactive"
+          },
+          "sso_app": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "app_key",
+          "app_name",
+          "category",
+          "plan",
+          "seats",
+          "unit_cost",
+          "currency",
+          "billing",
+          "annual_cost",
+          "renews_on",
+          "renews_soon",
+          "seat_source",
+          "owner",
+          "notes",
+          "holders",
+          "active",
+          "inactive",
+          "departed",
+          "unassigned",
+          "reclaimable",
+          "reclaimable_annual",
+          "activity_from",
+          "sso_app"
+        ]
+      },
       "DevicePage": {
         "type": "object",
         "properties": {
@@ -47814,6 +47970,827 @@
                     "data",
                     "total",
                     "categories"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/licenses": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "SaaS licenses: what you pay for, and which seats are used",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 7,
+              "maximum": 180,
+              "default": 30,
+              "description": "A seat counts as used if its holder used the app within this many days"
+            },
+            "required": false,
+            "description": "A seat counts as used if its holder used the app within this many days",
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SaasLicense"
+                      }
+                    },
+                    "totals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "currency": {
+                            "type": "string"
+                          },
+                          "annual_cost": {
+                            "type": "number"
+                          },
+                          "reclaimable_annual": {
+                            "type": "number"
+                          },
+                          "seats": {
+                            "type": "integer"
+                          },
+                          "reclaimable": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "currency",
+                          "annual_cost",
+                          "reclaimable_annual",
+                          "seats",
+                          "reclaimable"
+                        ]
+                      }
+                    },
+                    "renewing_soon": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "totals",
+                    "renewing_soon"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Add a license",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "app_key": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]{1,40}$"
+                  },
+                  "plan": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "seats": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "unit_cost": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 0,
+                    "description": "Price per seat per billing period, e.g. 12.5"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "default": "USD"
+                  },
+                  "billing": {
+                    "type": "string",
+                    "enum": [
+                      "monthly",
+                      "annual"
+                    ],
+                    "default": "annual"
+                  },
+                  "renews_on": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "seat_source": {
+                    "type": "string",
+                    "enum": [
+                      "sso",
+                      "list"
+                    ],
+                    "default": "sso",
+                    "description": "sso: people assigned to the app in Nexus hold the seats. list: the seat holders you give"
+                  },
+                  "owner_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "app_key",
+                  "seats"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaasLicense"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/licenses/{id}": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "A license and its seat holders",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 7,
+              "maximum": 180,
+              "default": 30,
+              "description": "A seat counts as used if its holder used the app within this many days"
+            },
+            "required": false,
+            "description": "A seat counts as used if its holder used the app within this many days",
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "license": {
+                      "$ref": "#/components/schemas/SaasLicense"
+                    },
+                    "holders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "user_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "inactive",
+                              "departed",
+                              "unknown"
+                            ]
+                          },
+                          "last_used": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "via": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "browser",
+                              "sso",
+                              null
+                            ]
+                          }
+                        },
+                        "required": [
+                          "email",
+                          "user_id",
+                          "name",
+                          "status",
+                          "last_used",
+                          "via"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "license",
+                    "holders"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Change a license",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "app_key": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]{1,40}$"
+                  },
+                  "plan": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "seats": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "unit_cost": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 0,
+                    "description": "Price per seat per billing period, e.g. 12.5"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "default": "USD"
+                  },
+                  "billing": {
+                    "type": "string",
+                    "enum": [
+                      "monthly",
+                      "annual"
+                    ],
+                    "default": "annual"
+                  },
+                  "renews_on": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "seat_source": {
+                    "type": "string",
+                    "enum": [
+                      "sso",
+                      "list"
+                    ],
+                    "default": "sso",
+                    "description": "sso: people assigned to the app in Nexus hold the seats. list: the seat holders you give"
+                  },
+                  "owner_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "app_key",
+                  "seats"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaasLicense"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Remove a license",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/licenses/{id}/holders": {
+      "put": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Set who holds the seats (for licenses whose seats come from a list)",
+        "description": "Replaces the list. Emails are matched to people in Nexus; others are kept as they are (contractors, shared accounts).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "emails": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 20000
+                  }
+                },
+                "required": [
+                  "emails"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "holders": {
+                      "type": "integer"
+                    },
+                    "added": {
+                      "type": "integer"
+                    },
+                    "removed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "holders",
+                    "added",
+                    "removed"
                   ]
                 }
               }

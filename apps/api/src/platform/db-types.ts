@@ -632,6 +632,28 @@ export interface Database {
     blocked: Generated<number>;
     last_at: Date;
   };
+  saas_licenses: {
+    id: string;
+    org_id: string;
+    app_key: string;
+    plan: Generated<string>;
+    seats: number;
+    unit_cost_cents: Generated<number>;
+    currency: Generated<string>;
+    billing: Generated<"monthly" | "annual">;
+    renews_on: string | null;
+    seat_source: Generated<"sso" | "list">;
+    owner_id: string | null;
+    notes: Generated<string>;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  saas_license_holders: {
+    license_id: string;
+    org_id: string;
+    email: string;
+    added_at: Generated<Date>;
+  };
   saas_apps: {
     org_id: string;
     app_key: string;
