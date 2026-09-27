@@ -22,6 +22,7 @@ export const SEALED: Target[] = [
   { table: "oncall_integrations", pk: "id", column: "secret", aad: (r) => `oncall:${r.id}` },
   { table: "command_keys", pk: "org_id", column: "private_key", aad: (r) => `command_key:${r.org_id}` },
   { table: "device_recovery_keys", pk: "id", column: "sealed", aad: (r) => `recovery_key:${r.id}` },
+  { table: "radius_clients", pk: "id", column: "secret", aad: (r) => `radius_client:${r.id}` },
 ];
 
 export type ResealReport = { table: string; checked: number; resealed: number; failed: string[] }[];

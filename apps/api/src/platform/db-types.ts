@@ -257,6 +257,34 @@ export interface Database {
     grace_hours: Generated<number>;
     updated_at: Timestamp;
   };
+  directory_service_settings: {
+    org_id: string;
+    ldap_enabled: Generated<boolean>;
+    radius_enabled: Generated<boolean>;
+    radius_mfa: Generated<"required" | "if_enrolled" | "off">;
+    updated_at: Generated<Date>;
+  };
+  ldap_service_accounts: {
+    id: string;
+    org_id: string;
+    name: string;
+    secret_hash: string;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+    revoked_at: Date | null;
+  };
+  radius_clients: {
+    id: string;
+    org_id: string;
+    name: string;
+    address: string;
+    secret: Buffer;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+    revoked_at: Date | null;
+  };
   mcp_clients: {
     id: string;
     org_id: string;
