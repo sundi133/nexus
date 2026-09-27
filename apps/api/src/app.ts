@@ -7,6 +7,7 @@ import { registerAppleMdmProfileRoutes } from "./apple-mdm/profiles.js";
 import { registerAdeRoutes, scheduleAdeSyncs } from "./apple-mdm/ade.js";
 import { scheduleDeviceHealth } from "./devices/health.js";
 import { registerRemoteAssistRoutes } from "./remote-assist/routes.js";
+import { registerAndroidRoutes, scheduleAndroidSync } from "./android/routes.js";
 import { registerAssetRoutes } from "./assets/routes.js";
 import { registerDeviceSignInRoutes } from "./auth/device-sign-in.js";
 import { registerSaasLicenseRoutes } from "./saas/licenses.js";
@@ -313,6 +314,7 @@ export function createApp(deps: Deps) {
   registerSaasLicenseRoutes(app);
   registerAssetRoutes(app);
   registerDeviceSignInRoutes(app);
+  registerAndroidRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -349,4 +351,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   schedulePatching(jobs, deps);
   scheduleAdeSyncs(jobs, deps);
   scheduleDeviceHealth(jobs, deps);
+  scheduleAndroidSync(jobs, deps);
 }

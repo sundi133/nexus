@@ -642,6 +642,39 @@ export interface Database {
     blocked: Generated<number>;
     last_at: Date;
   };
+  android_settings: {
+    org_id: string;
+    project_id: Generated<string>;
+    service_account: Buffer | null;
+    client_email: Generated<string>;
+    signup_url_name: Generated<string>;
+    enterprise_name: Generated<string>;
+    enterprise_display: Generated<string>;
+    policy: Json<Record<string, unknown>>;
+    policy_applied_at: Date | null;
+    last_sync_at: Date | null;
+    last_error: Generated<string>;
+    updated_at: Generated<Date>;
+  };
+  android_devices: {
+    id: string;
+    org_id: string;
+    name: string;
+    serial: Generated<string>;
+    brand: Generated<string>;
+    model: Generated<string>;
+    android_version: Generated<string>;
+    security_patch: Generated<string>;
+    management_mode: Generated<string>;
+    ownership: Generated<string>;
+    state: Generated<string>;
+    policy_compliant: boolean | null;
+    non_compliance: Json<unknown[]>;
+    assigned_user_id: string | null;
+    enrolled_at: Date | null;
+    last_status_at: Date | null;
+    updated_at: Generated<Date>;
+  };
   assets: {
     id: string;
     org_id: string;

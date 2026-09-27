@@ -31,6 +31,7 @@ export type Config = {
   bamboohrBase: string;
   appleMdmPushUrl: string; // APNs for MDM (overridable only for tests)
   appleDepBase: string; // Apple's device enrollment service (overridable only for tests)
+  androidApiBase: string; // Google's Android Management API (overridable only for tests)
   // On-call paging endpoints (overridable only for tests).
   pagerdutyEventsUrl: string;
   opsgenieBase: { us: string; eu: string };
@@ -119,6 +120,7 @@ export function loadConfig(env = process.env): Config {
     bamboohrBase: env.NEXUS_BAMBOOHR_BASE ?? "https://api.bamboohr.com/api/gateway.php",
     appleMdmPushUrl: env.NEXUS_APPLE_MDM_PUSH_URL ?? "https://api.push.apple.com",
     appleDepBase: env.NEXUS_APPLE_DEP_BASE ?? "https://mdmenrollment.apple.com",
+    androidApiBase: env.NEXUS_ANDROID_API_BASE ?? "https://androidmanagement.googleapis.com/v1",
     pagerdutyEventsUrl: env.NEXUS_PAGERDUTY_EVENTS_URL ?? "https://events.pagerduty.com/v2/enqueue",
     opsgenieBase: { us: env.NEXUS_OPSGENIE_BASE ?? "https://api.opsgenie.com", eu: env.NEXUS_OPSGENIE_EU_BASE ?? "https://api.eu.opsgenie.com" },
     allowPrivateOutbound: mode !== "prod" && env.NEXUS_ALLOW_PRIVATE_OUTBOUND !== "false",
