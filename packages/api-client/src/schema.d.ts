@@ -28124,6 +28124,462 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/devices/{id}/remote-assist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent Remote Assist sessions on a device */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["RemoteAssistSession"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Ask to see a Mac's screen (the person at the Mac must allow it)
+         * @description Needs `devices:actions` and a recent MFA. The agent asks the signed-in person; if they allow it, the session becomes `active` and you (only you) can view it until it ends, at most `minutes` later.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        reason: string;
+                        /** @default 60 */
+                        minutes?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Asked */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RemoteAssistSession"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/remote-assist/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A Remote Assist session */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RemoteAssistSession"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/remote-assist/sessions/{id}/ticket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A one-time ticket to open the session's viewer (the requester only)
+         * @description Open a websocket to `ws_url` within a minute, offering the subprotocols `binary` and `nexus-ticket.<ticket>`. The stream is the Mac's Screen Sharing (RFB/VNC).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ticket: string;
+                            ws_url: string;
+                            expires_at: string;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/remote-assist/sessions/{id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End a Remote Assist session (or withdraw the request) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RemoteAssistSession"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/agent/remote-assist/{id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report a Remote Assist decision or ending (called by the Nexus agent)
+         * @description Body `{state: accepted|declined|ended|failed, detail}`, signed with the device key.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Recorded */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -29957,7 +30413,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates";
+            action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates" | "remote_assist";
             /** @enum {string} */
             channel: "agent" | "mdm";
             /** @enum {string} */
@@ -32761,6 +33217,32 @@ export interface components {
             };
             updated_at: string;
             updated_by: string | null;
+        };
+        RemoteAssistSession: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            device_id: string;
+            hostname: string;
+            /** @enum {string} */
+            status: "asking" | "active" | "declined" | "ended" | "expired" | "failed";
+            detail: string;
+            reason: string;
+            /** @description The requester's email */
+            requested_by: string | null;
+            /** @description You asked for it, so you're the one who can view it */
+            mine: boolean;
+            created_at: string;
+            accepted_at: string | null;
+            ended_at: string | null;
+            /** @description While asking: the approval deadline. While active: when it ends on its own */
+            expires_at: string;
         };
         DevicePage: {
             data: components["schemas"]["Device"][];

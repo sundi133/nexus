@@ -18,6 +18,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/identity"
 	"github.com/votal-ai/nexus/agent/internal/release"
+	"github.com/votal-ai/nexus/agent/internal/wsock"
 )
 
 // Problem is the API's RFC 9457 error body.
@@ -211,4 +212,24 @@ func (c *Client) Download(ctx context.Context, path string, max int64) (io.ReadC
 		return nil, fmt.Errorf("download is %d bytes, expected at most %d", res.ContentLength, max)
 	}
 	return res.Body, nil
+}
+
+// RemoteAssistState reports what the person at the Mac decided, or how the session ended.
+func (c *Client) RemoteAssistState(ctx context.Context, sessionID, state, detail string) error {
+	return c.post(ctx, "/v1/agent/remote-assist/"+sessionID+"/state", map[string]string{"state": state, "detail": detail}, nil)
+}
+
+// RemoteAssistTunnel opens one websocket to the Remote Assist relay, signed like any agent call.
+func (c *Client) RemoteAssistTunnel(ctx context.Context, sessionID string) (*wsock.Conn, error) {
+	path := "/v1/agent/remote-assist/" + sessionID + "/tunnel"
+	proof, err := c.key.Proof(c.deviceID, http.MethodGet, path, nil, c.now())
+	if err != nil {
+		return nil, err
+	}
+	u := *c.base
+	u.Scheme = map[string]string{"https": "wss", "http": "ws"}[u.Scheme]
+	u.Path = strings.TrimSuffix(u.Path, "/") + path
+	dctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return wsock.Dial(dctx, u.String(), http.Header{"Authorization": {"NexusDevice " + proof}, "User-Agent": {"nexus-agent"}})
 }

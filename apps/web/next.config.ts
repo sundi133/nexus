@@ -8,6 +8,15 @@ const common = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
 ];
+// Remote Assist's viewer opens a websocket straight to the API (set NEXUS_API_PUBLIC_URL when building).
+const apiSocket = (() => {
+  try {
+    const u = new URL(process.env.NEXUS_API_PUBLIC_URL ?? "");
+    return ` ${u.protocol === "https:" ? "wss:" : "ws:"}//${u.host}`;
+  } catch {
+    return "";
+  }
+})();
 const csp = (formAction: string) =>
   [
     "default-src 'self'",
@@ -15,7 +24,7 @@ const csp = (formAction: string) =>
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' http://127.0.0.1:47823", // browser device checks talk to the local Nexus agent
+    `connect-src 'self' http://127.0.0.1:47823${apiSocket}`, // browser device checks talk to the local Nexus agent
     "frame-ancestors 'none'",
     "base-uri 'self'",
     `form-action ${formAction}`,

@@ -951,7 +951,8 @@
               "wipe",
               "osquery",
               "script",
-              "updates"
+              "updates",
+              "remote_assist"
             ]
           },
           "channel": {
@@ -10559,6 +10560,85 @@
           "data",
           "updated_at",
           "updated_by"
+        ]
+      },
+      "RemoteAssistSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "asking",
+              "active",
+              "declined",
+              "ended",
+              "expired",
+              "failed"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The requester's email"
+          },
+          "mine": {
+            "type": "boolean",
+            "description": "You asked for it, so you're the one who can view it"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ended_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "While asking: the approval deadline. While active: when it ends on its own"
+          }
+        },
+        "required": [
+          "id",
+          "device_id",
+          "hostname",
+          "status",
+          "detail",
+          "reason",
+          "requested_by",
+          "mine",
+          "created_at",
+          "accepted_at",
+          "ended_at",
+          "expires_at"
         ]
       },
       "DevicePage": {
@@ -46578,6 +46658,508 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/remote-assist": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Ask to see a Mac's screen (the person at the Mac must allow it)",
+        "description": "Needs `devices:actions` and a recent MFA. The agent asks the signed-in person; if they allow it, the session becomes `active` and you (only you) can view it until it ends, at most `minutes` later.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 300
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 120,
+                    "default": 60
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Asked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAssistSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Recent Remote Assist sessions on a device",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RemoteAssistSession"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/remote-assist/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A Remote Assist session",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAssistSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/remote-assist/sessions/{id}/ticket": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A one-time ticket to open the session's viewer (the requester only)",
+        "description": "Open a websocket to `ws_url` within a minute, offering the subprotocols `binary` and `nexus-ticket.<ticket>`. The stream is the Mac's Screen Sharing (RFB/VNC).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticket": {
+                      "type": "string"
+                    },
+                    "ws_url": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ticket",
+                    "ws_url",
+                    "expires_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/remote-assist/sessions/{id}/end": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "End a Remote Assist session (or withdraw the request)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAssistSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/remote-assist/{id}/state": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Report a Remote Assist decision or ending (called by the Nexus agent)",
+        "description": "Body `{state: accepted|declined|ended|failed, detail}`, signed with the device key.",
+        "responses": {
+          "204": {
+            "description": "Recorded"
           }
         }
       }

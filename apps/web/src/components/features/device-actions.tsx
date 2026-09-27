@@ -2,7 +2,8 @@
 
 import type { Schemas } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Lock, Power, RefreshCw, ShieldOff } from "lucide-react";
+import { ChevronDown, Lock, MonitorPlay, Power, RefreshCw, ShieldOff } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/features/confirm-action";
@@ -17,7 +18,7 @@ import { formatDateTime, timeAgo } from "@/lib/utils";
 
 type Device = Schemas["DeviceDetail"];
 type Command = Schemas["DeviceCommand"];
-type Action = Exclude<Command["action"], "osquery" | "script" | "updates">; // live queries, scripts and OS updates have their own pages
+type Action = Exclude<Command["action"], "osquery" | "script" | "updates" | "remote_assist">; // live queries, scripts and OS updates have their own pages
 
 const LABEL: Record<Action, string> = { refresh: "Refresh", lock: "Lock", restart: "Restart", wipe: "Wipe" };
 
@@ -25,6 +26,7 @@ const LABEL: Record<Action, string> = { refresh: "Refresh", lock: "Lock", restar
 export function DeviceActions({ device: d }: { device: Device }) {
   const qc = useQueryClient();
   const can = useCan();
+  const router = useRouter();
   const withStepUp = useStepUp();
   const [confirm, setConfirm] = useState<Exclude<Action, "refresh"> | null>(null);
   const [pin, setPin] = useState<string | null>(null);
@@ -65,6 +67,11 @@ export function DeviceActions({ device: d }: { device: Device }) {
           <MenuItem onSelect={() => setConfirm("restart")}>
             <Power className="size-4" /> Restart
           </MenuItem>
+          {d.platform === "macos" ? (
+            <MenuItem onSelect={() => router.push(`/devices/${d.id}/assist`)}>
+              <MonitorPlay className="size-4" /> Remote Assist
+            </MenuItem>
+          ) : null}
           {can("devices:wipe") ? (
             <>
               <MenuSeparator />
@@ -131,7 +138,7 @@ export function CommandHistory({ deviceId }: { deviceId: string }) {
         <li key={c.id} className="flex flex-wrap items-start gap-3 px-4 py-3 text-[13px]">
           <div className="min-w-0 flex-1">
             <p className="flex flex-wrap items-center gap-2 font-medium">
-              {c.action === "osquery" ? "Live query" : c.action === "script" ? "Script" : c.action === "updates" ? "Install OS updates" : LABEL[c.action]} <StatusPill tone={TONE[c.status].tone}>{TONE[c.status].label}</StatusPill>
+              {c.action === "osquery" ? "Live query" : c.action === "script" ? "Script" : c.action === "updates" ? "Install OS updates" : c.action === "remote_assist" ? "Remote Assist" : LABEL[c.action]} <StatusPill tone={TONE[c.status].tone}>{TONE[c.status].label}</StatusPill>
               <span className="text-xs font-normal text-fg-muted">{c.channel === "mdm" ? "via MDM" : "via the Nexus agent"}</span>
             </p>
             <p className="text-xs text-fg-muted">

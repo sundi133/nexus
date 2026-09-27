@@ -384,6 +384,22 @@ export interface Database {
     added_by: string | null;
     created_at: Generated<Date>;
   };
+  remote_assist_sessions: {
+    id: string;
+    org_id: string;
+    device_id: string;
+    requested_by: string | null;
+    reason: string;
+    status: Generated<"asking" | "active" | "declined" | "ended" | "expired" | "failed">;
+    detail: Generated<string>;
+    command_id: string | null;
+    ticket_hash: string | null;
+    ticket_expires_at: Date | null;
+    created_at: Generated<Date>;
+    accepted_at: Date | null;
+    ended_at: Date | null;
+    expires_at: Date;
+  };
   vault_items: {
     id: string;
     org_id: string;
@@ -657,7 +673,7 @@ export interface Database {
     id: string;
     org_id: string;
     device_id: string;
-    action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates";
+    action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates" | "remote_assist";
     channel: "agent" | "mdm";
     status: Generated<"queued" | "sent" | "done" | "failed" | "expired" | "canceled">;
     reason: Generated<string>;

@@ -16,6 +16,8 @@ import { LoggedMailer, ResendMailer, SmtpMailer } from "./platform/mailer.js";
 import { RecordingPushSender, RoutingPushSender } from "./platform/push.js";
 import { ApnsSender } from "./platform/push-apns.js";
 import { FcmSender } from "./platform/push-fcm.js";
+import type { Server } from "node:http";
+import { attachRemoteAssistRelay } from "./remote-assist/relay.js";
 
 const cfg = loadConfig();
 const problems = validateProd(cfg);
@@ -87,6 +89,11 @@ if (runsApi && process.env.NEXUS_RADIUS_PORT) {
 const server = serve({ fetch: app.fetch, port: cfg.port }, (info) => {
   console.log(`nexus ${cfg.role} listening on http://localhost:${info.port} (${cfg.env})`);
 });
+// Remote Assist's websockets share the API's port.
+if (runsApi) {
+  const relay = attachRemoteAssistRelay(server as Server, deps);
+  extra.push({ close: async () => relay.close() });
+}
 // Idle connections outlive the load balancer's (AWS ALB: 60 s), so it never reuses one this server
 // has just closed (a 502 for the user).
 Object.assign(server, { keepAliveTimeout: Number(process.env.NEXUS_KEEPALIVE_TIMEOUT_MS) || 65_000, headersTimeout: (Number(process.env.NEXUS_KEEPALIVE_TIMEOUT_MS) || 65_000) + 1000 });

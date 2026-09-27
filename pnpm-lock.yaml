@@ -83,6 +83,9 @@ importers:
       uuidv7:
         specifier: ^1.2.1
         version: 1.2.1
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
       xml-crypto:
         specifier: ^6.3.1
         version: 6.3.1
@@ -117,6 +120,9 @@ importers:
       '@types/plist':
         specifier: ^3.0.5
         version: 3.0.5
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       ldapts:
         specifier: ^9.2.0
         version: 9.2.0
@@ -218,6 +224,9 @@ importers:
       '@nexus/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@novnc/novnc':
+        specifier: ^1.7.0
+        version: 1.7.0
       '@simplewebauthn/browser':
         specifier: ^14.0.0
         version: 14.0.0
@@ -2570,6 +2579,10 @@ packages:
     transitivePeerDependencies:
       - supports-color
     dev: true
+
+  /@novnc/novnc@1.7.0:
+    resolution: {integrity: sha512-ucEJOx4T2avIRCleodk7YobZj5O2Ga2AeLfQ69A/yjG9HHba2+PDgwSkN3FttrmG+70ZGx21sElNFouK13RzyA==}
+    dev: false
 
   /@oxc-project/types@0.151.0:
     resolution: {integrity: sha512-J1yXrIlNDZVzE3ada310xeAw7nH8yCAyLPuUIsjKatFPmfn5bS1oW+cM+QsGOtVWd5nhSpbwZWx/rue+r5Z+PA==}
@@ -5178,6 +5191,12 @@ packages:
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
     dependencies:
       csstype: 3.2.3
+
+  /@types/ws@8.18.1:
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+    dependencies:
+      '@types/node': 26.6.2
+    dev: true
 
   /@types/xml-encryption@1.2.4:
     resolution: {integrity: sha512-I69K/WW1Dv7j6O3jh13z0X8sLWJRXbu5xnHDl9yHzUNDUBtUoBY058eb5s+x/WG6yZC1h8aKdI2EoyEPjyEh+Q==}
