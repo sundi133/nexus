@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Votal Nexus",
+  "description": "Your organization's policy for AI apps: protects company data you paste, send or upload.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["storage", "alarms", "scripting", "declarativeNetRequest", "identity", "identity.email"],
+  "host_permissions": ["<all_urls>"],
+  "storage": { "managed_schema": "schema.json" },
+  "action": { "default_title": "Votal Nexus", "default_popup": "popup.html" },
+  "web_accessible_resources": [{ "resources": ["interstitial.html"], "matches": ["<all_urls>"] }]
+}

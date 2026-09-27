@@ -1,0 +1,7 @@
+{
+  "type": "object",
+  "properties": {
+    "server": { "title": "Nexus API URL", "description": "e.g. https://api.nexus.example.com", "type": "string" },
+    "token": { "title": "Extension token", "description": "From Nexus: AI in browsers → Setup", "type": "string" }
+  }
+}

@@ -257,3 +257,26 @@ jobs:
           kubectl -n nexus-drill get all
           kubectl -n nexus-drill get events --sort-by=.lastTimestamp | tail -40
           kubectl -n nexus-drill logs -l app.kubernetes.io/instance=nexus --tail 40 --prefix || true
+
+  browser-extension:
+    name: Browser extension (unit tests + real Chromium e2e)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile --filter @nexus/browser-extension
+      - name: Typecheck, unit tests, build
+        working-directory: apps/browser-extension
+        run: |
+          pnpm typecheck
+          pnpm test
+          pnpm build
+      - name: Chromium for the e2e (branded Chrome no longer loads unpacked extensions)
+        run: npx -y playwright@1.55.0 install --with-deps chromium
+      - name: End to end in real Chromium
+        working-directory: apps/browser-extension
+        run: node e2e.mjs
+      - uses: actions/upload-artifact@v4
+        with: { name: browser-extension, path: apps/browser-extension/dist.zip }

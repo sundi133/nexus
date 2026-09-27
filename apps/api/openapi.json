@@ -8507,6 +8507,388 @@
           "classes"
         ]
       },
+      "BrowserPolicy": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "vendor": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "hosts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "warn",
+                    "block"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "name",
+                "vendor",
+                "category",
+                "hosts",
+                "action"
+              ]
+            }
+          },
+          "dlp": {
+            "type": "object",
+            "properties": {
+              "detectors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "monitor",
+                    "warn",
+                    "block"
+                  ]
+                }
+              },
+              "custom": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_-]{1,40}$"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "pattern": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 200
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "monitor",
+                        "warn",
+                        "block"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "pattern",
+                    "action"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "detectors",
+              "custom"
+            ]
+          },
+          "uploads": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "warn",
+              "block"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "server": {
+            "type": "string",
+            "description": "The API address browsers are configured with"
+          }
+        },
+        "required": [
+          "apps",
+          "dlp",
+          "uploads",
+          "message",
+          "version",
+          "updated_at",
+          "server"
+        ]
+      },
+      "BrowserPolicyInput": {
+        "type": "object",
+        "properties": {
+          "apps": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "warn",
+                "block"
+              ]
+            },
+            "default": {},
+            "description": "App key → allow, warn or block; apps not listed are allowed"
+          },
+          "dlp": {
+            "type": "object",
+            "properties": {
+              "detectors": {
+                "type": "object",
+                "properties": {
+                  "secret": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "monitor",
+                      "warn",
+                      "block"
+                    ]
+                  },
+                  "private_key": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "monitor",
+                      "warn",
+                      "block"
+                    ]
+                  },
+                  "credit_card": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "monitor",
+                      "warn",
+                      "block"
+                    ]
+                  },
+                  "us_ssn": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "monitor",
+                      "warn",
+                      "block"
+                    ]
+                  },
+                  "iban": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "monitor",
+                      "warn",
+                      "block"
+                    ]
+                  },
+                  "email_list": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "monitor",
+                      "warn",
+                      "block"
+                    ]
+                  }
+                },
+                "default": {}
+              },
+              "custom": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_-]{1,40}$"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "pattern": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 200
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "monitor",
+                        "warn",
+                        "block"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "pattern",
+                    "action"
+                  ]
+                },
+                "maxItems": 50,
+                "default": []
+              }
+            },
+            "default": {
+              "detectors": {},
+              "custom": []
+            }
+          },
+          "uploads": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "warn",
+              "block"
+            ],
+            "default": "allow",
+            "description": "File uploads to AI apps"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500,
+            "default": "",
+            "description": "Shown to people on warnings and blocks, e.g. a link to your AI policy"
+          }
+        }
+      },
+      "BrowserToken": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_by",
+          "created_at",
+          "last_used_at",
+          "revoked_at"
+        ]
+      },
+      "BrowserEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "at": {
+            "type": "string"
+          },
+          "user_email": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "app": {
+            "type": "string"
+          },
+          "app_name": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "detector": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "user_email",
+          "user_id",
+          "kind",
+          "action",
+          "app",
+          "app_name",
+          "host",
+          "detector",
+          "count",
+          "detail"
+        ]
+      },
       "DevicePage": {
         "type": "object",
         "properties": {
@@ -35415,6 +35797,826 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DataRetention"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/browser/extension/sync": {
+      "post": {
+        "tags": [
+          "Browser"
+        ],
+        "summary": "The browser extension reports events and gets the current policy",
+        "description": "Authenticated with the organization's extension token: `Authorization: NexusBrowser nxb_…`. Returns the policy when `policy_version` differs from the current one.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user": {
+                    "type": "string",
+                    "maxLength": 320,
+                    "default": "",
+                    "description": "The browser profile's email (managed Chrome/Edge)"
+                  },
+                  "extension_version": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "default": ""
+                  },
+                  "policy_version": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "default": ""
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {},
+                    "maxItems": 500,
+                    "default": [],
+                    "description": "Up to 500 events: at, kind (visit|dlp|upload), action, app, host, detector, count, detail"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string"
+                    },
+                    "policy": {},
+                    "accepted": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "accepted"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/browser/policy": {
+      "get": {
+        "tags": [
+          "Browser"
+        ],
+        "summary": "AI apps in the browser: what's allowed, and sensitive-data protection",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Browser"
+        ],
+        "summary": "Set what's allowed in AI apps, and sensitive-data protection",
+        "description": "Needs `devices:enforce` and a recent MFA. Browsers pick up the change on their next sync (within about a minute).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserPolicyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/browser/tokens": {
+      "get": {
+        "tags": [
+          "Browser"
+        ],
+        "summary": "Extension tokens",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BrowserToken"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Browser"
+        ],
+        "summary": "Create an extension token (shown once)",
+        "description": "Browsers are configured with it through managed policy (Google Admin, Intune, Group Policy). It identifies the organization, not a person: what browsers report is self-reported telemetry.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/BrowserToken"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "token"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/browser/tokens/{id}": {
+      "delete": {
+        "tags": [
+          "Browser"
+        ],
+        "summary": "Revoke an extension token",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/browser/events": {
+      "get": {
+        "tags": [
+          "Browser"
+        ],
+        "summary": "What browsers reported: AI app use, warnings, blocks and sensitive data",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "visit",
+                "dlp",
+                "upload"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 20
+            },
+            "required": false,
+            "name": "action",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "required": false,
+            "name": "app",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BrowserEvent"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/browser/usage": {
+      "get": {
+        "tags": [
+          "Browser"
+        ],
+        "summary": "AI apps people use in the browser (30 days)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "app": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "vendor": {
+                            "type": "string"
+                          },
+                          "people": {
+                            "type": "integer"
+                          },
+                          "visits": {
+                            "type": "integer"
+                          },
+                          "sensitive": {
+                            "type": "integer"
+                          },
+                          "blocked": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "app",
+                          "name",
+                          "vendor",
+                          "people",
+                          "visits",
+                          "sensitive",
+                          "blocked"
+                        ]
+                      }
+                    },
+                    "browsers": {
+                      "type": "object",
+                      "properties": {
+                        "people": {
+                          "type": "integer"
+                        },
+                        "last_seen_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "people",
+                        "last_seen_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "browsers"
+                  ]
                 }
               }
             }

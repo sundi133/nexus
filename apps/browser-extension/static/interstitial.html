@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Votal Nexus</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f7f7f8; --card:#fff; --fg:#0f1115; --muted:#5b606b; --border:#e6e7ea; --primary:#4f46e5; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --card:#1a1c22; --fg:#eceef2; --muted:#9aa0ab; --border:#2c2f37; } }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); color:var(--fg); font:15px/1.5 -apple-system,Segoe UI,Inter,sans-serif; }
+  main { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:28px; max-width:520px; margin:16px; }
+  .brand { font-weight:600; font-size:13px; color:var(--muted); margin-bottom:14px; }
+  h1 { font-size:20px; margin:0 0 10px; }
+  p { margin:0 0 12px; color:var(--muted); }
+  .row { display:flex; gap:8px; margin-top:20px; }
+  button { font:inherit; border-radius:7px; padding:8px 16px; border:1px solid var(--border); background:var(--card); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--primary); border-color:var(--primary); color:#fff; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Votal Nexus · your organization</div>
+  <h1 id="title">Checking…</h1>
+  <p id="body"></p>
+  <p id="message"></p>
+  <div class="row">
+    <button class="primary" id="back">Go back</button>
+    <button id="continue" hidden>Continue for an hour</button>
+  </div>
+</main>
+<script src="interstitial.js"></script>
+</body>
+</html>
