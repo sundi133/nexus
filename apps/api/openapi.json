@@ -5925,6 +5925,44 @@
           }
         ]
       },
+      "AppDirectoryEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "protocols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "saml",
+                "oidc"
+              ]
+            }
+          },
+          "template": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A catalog template to use instead, when there is one"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "protocols",
+          "template"
+        ]
+      },
       "SigningKey": {
         "type": "object",
         "properties": {
@@ -28530,6 +28568,92 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CatalogInstalled"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/app-directory": {
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Every app you can connect with a template or a generic SAML/OIDC setup",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AppDirectoryEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
                 }
               }
             }

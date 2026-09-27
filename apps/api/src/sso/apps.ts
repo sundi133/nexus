@@ -25,8 +25,8 @@ const RedirectUri = z
   .string()
   .url()
   .refine((u) => {
-    const url = new URL(u);
-    return url.protocol === "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1" || !url.protocol.startsWith("http");
+    const url = URL.parse(u); // zod's url() accepts some strings URL can't parse: refuse, don't throw
+    return !!url && (url.protocol === "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1" || !url.protocol.startsWith("http"));
   }, "Redirect URIs must use https (http is only allowed for localhost)")
   .refine((u) => !u.includes("#"), "Redirect URIs can't contain a fragment");
 
@@ -73,8 +73,8 @@ const SpUrl = z
   .string()
   .url()
   .refine((u) => {
-    const url = new URL(u);
-    return url.protocol === "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    const url = URL.parse(u); // zod's url() accepts some strings URL can't parse: refuse, don't throw
+    return !!url && (url.protocol === "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1");
   }, "Must use https (http is only allowed for localhost)");
 
 const OidcInput = z.object({

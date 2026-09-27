@@ -61,6 +61,7 @@ import { registerAppRoutes } from "./sso/apps.js";
 import { registerOidcRoutes } from "./sso/oidc.js";
 import { registerSamlRoutes } from "./sso/saml.js";
 import { registerCatalogRoutes } from "./sso/catalog.js";
+import { registerAppDirectoryRoutes } from "./sso/directory.js";
 import { registerKeyRoutes } from "./sso/key-routes.js";
 import { registerAgentRoutes, registerReleaseDownloads } from "./devices/agent-api.js";
 import { registerAgentUpdateRoutes } from "./devices/update-routes.js";
@@ -263,6 +264,7 @@ export function createApp(deps: Deps) {
   registerOidcRoutes(app);
   registerSamlRoutes(app);
   registerCatalogRoutes(app);
+  registerAppDirectoryRoutes(app);
   registerKeyRoutes(app);
   registerAgentRoutes(app);
   registerReleaseDownloads(app);
