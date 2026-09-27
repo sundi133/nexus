@@ -1,0 +1,60 @@
+# A single Postgres for the CI drill only (production uses a managed, highly available one).
+# A StatefulSet with a volume, so deleting its pod is a database restart, not data loss.
+apiVersion: v1
+kind: Secret
+metadata: { name: pg }
+stringData:
+  POSTGRES_USER: nexus_owner
+  POSTGRES_PASSWORD: ci-owner-password
+  POSTGRES_DB: nexus
+  NEXUS_APP_DB_PASSWORD: ci-app-password
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: pg-init }
+data:
+  01-roles.sh: |
+    #!/bin/sh
+    set -e
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<SQL
+    CREATE ROLE nexus_app LOGIN PASSWORD '${NEXUS_APP_DB_PASSWORD}';
+    GRANT CONNECT ON DATABASE ${POSTGRES_DB} TO nexus_app;
+    SQL
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: postgres }
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata: { labels: { app: postgres } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          envFrom: [{ secretRef: { name: pg } }]
+          env: [{ name: PGDATA, value: /var/lib/postgresql/data/pgdata }]
+          ports: [{ containerPort: 5432 }]
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "nexus_owner", "-d", "nexus"] }
+            periodSeconds: 2
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d }
+      volumes:
+        - name: init
+          configMap: { name: pg-init }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 1Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres }
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 5432 }]

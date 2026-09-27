@@ -10,6 +10,7 @@ import { sql } from "kysely";
 import { loadPrincipal } from "./auth/guard.js";
 import { metrics, renderMetrics } from "./platform/metrics.js";
 import { Gate, retryAfter } from "./platform/admission.js";
+import { lifecycle } from "./platform/lifecycle.js";
 import { LATEST_MIGRATION } from "./platform/migrate.js";
 import { unauthorized } from "./platform/errors.js";
 import { isPublicRoute } from "./auth/public-routes.js";
@@ -109,6 +110,9 @@ export function createApp(deps: Deps) {
     c.set("deps", deps);
     c.set("meta", { ip, userAgent: c.req.header("user-agent") ?? "", requestId });
     c.header("X-Request-Id", requestId);
+    // While draining, ask clients and proxies to stop reusing this connection, so none sends a
+    // request on it just as the server closes it.
+    if (lifecycle.draining) c.header("Connection", "close");
     // Security headers: the API only serves JSON (and a few protocol responses) to other code.
     c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "no-referrer");
@@ -189,10 +193,13 @@ export function createApp(deps: Deps) {
   // Liveness: the process answers. Readiness: it can reach the database and the schema is current.
   app.get("/healthz", (c) => c.json({ ok: true }));
   app.get("/readyz", async (c) => {
+    if (lifecycle.draining) return c.json({ ok: false, reason: "shutting down" }, 503);
     try {
       const v = await deps.db.unscoped(async (tx) => (await sql<{ v: string | null }>`SELECT nexus_schema_version() AS v`.execute(tx)).rows[0]!.v);
       const want = LATEST_MIGRATION;
-      if (want && v !== want) return c.json({ ok: false, reason: `schema at ${v}, code expects ${want}` }, 503);
+      // A newer schema is fine: a rollout migrates first, while the previous release still serves
+      // (migrations stay backward compatible). An older one means this release's migrations haven't run.
+      if (want && (v ?? "") < want) return c.json({ ok: false, reason: `schema at ${v}, code expects ${want}` }, 503);
       return c.json({ ok: true, schema: v }, 200);
     } catch (err) {
       return c.json({ ok: false, reason: `database unavailable: ${(err as Error).message}` }, 503);

@@ -3,6 +3,7 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig, validateProd } from "../src/config.js";
 import { LATEST_MIGRATION, migrate } from "../src/platform/migrate.js";
+import { lifecycle } from "../src/platform/lifecycle.js";
 import { bootApp, PASSWORD, uniqueEmail } from "./harness.js";
 
 /** Operability: health, readiness, metrics, security headers, production config checks, job retention. */
@@ -29,6 +30,31 @@ describe("health", () => {
     const r = await h.app.request("/readyz");
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ ok: true, schema: LATEST_MIGRATION });
+  });
+
+  it("stays ready when the schema is newer (a rollout migrates first), not when it's older", async () => {
+    await owner.query("INSERT INTO schema_migrations (version, checksum) VALUES ('9999_next_release.sql', 'x')");
+    try {
+      const r = await h.app.request("/readyz");
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ ok: true, schema: "9999_next_release.sql" });
+    } finally {
+      await owner.query("DELETE FROM schema_migrations WHERE version = '9999_next_release.sql'");
+    }
+  });
+
+  it("stops being ready while draining for shutdown, and stays alive", async () => {
+    lifecycle.draining = true;
+    try {
+      const r = await h.app.request("/readyz");
+      expect(r.status).toBe(503);
+      expect(await r.json()).toEqual({ ok: false, reason: "shutting down" });
+      const live = await h.app.request("/healthz");
+      expect(live.status).toBe(200);
+      expect(live.headers.get("connection")).toBe("close"); // clients stop reusing the connection
+    } finally {
+      lifecycle.draining = false;
+    }
   });
 });
 
@@ -89,6 +115,9 @@ describe("production configuration", () => {
       NEXUS_METRICS_TOKEN: "a-long-random-scrape-token-1234",
     };
     expect(validateProd(loadConfig(env), env)).toEqual([]);
+    // The API doesn't need the schema owner's credentials (only migrations do).
+    const { NEXUS_DATABASE_OWNER_URL: _, ...apiOnly } = env;
+    expect(validateProd(loadConfig(apiOnly), apiOnly)).toEqual([]);
   });
 });
 

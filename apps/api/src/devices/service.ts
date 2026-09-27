@@ -149,10 +149,7 @@ registerJobHandler("device.reevaluate", async (deps, job) => {
 
 /** Every few minutes: devices whose grace period ran out are re-evaluated, even if they're offline. */
 export function scheduleGraceChecks(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 5 * 60_000) return;
-    last = Date.now();
+  jobs.every("devices.grace", 5 * 60_000, async () => {
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; device_id: string }>`SELECT * FROM nexus_devices_grace_expired()`.execute(tx)).rows);
     for (const d of due) await deps.db.tenant(d.org_id, (tx) => enqueue(tx, d.org_id, "device.reevaluate", { device_id: d.device_id }, { dedupeKey: `device.reevaluate:${d.device_id}` }));
   });

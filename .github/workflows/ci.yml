@@ -216,3 +216,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: deploy/compose/smoke-test.sh
+
+  helm:
+    name: Helm chart + HA drill (kind)
+    runs-on: ubuntu-latest
+    needs: [platform]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Lint and validate the chart (defaults, and every option on)
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          helm lint deploy/helm/nexus -f deploy/helm/ci/values.yaml
+          helm template t deploy/helm/nexus -f deploy/helm/ci/values.yaml > default.yaml
+          helm template t deploy/helm/nexus -f deploy/helm/ci/values.yaml \
+            --set ingress.enabled=true,ingress.consoleHost=nexus.example.com,ingress.apiHost=api.nexus.example.com \
+            --set networkPolicy.enabled=true,serviceMonitor.enabled=true,api.autoscaling.enabled=true \
+            --set agentReleases.existingClaim=releases,secret.existingSecret=nexus > all.yaml
+          ./kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.29.0 default.yaml all.yaml
+          # Required values are enforced.
+          if helm template t deploy/helm/nexus >/dev/null 2>&1; then echo "rendered without publicUrl/secret"; exit 1; fi
+          # The schema owner's credentials reach the migration Job only.
+          [ "$(grep -c 'key: databaseOwnerUrl' default.yaml)" = 1 ]
+      - name: Build the images, and a "next release" with one more migration (for the upgrade drill)
+        run: |
+          docker build -q -f deploy/docker/api.Dockerfile -t votal/nexus-api:ci .
+          docker build -q -f deploy/docker/web.Dockerfile -t votal/nexus-web:ci .
+          printf 'FROM votal/nexus-api:ci\nCOPY 9999_drill.sql /app/migrations/\n' | docker build -q -t votal/nexus-api:ci2 -f - deploy/helm/ci
+      - uses: helm/kind-action@v1
+        with: { cluster_name: nexus }
+      - run: kind load docker-image votal/nexus-api:ci votal/nexus-api:ci2 votal/nexus-web:ci --name nexus
+      - name: HA drill (rolling restart, eviction, upgrade with a migration, worker kill, database restart)
+        run: deploy/helm/ci/drill.sh
+      - name: Cluster state on failure
+        if: failure()
+        run: |
+          kubectl -n nexus-drill get all
+          kubectl -n nexus-drill get events --sort-by=.lastTimestamp | tail -40
+          kubectl -n nexus-drill logs -l app.kubernetes.io/instance=nexus --tail 40 --prefix || true

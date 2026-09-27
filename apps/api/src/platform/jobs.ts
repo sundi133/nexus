@@ -50,6 +50,12 @@ export async function enqueue(
 }
 
 /** 30 s, 1 min, 2 min … capped at 1 h. */
+/** True for exactly one caller per interval, across every worker (migration 0046). */
+export async function claimSchedule(deps: Deps, name: string, ms: number) {
+  const r = await deps.db.unscoped((tx) => sql<{ ok: boolean }>`SELECT nexus_claim_schedule(${name}, make_interval(secs => ${ms / 1000})) AS ok`.execute(tx));
+  return r.rows[0]!.ok;
+}
+
 export const backoff = (attempts: number) => Math.min(3600, 30 * 2 ** Math.max(0, attempts - 1)) * 1000;
 
 const LEASE_SECONDS = 300;
@@ -59,11 +65,29 @@ export class JobRunner {
   private running = false;
   private ticks: (() => Promise<void>)[] = [];
 
-  constructor(private deps: Deps) {}
+  constructor(private deps: Deps) {
+    this.every("jobs.prune", 3600_000, async () => {
+      await this.deps.db.unscoped((tx) => sql`SELECT nexus_prune_jobs()`.execute(tx));
+    });
+  }
 
-  /** Periodic work (e.g. enqueue due syncs), run by the polling loop. */
+  /** Work run by the polling loop on every tick of every worker. Prefer every() for periodic work. */
   onTick(fn: () => Promise<void>) {
     this.ticks.push(fn);
+  }
+
+  /**
+   * Periodic work (e.g. enqueue due syncs) on a cluster-wide clock: once per interval across all
+   * workers, and restarts don't reset it. Each worker asks at most once a minute (or once per
+   * interval, if shorter), so one that just started picks up overdue work within a minute.
+   */
+  every(name: string, ms: number, fn: () => Promise<void>) {
+    let asked = 0;
+    this.ticks.push(async () => {
+      if (Date.now() - asked < Math.min(ms, 60_000)) return;
+      asked = Date.now();
+      if (await claimSchedule(this.deps, name, ms)) await fn();
+    });
   }
 
   /** Claims and runs ready jobs until none are left. `orgId` limits it to one tenant (tests). */
@@ -99,7 +123,11 @@ export class JobRunner {
   }
 
   private current: Promise<void> | null = null;
-  private lastPrune = 0;
+
+  /** Periodic work, once: what the polling loop does before claiming jobs (tests call it directly). */
+  async tick() {
+    for (const t of this.ticks) await t().catch((e) => console.error("[jobs] tick failed", e));
+  }
 
   start(intervalMs = 2000) {
     const loop = async () => {
@@ -107,11 +135,7 @@ export class JobRunner {
       this.running = true;
       this.current = (async () => {
         try {
-          for (const t of this.ticks) await t().catch((e) => console.error("[jobs] tick failed", e));
-          if (Date.now() - this.lastPrune > 3600_000) {
-            this.lastPrune = Date.now();
-            await this.deps.db.unscoped((tx) => sql`SELECT nexus_prune_jobs()`.execute(tx)).catch((e) => console.error("[jobs] prune failed", e));
-          }
+          await this.tick();
           await this.runOnce();
         } catch (err) {
           console.error("[jobs] loop failed", err);

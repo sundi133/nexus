@@ -142,10 +142,7 @@ registerJobHandler("mcp.sync", async (deps, job) => {
 
 /** Re-discovers every server's tools every 6 hours (drift detection). */
 export function scheduleMcpSyncs(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 5 * 60_000) return;
-    last = Date.now();
+  jobs.every("mcp.sync", 5 * 60_000, async () => {
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; server_id: string }>`SELECT * FROM nexus_due_mcp_syncs()`.execute(tx)).rows);
     for (const d of due) await deps.db.tenant(d.org_id, (tx) => enqueue(tx, d.org_id, "mcp.sync", { server_id: d.server_id }, { dedupeKey: `mcp.sync:${d.server_id}` }));
   });

@@ -207,10 +207,7 @@ registerJobHandler("access.review_remind", async (deps, job) => {
 });
 
 export function scheduleAccessReviews(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 5 * 60_000) return;
-    last = Date.now();
+  jobs.every("access.reviews", 5 * 60_000, async () => {
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; review_id: string; action: string }>`SELECT * FROM nexus_access_reviews_due()`.execute(tx)).rows);
     for (const d of due) {
       const kind = d.action === "close" ? "access.review_close" : "access.review_remind";

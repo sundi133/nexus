@@ -73,10 +73,7 @@ registerJobHandler("risk.recompute", async (deps, job) => {
 
 /** Hourly: the graph changes with every check-in, sync and policy edit; an hour is soon enough to alert. */
 export function scheduleRisk(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 60 * 60_000) return;
-    last = Date.now();
+  jobs.every("risk.recompute", 60 * 60_000, async () => {
     const orgs = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string }>`SELECT * FROM nexus_orgs_for_risk()`.execute(tx)).rows);
     for (const o of orgs) await deps.db.tenant(o.org_id, (tx) => enqueue(tx, o.org_id, "risk.recompute", {}, { dedupeKey: "risk.recompute" }));
   });

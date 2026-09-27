@@ -7,8 +7,8 @@ How to deploy, run, observe, back up and recover Nexus. For the security model, 
 | Process | Image | Role | Scales |
 |---|---|---|---|
 | API | `deploy/docker/api.Dockerfile` | `NEXUS_ROLE=api`: HTTP API, SSE, OIDC/SAML protocol endpoints | Horizontally, stateless |
-| Worker | same image | `NEXUS_ROLE=worker`: background jobs (directory sync, SCIM, webhooks/SIEM, notifications, rollouts, domain checks) | Horizontally. Jobs are claimed with `SKIP LOCKED`, and runs of the same key are serialized |
-| Migrations | same image | `node dist/cli/migrate.js`: run once per release, before the rollout | One at a time (advisory lock) |
+| Worker | same image | `NEXUS_ROLE=worker`: background jobs (directory sync, SCIM, webhooks/SIEM, notifications, rollouts, domain checks) | Horizontally. Jobs are claimed with `SKIP LOCKED`, runs of the same key are serialized, and periodic work runs once per interval across all workers |
+| Migrations | same image | `node dist/cli/migrate.js`: run once per release, beside the rollout. The only process that needs `NEXUS_DATABASE_OWNER_URL` | One at a time (advisory lock) |
 | Console | `deploy/docker/web.Dockerfile` | Next.js console and BFF, which holds session cookies | Horizontally, stateless |
 | Postgres 16 | managed | All state. Row-level security isolates tenants | Vertically, with read replicas later |
 
@@ -19,7 +19,8 @@ How to deploy, run, observe, back up and recover Nexus. For the security model, 
 - **Single host:** `deploy/compose/docker-compose.prod.yml` runs Postgres, migrations, two API replicas, a worker, the console, and Caddy with automatic HTTPS.
   1. Copy `deploy/compose/prod.env.example` to `prod.env` and fill it in.
   2. Run `docker compose -f deploy/compose/docker-compose.prod.yml --env-file deploy/compose/prod.env up -d --build`.
-- **Kubernetes or ECS:** run the same images. Use `/healthz` for liveness and `/readyz` for readiness; readiness fails if the database is unreachable or the schema is behind the build. Run the migration command as a pre-rollout job.
+- **Kubernetes:** the Helm chart in `deploy/helm/nexus` runs everything highly available: zero-downtime rollouts, a migration Job per release, disruption budgets, and locked-down pods. See [HA.md](HA.md), which also covers managed Postgres and the failover drill CI runs.
+- **ECS or another orchestrator:** run the same images. Use `/healthz` for liveness and `/readyz` for readiness. Readiness fails when the database is unreachable, when the schema is behind the build (a newer schema is fine), and while the process is shutting down. Run the migration command beside the rollout: new tasks become ready once it has run.
 - **Smoke test:** `deploy/compose/smoke-test.sh` builds the images, boots them in production mode, and checks readiness, signup, authentication, deny-by-default, metrics auth and security headers. CI runs it on every change.
 
 Production refuses to start on unsafe settings. It lists every problem at once, for example a missing seal key, non-https URLs, default database passwords, a missing metrics token, or outbound private-network access left enabled.
@@ -29,7 +30,7 @@ Production refuses to start on unsafe settings. It lists every problem at once, 
 | Variable | Purpose |
 |---|---|
 | `NEXUS_ENV` | `prod` in production (the images default to it) |
-| `NEXUS_DATABASE_URL` / `NEXUS_DATABASE_OWNER_URL` | Runtime role `nexus_app` (always subject to RLS) / owner role for migrations and `reseal` |
+| `NEXUS_DATABASE_URL` / `NEXUS_DATABASE_OWNER_URL` | Runtime role `nexus_app` (always subject to RLS) / owner role, needed only by the migrate and `reseal` commands |
 | `NEXUS_PUBLIC_URL` / `NEXUS_API_PUBLIC_URL` | Console origin (OIDC issuer, links, CORS, the agent's allowed origin) / API origin (phones, agents) |
 | `NEXUS_SEAL_KEYS` | `id:base64,…`, current key first. Encrypts stored secrets (see Key rotation) |
 | `NEXUS_SMTP_URL`, `NEXUS_MAIL_FROM` | Transactional email (invitations, resets, alerts) |
@@ -40,6 +41,9 @@ Production refuses to start on unsafe settings. It lists every problem at once, 
 | `NEXUS_AGENT_RELEASES_DIR`, `NEXUS_AGENT_RELEASE_KEYS` | Signed agent releases (see `agent/README.md`) |
 | `NEXUS_LOG_FORMAT` | `json` (production default) or `pretty` |
 | `NEXUS_DB_POOL_SIZE` | Database connections per API process (default 20). Keep processes × pool size under the database's connection limit |
+| `NEXUS_DB_CONNECT_TIMEOUT_MS` | How long to wait for a new database connection before failing the request (default 5000), so a database failover produces quick errors instead of hung requests |
+| `NEXUS_SHUTDOWN_DELAY_MS` | After SIGTERM, how long an API process keeps serving while readiness fails, so the load balancer can remove it (default 5000 in production) |
+| `NEXUS_KEEPALIVE_TIMEOUT_MS` | Idle keep-alive timeout (default 65000). Keep it above your load balancer's idle timeout, which is 60 s on AWS ALB |
 | `NEXUS_AGENT_CONCURRENCY` | Device agent requests (enroll, check-in, process events) running at once per process (default 70% of the pool, 14). The rest of the pool stays free for people and integrations |
 | `NEXUS_AGENT_QUEUE`, `NEXUS_AGENT_QUEUE_WAIT_MS` | Agent requests that may wait for a slot (default 500) and for how long (default 3000 ms). Beyond that they get `503 busy` |
 | `NEXUS_AGENT_RETRY_AFTER` | Base `Retry-After` in seconds for a busy response (default 15). Each response picks a value from base up to twice the base, so devices come back spread out |

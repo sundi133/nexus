@@ -166,10 +166,7 @@ registerJobHandler("alerts.evaluate", async (deps, job) => {
 
 /** Every tick (a few seconds): organizations with new events are evaluated. */
 export function scheduleAlerts(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 10_000) return;
-    last = Date.now();
+  jobs.every("alerts.evaluate", 10_000, async () => {
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string }>`SELECT * FROM nexus_alerts_due()`.execute(tx)).rows);
     for (const d of due) await deps.db.tenant(d.org_id, (tx) => enqueue(tx, d.org_id, "alerts.evaluate", {}, { dedupeKey: "alerts.evaluate" }));
   });

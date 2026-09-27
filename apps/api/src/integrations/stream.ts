@@ -128,10 +128,7 @@ export const deliverKey = (id: string) => `events.deliver:${id}`;
 
 /** Every few seconds: destinations with waiting events get a delivery job (one at a time each, in order). */
 export function scheduleEventDelivery(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 4000) return;
-    last = Date.now();
+  jobs.every("events.deliver", 4000, async () => {
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; destination_id: string }>`SELECT * FROM nexus_destinations_with_backlog()`.execute(tx)).rows);
     for (const d of due) {
       await deps.db.tenant(d.org_id, (tx) => enqueue(tx, d.org_id, "events.deliver", { destination_id: d.destination_id }, { dedupeKey: deliverKey(d.destination_id), maxAttempts: 1 }));

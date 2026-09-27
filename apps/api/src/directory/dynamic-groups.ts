@@ -114,10 +114,7 @@ registerJobHandler("groups.dynamic", async (deps, job) => {
 
 /** Every 15 minutes, as a safety net for changes that didn't go through touchUsers. */
 export function scheduleDynamicGroups(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 15 * 60_000) return;
-    last = Date.now();
+  jobs.every("groups.dynamic", 15 * 60_000, async () => {
     const orgs = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string }>`SELECT * FROM nexus_orgs_with_dynamic_groups()`.execute(tx)).rows);
     for (const o of orgs) await deps.db.tenant(o.org_id, (tx) => enqueue(tx, o.org_id, "groups.dynamic", {}, { dedupeKey: "groups.dynamic" }));
   });

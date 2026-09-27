@@ -255,10 +255,7 @@ export const syncDedupeKey = (id: string) => `directory.sync:${id}`;
 
 /** Enqueue scheduled syncs once a minute. */
 export function scheduleDirectorySyncs(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 60_000) return;
-    last = Date.now();
+  jobs.every("directory.sync", 60_000, async () => {
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; connection_id: string }>`SELECT * FROM nexus_due_directory_syncs()`.execute(tx)).rows);
     for (const d of due) {
       await deps.db.tenant(d.org_id, (tx) => enqueue(tx, d.org_id, "directory.sync", { connection_id: d.connection_id, trigger: "schedule" }, { dedupeKey: syncDedupeKey(d.connection_id), maxAttempts: 3 }));
