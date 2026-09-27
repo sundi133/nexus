@@ -358,6 +358,42 @@ export interface Database {
     last_seen_at: NullableTimestamp;
     created_at: Generated<Date>;
   };
+  vault_accounts: {
+    user_id: string;
+    org_id: string;
+    public_key: string;
+    private_key_enc: Json<{ iv: string; ct: string }>;
+    kdf: Json<{ alg: string; iterations: number; salt: string }>;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  vaults: {
+    id: string;
+    org_id: string;
+    kind: "personal" | "shared";
+    name_enc: Json<{ iv: string; ct: string }>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
+  vault_members: {
+    vault_id: string;
+    user_id: string;
+    org_id: string;
+    wrapped_key: string;
+    role: "owner" | "editor" | "viewer";
+    added_by: string | null;
+    created_at: Generated<Date>;
+  };
+  vault_items: {
+    id: string;
+    org_id: string;
+    vault_id: string;
+    data: Json<{ iv: string; ct: string }>;
+    created_by: string | null;
+    updated_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
   apple_ade_settings: {
     org_id: string;
     key: Buffer;

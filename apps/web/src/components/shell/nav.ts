@@ -15,6 +15,7 @@ import {
   Key,
   KeyRound,
   LayoutGrid,
+  LockKeyhole,
   LogIn,
   Network,
   MonitorSmartphone,
@@ -46,6 +47,7 @@ export const NAV: NavSection[] = [
       { label: "Overview", href: "/", icon: Home, shortcut: "G O" },
       { label: "My apps", href: "/my-apps", icon: LayoutGrid },
       { label: "My devices", href: "/my-devices", icon: MonitorSmartphone },
+      { label: "Passwords", href: "/passwords", icon: LockKeyhole },
     ],
   },
   {

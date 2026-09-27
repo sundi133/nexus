@@ -5,6 +5,7 @@ import { registerAppleMdmProtocol } from "./apple-mdm/protocol.js";
 import { registerAppleMdmRoutes } from "./apple-mdm/routes.js";
 import { registerAppleMdmProfileRoutes } from "./apple-mdm/profiles.js";
 import { registerAdeRoutes, scheduleAdeSyncs } from "./apple-mdm/ade.js";
+import { registerVaultRoutes } from "./vault/routes.js";
 import { registerScriptRoutes } from "./devices/scripts.js";
 import { registerDirectoryServiceRoutes } from "./protocols/routes.js";
 import { registerMcpPeopleRoutes } from "./mcp/people-routes.js";
@@ -300,6 +301,7 @@ export function createApp(deps: Deps) {
   registerAppleMdmRoutes(app);
   registerAppleMdmProfileRoutes(app);
   registerAdeRoutes(app);
+  registerVaultRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
