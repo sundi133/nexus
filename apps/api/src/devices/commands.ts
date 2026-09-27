@@ -13,6 +13,7 @@ import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, isoOrNull, json, problemResponses } from "../schemas.js";
 import { mdmAction } from "./mdm-providers.js";
 import { MDM_PROVIDER, mdmRowsForDevice } from "./mdm-signals.js";
+import { UpdatesResult } from "./patching.js";
 import { ONLINE_WINDOW_MS } from "./service.js";
 
 /**
@@ -90,14 +91,14 @@ export async function recordCommandResults(tx: Tx, device: { id: string; org_id:
   for (const r of results) {
     // What a command returns depends on what it was: rows for a live query, exit code and output for a script.
     const open = await tx.selectFrom("device_commands").select("action").where("id", "=", r.id).where("device_id", "=", device.id).executeTakeFirst();
-    const schema = open?.action === "script" ? ScriptResult : QueryResult;
+    const schema = open?.action === "script" ? ScriptResult : open?.action === "updates" ? UpdatesResult : QueryResult;
     const data = r.data === undefined ? null : schema.safeParse(r.data);
     const failedData = data && !data.success;
     const row = await tx
       .updateTable("device_commands")
       .set({
         status: failedData ? "failed" : r.status,
-        output: failedData ? (open?.action === "script" ? "The device returned a result Nexus couldn't read" : "The device returned rows Nexus couldn't read") : r.output.slice(0, 2000),
+        output: failedData ? (open?.action === "osquery" ? "The device returned rows Nexus couldn't read" : "The device returned a result Nexus couldn't read") : r.output.slice(0, 2000),
         ...(data?.success ? { result: JSON.stringify(data.data) } : {}),
         finished_at: new Date(),
       })
@@ -119,7 +120,7 @@ export async function recordCommandResults(tx: Tx, device: { id: string; org_id:
 const CommandOut = z
   .object({
     id: Id,
-    action: z.enum(["refresh", "lock", "restart", "wipe", "osquery", "script"]),
+    action: z.enum(["refresh", "lock", "restart", "wipe", "osquery", "script", "updates"]),
     channel: z.enum(["agent", "mdm"]),
     status: z.enum(["queued", "sent", "done", "failed", "expired", "canceled"]),
     reason: z.string(),

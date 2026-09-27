@@ -231,6 +231,12 @@ export interface Database {
     settings_reported_at: Generated<Date | null>;
     events_status: Generated<string>;
     osquery_collected_at: NullableTimestamp;
+    updates_checked_at: NullableTimestamp;
+    updates_error: string | null;
+    updates_pending: Generated<number>;
+    security_updates_pending: Generated<number>;
+    updates_pending_since: NullableTimestamp;
+    security_updates_since: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
     last_ip: Generated<string>;
@@ -294,6 +300,18 @@ export interface Database {
     body: string;
     created_by: string | null;
     created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  patch_policies: {
+    org_id: string;
+    enabled: Generated<boolean>;
+    scope: Generated<"security" | "all">;
+    deadline_days: Generated<number>;
+    restart: Generated<"never" | "if_needed">;
+    window_start: Generated<number>;
+    window_end: Generated<number>;
+    timezone: Generated<string>;
+    updated_by: string | null;
     updated_at: Generated<Date>;
   };
   script_runs: {
@@ -413,7 +431,7 @@ export interface Database {
     id: string;
     org_id: string;
     device_id: string;
-    action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script";
+    action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates";
     channel: "agent" | "mdm";
     status: Generated<"queued" | "sent" | "done" | "failed" | "expired" | "canceled">;
     reason: Generated<string>;
