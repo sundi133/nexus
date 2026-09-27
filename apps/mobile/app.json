@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Nexus Mobile",
+    "slug": "nexus-mobile",
+    "version": "0.1.0",
+    "scheme": "nexus",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.votal.nexus",
+      "infoPlist": { "NSFaceIDUsageDescription": "Confirm it's you before approving sign-ins." }
+    },
+    "android": {
+      "package": "ai.votal.nexus",
+      "adaptiveIcon": {
+        "backgroundColor": "#4F46E5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": { "favicon": "./assets/favicon.png" },
+    "experiments": { "typedRoutes": true },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      ["expo-secure-store", { "faceIDPermission": "Confirm it's you before approving sign-ins." }],
+      ["expo-local-authentication", { "faceIDPermission": "Confirm it's you before approving sign-ins." }],
+      ["expo-camera", { "cameraPermission": "Scan the pairing QR code shown in the Nexus console." }],
+      ["expo-notifications", { "color": "#4F46E5" }]
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Runs as root once the package is installed.
+#  - MDM: drop /Library/Application Support/Nexus/enroll.conf (server=… / token=…)
+#    before installing; the agent enrolls itself and deletes the file.
+#  - Upgrade: an already-enrolled device just restarts on the new binary.
+BIN="/Library/Application Support/Nexus/bin/nexus-agent"
+CONF="/Library/Application Support/Nexus/enroll.conf"
+if [ -f "$CONF" ]; then
+  exec "$BIN" install --config "$CONF"
+fi
+if "$BIN" status >/dev/null 2>&1; then
+  exec "$BIN" install
+fi
+echo "Nexus agent installed. Enroll this Mac with: sudo \"$BIN\" install --server <url> --token <token>"
+exit 0

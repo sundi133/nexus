@@ -1,0 +1,4 @@
+# Files that ship to Linux/macOS or are compared byte for byte stay LF on every checkout (Windows included).
+*.sh text eol=lf
+*.service text eol=lf
+agent/packaging/linux/** text eol=lf

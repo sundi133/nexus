@@ -1,0 +1,28 @@
+name: nexus
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nexus_owner
+      POSTGRES_PASSWORD: nexus_owner
+      POSTGRES_DB: nexus
+    ports:
+      - "55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus_owner -d nexus"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "58025:8025"
+      - "51025:1025"
+
+volumes:
+  pgdata:

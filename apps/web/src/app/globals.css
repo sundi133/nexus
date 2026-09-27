@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+/* Design tokens (docs/UI.md §6). Components use the semantic names, so both themes come for free. */
+:root {
+  --bg: #ffffff;
+  --bg-subtle: #f7f7f8;
+  --bg-muted: #f0f1f3;
+  --border: #e6e7ea;
+  --border-strong: #d4d6db;
+  --fg: #0f1115;
+  --fg-muted: #5b606b;
+  --fg-subtle: #8a909b;
+  --primary: #4f46e5;
+  --primary-fg: #ffffff;
+  --primary-soft: #eef2ff;
+  --success: #16a34a;
+  --success-soft: #ecfdf3;
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --agent: #7c3aed;
+  --ring: #6366f1;
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0c0e;
+    --bg-subtle: #111316;
+    --bg-muted: #181a1e;
+    --border: #23262b;
+    --border-strong: #30343a;
+    --fg: #edeef0;
+    --fg-muted: #9097a3;
+    --fg-subtle: #6b717c;
+    --primary: #818cf8;
+    --primary-fg: #0b0c0e;
+    --primary-soft: #1e1b4b;
+    --success: #4ade80;
+    --success-soft: #052e16;
+    --warning: #fbbf24;
+    --warning-soft: #2a1a04;
+    --danger: #f87171;
+    --danger-soft: #2a0b0b;
+    --agent: #a78bfa;
+    --ring: #818cf8;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-bg-muted: var(--bg-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-agent: var(--agent);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-jb), ui-monospace, SFMono-Regular, monospace;
+  --shadow-card: var(--shadow);
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  font-size: 14px;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

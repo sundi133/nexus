@@ -1,0 +1,90 @@
+# Test directory for LDAP sync (OpenLDAP). Loaded by the openldap container in CI and dev.
+dn: dc=acme,dc=test
+objectClass: dcObject
+objectClass: organization
+dc: acme
+o: Acme
+
+dn: ou=people,dc=acme,dc=test
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=service,dc=acme,dc=test
+objectClass: organizationalUnit
+ou: service
+
+dn: ou=groups,dc=acme,dc=test
+objectClass: organizationalUnit
+ou: groups
+
+dn: cn=svc-nexus,ou=service,dc=acme,dc=test
+objectClass: inetOrgPerson
+cn: svc-nexus
+sn: Service
+userPassword: service-password
+
+dn: uid=alice,ou=people,dc=acme,dc=test
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Liddell
+givenName: Alice
+sn: Liddell
+mail: alice@acme.test
+title: Staff Engineer
+departmentNumber: Engineering
+userPassword: alice-password
+
+dn: uid=bob,ou=people,dc=acme,dc=test
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob Builder
+givenName: Bob
+sn: Builder
+mail: Bob@Acme.test
+departmentNumber: Platform
+userPassword: bob-password
+
+dn: uid=carol,ou=people,dc=acme,dc=test
+objectClass: inetOrgPerson
+uid: carol
+cn: Carol Danvers
+givenName: Carol
+sn: Danvers
+mail: carol@acme.test
+departmentNumber: Sales
+userPassword: carol-password
+
+dn: uid=dave,ou=people,dc=acme,dc=test
+objectClass: inetOrgPerson
+uid: dave
+cn: Dave Gone
+givenName: Dave
+sn: Gone
+mail: dave@acme.test
+employeeType: disabled
+userPassword: dave-password
+
+dn: uid=printer,ou=people,dc=acme,dc=test
+objectClass: inetOrgPerson
+uid: printer
+cn: Printer
+sn: Printer
+
+dn: cn=platform,ou=groups,dc=acme,dc=test
+objectClass: groupOfNames
+cn: platform
+description: Platform team
+member: uid=bob,ou=people,dc=acme,dc=test
+
+dn: cn=engineering,ou=groups,dc=acme,dc=test
+objectClass: groupOfNames
+cn: engineering
+description: All engineers
+member: uid=alice,ou=people,dc=acme,dc=test
+member: cn=platform,ou=groups,dc=acme,dc=test
+
+dn: cn=sales,ou=groups,dc=acme,dc=test
+objectClass: groupOfNames
+cn: sales
+member: uid=carol,ou=people,dc=acme,dc=test
+member: uid=dave,ou=people,dc=acme,dc=test

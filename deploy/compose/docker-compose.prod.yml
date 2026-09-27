@@ -1,0 +1,91 @@
+# Single-host production deployment: Postgres, migrations, API (x2), worker, console, Caddy (TLS).
+#   cp deploy/compose/prod.env.example deploy/compose/prod.env   # fill it in
+#   docker compose -f deploy/compose/docker-compose.prod.yml --env-file deploy/compose/prod.env up -d --build
+# For larger deployments use a managed Postgres (point-in-time recovery) and run the same
+# images on your orchestrator; see docs/OPERATIONS.md.
+name: nexus-prod
+
+x-nexus-env: &nexus-env
+  NEXUS_ENV: prod
+  NEXUS_DATABASE_URL: postgres://nexus_app:${NEXUS_APP_DB_PASSWORD}@db:5432/nexus
+  NEXUS_DATABASE_OWNER_URL: postgres://nexus_owner:${NEXUS_OWNER_DB_PASSWORD}@db:5432/nexus
+  NEXUS_SEAL_KEYS: ${NEXUS_SEAL_KEYS}
+  NEXUS_PUBLIC_URL: https://${NEXUS_CONSOLE_HOST}
+  NEXUS_API_PUBLIC_URL: https://${NEXUS_API_HOST}
+  NEXUS_SMTP_URL: ${NEXUS_SMTP_URL}
+  NEXUS_MAIL_FROM: ${NEXUS_MAIL_FROM}
+  NEXUS_METRICS_TOKEN: ${NEXUS_METRICS_TOKEN}
+  NEXUS_TRUST_PROXY: "true"
+  NEXUS_SIGNUP: ${NEXUS_SIGNUP:-first}
+  NEXUS_ALLOW_PRIVATE_DIRECTORY: ${NEXUS_ALLOW_PRIVATE_DIRECTORY:-false}
+  NEXUS_AGENT_RELEASE_KEYS: ${NEXUS_AGENT_RELEASE_KEYS:-}
+  NEXUS_APNS_TEAM_ID: ${NEXUS_APNS_TEAM_ID:-}
+  NEXUS_APNS_KEY_ID: ${NEXUS_APNS_KEY_ID:-}
+  NEXUS_APNS_KEY: ${NEXUS_APNS_KEY:-}
+  NEXUS_FCM_SERVICE_ACCOUNT: ${NEXUS_FCM_SERVICE_ACCOUNT:-}
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nexus_owner
+      POSTGRES_PASSWORD: ${NEXUS_OWNER_DB_PASSWORD}
+      POSTGRES_DB: nexus
+      NEXUS_APP_DB_PASSWORD: ${NEXUS_APP_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./prod-initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus_owner -d nexus"]
+      interval: 5s
+      retries: 30
+    restart: unless-stopped
+
+  migrate:
+    build: { context: ../.., dockerfile: deploy/docker/api.Dockerfile }
+    image: votal/nexus-api:local
+    command: ["node", "dist/cli/migrate.js"]
+    environment: *nexus-env
+    depends_on: { db: { condition: service_healthy } }
+    restart: "no"
+
+  api:
+    image: votal/nexus-api:local
+    environment:
+      <<: *nexus-env
+      NEXUS_ROLE: api
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    deploy: { replicas: 2 }
+    restart: unless-stopped
+
+  worker:
+    image: votal/nexus-api:local
+    environment:
+      <<: *nexus-env
+      NEXUS_ROLE: worker
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    restart: unless-stopped
+
+  web:
+    build: { context: ../.., dockerfile: deploy/docker/web.Dockerfile }
+    image: votal/nexus-web:local
+    environment:
+      NEXUS_API_URL: http://api:8080
+    depends_on: [api]
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports: ["80:80", "443:443"]
+    environment:
+      NEXUS_CONSOLE_HOST: ${NEXUS_CONSOLE_HOST}
+      NEXUS_API_HOST: ${NEXUS_API_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [web, api]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy-data:
