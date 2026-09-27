@@ -15,6 +15,23 @@
 
 Installs are `updates` commands signed with your organization's key. The agent refuses anything unsigned, altered, meant for another device, expired or replayed. An install is limited to an hour, and the device doesn't check in while it runs. Changing the policy and installing need `devices:updates` (owners and admins) and a recent MFA. Both are audited: `device.patch_policy_changed`, and `device.updates_install` (with `automatic: true` when the policy did it). Each device's result is recorded as `device.action_finished`.
 
+## Third-party apps
+
+Apps people install themselves go stale faster than the OS, and browsers most of all. Nexus keeps them up to date too.
+
+- **Windows:** `winget upgrade` finds every installed app with a newer version in winget's catalog (Chrome, Firefox, Zoom, Slack, VS Code, 7-Zip and thousands more). The agent updates them silently by winget ID.
+- **macOS:** a built-in catalog covers Google Chrome, Firefox, Slack, Zoom, Visual Studio Code and 1Password.
+  - The agent downloads the vendor's latest release, unpacks it, and reads its version.
+  - It installs only if that version is **newer** than the one installed, and only if the app is **signed by the vendor's Apple Team ID** (Google `EQHXZ8M8AV`, Mozilla `43AQ936H96`, Zoom `BJ4HAAB9B3`…). A swapped download can't pass that check.
+  - The new copy is swapped in whole, and an app that's open is skipped rather than quit.
+- **Linux:** apt and dnf already update apps from third-party repositories with the OS updates.
+
+The agent checks apps once a day, since macOS has to download each app to compare versions. They show under **OS updates** (the **Apps** column, and *current → new* in a device's details).
+
+To update them:
+- **Install updates:** tick **Also update apps**.
+- **Automatically:** turn on **Also keep apps up to date** in the patch policy. Apps then follow the same deadline and maintenance window as OS updates.
+
 ## Compliance
 
 The **Security updates installed** device policy (`os_updates`) fails a device whose security updates have waited longer than you allow (14 days by default). It starts off and in audit mode. Use it with conditional access to keep unpatched devices away from sensitive apps.

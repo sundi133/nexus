@@ -29,10 +29,14 @@ export const UpdatesReport = z.object({
         security: z.boolean(),
         restart: z.boolean(),
         upgrade: z.boolean().optional().openapi({ description: "A major OS upgrade (e.g. the next macOS): shown, but never installed by patching" }),
+        third_party: z.boolean().optional().openapi({ description: "An app, not the OS (Chrome, Zoom…)" }),
+        app_id: z.string().max(200).optional().openapi({ description: "winget ID, or the macOS catalog ID" }),
+        current: z.string().max(200).optional().openapi({ description: "The version installed now" }),
       }),
     )
     .max(2000),
   error: z.string().max(1000).optional(),
+  third_party_error: z.string().max(1000).optional(),
 });
 export type UpdatesReport = z.infer<typeof UpdatesReport>;
 
@@ -46,11 +50,14 @@ export const UpdatesResult = z.object({ summary: z.string().max(2000), restarted
  */
 export async function recordUpdates(tx: Tx, deviceId: string, r: UpdatesReport) {
   const checked = new Date(r.checked_at);
+  const apps = r.available.filter((u) => u.third_party).length;
+  // A failed app check keeps the app counts as they were, like a failed OS check keeps OS counts.
+  const appFields = r.third_party_error ? {} : { third_party_pending: apps, third_party_since: apps ? sql<Date>`COALESCE(third_party_since, now())` : null };
   if (r.error) {
-    await tx.updateTable("devices").set({ updates_checked_at: checked, updates_error: r.error.slice(0, 500) }).where("id", "=", deviceId).execute();
+    await tx.updateTable("devices").set({ updates_checked_at: checked, updates_error: r.error.slice(0, 500), ...appFields }).where("id", "=", deviceId).execute();
     return;
   }
-  const updates = r.available.filter((u) => !u.upgrade);
+  const updates = r.available.filter((u) => !u.upgrade && !u.third_party);
   const all = updates.length;
   const security = updates.filter((u) => u.security).length;
   await tx
@@ -62,6 +69,7 @@ export async function recordUpdates(tx: Tx, deviceId: string, r: UpdatesReport) 
       security_updates_pending: security,
       updates_pending_since: all ? sql<Date>`COALESCE(updates_pending_since, now())` : null,
       security_updates_since: security ? sql<Date>`COALESCE(security_updates_since, now())` : null,
+      ...appFields,
     })
     .where("id", "=", deviceId)
     .execute();
@@ -82,19 +90,20 @@ const PatchPolicy = z
     window_start: z.number().int().min(0).max(23).openapi({ description: "Maintenance window start hour (local time in `timezone`)" }),
     window_end: z.number().int().min(0).max(23).openapi({ description: "Maintenance window end hour; may wrap past midnight; equal to start means any time" }),
     timezone: z.string().min(1).max(64),
+    third_party: z.boolean().default(false).openapi({ description: "Also keep third-party apps (Chrome, Zoom…) up to date, on the same deadline and window" }),
   })
   .openapi("PatchPolicy");
 type PatchPolicy = z.infer<typeof PatchPolicy>;
-const DEFAULT_POLICY: PatchPolicy = { enabled: false, scope: "security", deadline_days: 3, restart: "never", window_start: 1, window_end: 5, timezone: "UTC" };
+const DEFAULT_POLICY: PatchPolicy = { enabled: false, scope: "security", deadline_days: 3, restart: "never", window_start: 1, window_end: 5, timezone: "UTC", third_party: false };
 
 async function getPolicy(tx: Tx): Promise<PatchPolicy & { updated_at: string | null }> {
   const r = await tx.selectFrom("patch_policies").selectAll().executeTakeFirst();
   if (!r) return { ...DEFAULT_POLICY, updated_at: null };
-  return { enabled: r.enabled, scope: r.scope, deadline_days: r.deadline_days, restart: r.restart, window_start: r.window_start, window_end: r.window_end, timezone: r.timezone, updated_at: iso(r.updated_at) };
+  return { enabled: r.enabled, scope: r.scope, deadline_days: r.deadline_days, restart: r.restart, window_start: r.window_start, window_end: r.window_end, timezone: r.timezone, third_party: r.third_party, updated_at: iso(r.updated_at) };
 }
 
 /** Queues installs, skipping devices that already have one queued or running. Returns the devices queued. */
-async function queueInstalls(tx: Tx, orgId: string, deviceIds: string[], o: { scope: "security" | "all"; restart: "never" | "if_needed"; reason: string; requestedBy: string | null; ttlMs: number }) {
+async function queueInstalls(tx: Tx, orgId: string, deviceIds: string[], o: { scope: "security" | "all" | "none"; restart: "never" | "if_needed"; apps?: boolean; reason: string; requestedBy: string | null; ttlMs: number }) {
   if (!deviceIds.length) return [];
   const busy = new Set(
     (await tx.selectFrom("device_commands").select("device_id").where("device_id", "in", deviceIds).where("action", "=", "updates").where("status", "in", ["queued", "sent"]).execute()).map((r) => r.device_id),
@@ -104,7 +113,7 @@ async function queueInstalls(tx: Tx, orgId: string, deviceIds: string[], o: { sc
   const expires = new Date(Date.now() + o.ttlMs);
   await tx
     .insertInto("device_commands")
-    .values(ids.map((device_id) => ({ id: newId(), org_id: orgId, device_id, action: "updates" as const, channel: "agent" as const, reason: o.reason, requested_by: o.requestedBy, expires_at: expires, args: JSON.stringify({ scope: o.scope, restart: o.restart }), query_id: null })))
+    .values(ids.map((device_id) => ({ id: newId(), org_id: orgId, device_id, action: "updates" as const, channel: "agent" as const, reason: o.reason, requested_by: o.requestedBy, expires_at: expires, args: JSON.stringify({ scope: o.scope, restart: o.restart, third_party: !!o.apps }), query_id: null })))
     .execute();
   return ids;
 }
@@ -113,21 +122,27 @@ const SYSTEM_META = { ip: "", userAgent: "nexus-scheduler", requestId: "" };
 
 /** One pass of every org's patch policy: installs on devices past the deadline, inside the window. */
 export async function runPatchPolicies(deps: Deps) {
-  const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; device_id: string; scope: "security" | "all"; restart: "never" | "if_needed" }>`SELECT * FROM nexus_patch_due()`.execute(tx)).rows);
-  const byOrg = new Map<string, typeof due>();
-  for (const d of due) byOrg.set(d.org_id, [...(byOrg.get(d.org_id) ?? []), d]);
+  const due = await deps.db.unscoped(
+    async (tx) => (await sql<{ org_id: string; device_id: string; scope: "security" | "all"; restart: "never" | "if_needed"; os_due: boolean; apps_due: boolean }>`SELECT * FROM nexus_patch_due()`.execute(tx)).rows,
+  );
+  // One batch per org and per what's due (OS, apps, or both): each command says exactly what to do.
+  const batches = new Map<string, typeof due>();
+  for (const d of due) {
+    const k = `${d.org_id}|${d.os_due}|${d.apps_due}`;
+    batches.set(k, [...(batches.get(k) ?? []), d]);
+  }
   let queued = 0;
-  for (const [orgId, rows] of byOrg) {
+  for (const rows of batches.values()) {
+    const { org_id: orgId, scope, restart, os_due, apps_due } = rows[0]!;
     await deps.db.tenant(orgId, async (tx) => {
-      const { scope, restart } = rows[0]!;
-      const ids = await queueInstalls(tx, orgId, rows.map((r) => r.device_id), { scope, restart, reason: "Patch policy", requestedBy: null, ttlMs: AUTO_TTL_MS });
+      const ids = await queueInstalls(tx, orgId, rows.map((r) => r.device_id), { scope: os_due ? scope : "none", restart, apps: apps_due, reason: "Patch policy", requestedBy: null, ttlMs: AUTO_TTL_MS });
       if (!ids.length) return;
       queued += ids.length;
       await audit(tx, orgId, { meta: SYSTEM_META }, {
         type: "device.updates_install",
         actor: { type: "system", id: null, display: "Patch policy" },
         target: { type: "organization", id: orgId },
-        details: { automatic: true, scope, restart, devices: ids.length, device_ids: ids.slice(0, 50) },
+        details: { automatic: true, scope: os_due ? scope : "none", apps: apps_due, restart, devices: ids.length, device_ids: ids.slice(0, 50) },
       });
     });
   }
@@ -159,6 +174,8 @@ const FleetRow = z
     security_pending: z.number().int(),
     pending_since: z.string().nullable(),
     security_since: z.string().nullable(),
+    apps_pending: z.number().int().openapi({ description: "Third-party apps with a newer version" }),
+    apps_since: z.string().nullable(),
     overdue: z.boolean().openapi({ description: "Past the patch policy's deadline (false while the policy is off)" }),
     last_install: Install.nullable(),
   })
@@ -221,7 +238,7 @@ export function registerPatchingRoutes(app: App) {
       responses: {
         200: json(
           z.object({
-            summary: z.object({ devices: z.number().int(), reporting: z.number().int(), up_to_date: z.number().int(), with_security: z.number().int(), overdue: z.number().int(), failing_checks: z.number().int() }),
+            summary: z.object({ devices: z.number().int(), reporting: z.number().int(), up_to_date: z.number().int(), with_security: z.number().int(), apps_outdated: z.number().int(), overdue: z.number().int(), failing_checks: z.number().int() }),
             policy: PatchPolicy,
             data: z.array(FleetRow),
           }),
@@ -235,7 +252,7 @@ export function registerPatchingRoutes(app: App) {
         const policy = await getPolicy(tx);
         const devices = await tx
           .selectFrom("devices")
-          .select(["id", "hostname", "platform", "os_version", "last_seen_at", "updates_checked_at", "updates_error", "updates_pending", "security_updates_pending", "updates_pending_since", "security_updates_since"])
+          .select(["id", "hostname", "platform", "os_version", "last_seen_at", "updates_checked_at", "updates_error", "updates_pending", "security_updates_pending", "updates_pending_since", "security_updates_since", "third_party_pending", "third_party_since"])
           .where("status", "=", "active")
           .orderBy("security_updates_pending", "desc")
           .orderBy("updates_pending", "desc")
@@ -257,6 +274,7 @@ export function registerPatchingRoutes(app: App) {
         const cutoff = Date.now() - policy.deadline_days * 86_400_000;
         const data = devices.map((d) => {
           const since = policy.scope === "security" ? d.security_updates_since : d.updates_pending_since;
+          const appsLate = policy.third_party && !!d.third_party_since && d.third_party_since.getTime() <= cutoff;
           const l = lastBy.get(d.id);
           return {
             device_id: d.id,
@@ -270,7 +288,9 @@ export function registerPatchingRoutes(app: App) {
             security_pending: d.security_updates_pending,
             pending_since: isoOrNull(d.updates_pending_since),
             security_since: isoOrNull(d.security_updates_since),
-            overdue: policy.enabled && !!since && since.getTime() <= cutoff,
+            apps_pending: d.third_party_pending,
+            apps_since: isoOrNull(d.third_party_since),
+            overdue: policy.enabled && ((!!since && since.getTime() <= cutoff) || appsLate),
             last_install: l ? installOf(l) : null,
           };
         });
@@ -280,6 +300,7 @@ export function registerPatchingRoutes(app: App) {
           reporting: reporting.length,
           up_to_date: reporting.filter((d) => !d.error && d.pending === 0).length,
           with_security: data.filter((d) => d.security_pending > 0).length,
+          apps_outdated: data.filter((d) => d.apps_pending > 0).length,
           overdue: data.filter((d) => d.overdue).length,
           failing_checks: data.filter((d) => d.error).length,
         };
@@ -330,11 +351,19 @@ export function registerPatchingRoutes(app: App) {
       method: "post",
       path: "/v1/device-updates/install",
       tags: ["Devices"],
-      summary: "Install pending OS updates now",
+      summary: "Install pending OS updates (and optionally app updates) now",
       description:
         "Queues a signed install on the chosen devices that have updates pending (security only, or all). Each runs it on its next check-in (offline devices within a day) and restarts afterwards only if `restart` is `if_needed` and the OS asks for it. Needs `devices:updates` and a recent MFA.",
       security: bearer,
-      request: body(z.object({ target: Target, scope: Scope.default("security"), restart: Restart.default("never"), reason: z.string().trim().min(3).max(500) })),
+      request: body(
+        z.object({
+          target: Target,
+          scope: Scope.default("security"),
+          restart: Restart.default("never"),
+          apps: z.boolean().default(false).openapi({ description: "Also update third-party apps (Chrome, Zoom…)" }),
+          reason: z.string().trim().min(3).max(500),
+        }),
+      ),
       responses: { 201: json(z.object({ queued: z.number().int(), skipped_up_to_date: z.number().int(), skipped_not_reporting: z.number().int(), skipped_in_progress: z.number().int() })), ...problemResponses },
     }),
     async (c) => {
@@ -342,17 +371,23 @@ export function registerPatchingRoutes(app: App) {
       const input = c.req.valid("json");
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0);
-        let q = tx.selectFrom("devices").select(["id", "updates_checked_at", "updates_pending", "security_updates_pending"]).where("status", "=", "active");
+        let q = tx.selectFrom("devices").select(["id", "updates_checked_at", "updates_pending", "security_updates_pending", "third_party_pending"]).where("status", "=", "active");
         if (input.target.device_ids?.length) q = q.where("id", "in", input.target.device_ids);
         if (input.target.group_id) q = q.where((eb) => eb.exists(eb.selectFrom("group_members").whereRef("group_members.user_id", "=", "devices.primary_user_id").where("group_members.group_id", "=", input.target.group_id!)));
         const found = await q.limit(MAX_TARGETS + 1).execute();
         if (found.length > MAX_TARGETS) throw badRequest("too_many_devices", `An install goes to at most ${MAX_TARGETS} devices; narrow the target`);
         if (!found.length) throw badRequest("no_devices", "No devices match");
         const reporting = found.filter((d) => d.updates_checked_at);
-        const pending = reporting.filter((d) => (input.scope === "security" ? d.security_updates_pending : d.updates_pending) > 0);
-        const ids = await queueInstalls(tx, p.orgId, pending.map((d) => d.id), { scope: input.scope, restart: input.restart, reason: input.reason, requestedBy: p.userId, ttlMs: MANUAL_TTL_MS });
+        const osPending = (d: (typeof found)[number]) => (input.scope === "security" ? d.security_updates_pending : d.updates_pending) > 0;
+        const appsPending = (d: (typeof found)[number]) => input.apps && d.third_party_pending > 0;
+        const pending = reporting.filter((d) => osPending(d) || appsPending(d));
+        const who = { restart: input.restart, apps: input.apps, reason: input.reason, requestedBy: p.userId, ttlMs: MANUAL_TTL_MS };
+        const ids = [
+          ...(await queueInstalls(tx, p.orgId, pending.filter(osPending).map((d) => d.id), { ...who, scope: input.scope })),
+          ...(await queueInstalls(tx, p.orgId, pending.filter((d) => !osPending(d)).map((d) => d.id), { ...who, scope: "none" })),
+        ];
         const result = { queued: ids.length, skipped_up_to_date: reporting.length - pending.length, skipped_not_reporting: found.length - reporting.length, skipped_in_progress: pending.length - ids.length };
-        await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, { type: "device.updates_install", target: { type: "organization", id: p.orgId }, details: { automatic: false, scope: input.scope, restart: input.restart, reason: input.reason, target: input.target, ...result, device_ids: ids.slice(0, 50) } });
+        await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, { type: "device.updates_install", target: { type: "organization", id: p.orgId }, details: { automatic: false, scope: input.scope, apps: input.apps, restart: input.restart, reason: input.reason, target: input.target, ...result, device_ids: ids.slice(0, 50) } });
         return result;
       });
       return c.json(out, 201);

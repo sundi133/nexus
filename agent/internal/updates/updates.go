@@ -18,6 +18,8 @@ type Report struct {
 	CheckedAt string   `json:"checked_at"`
 	Available []Update `json:"available"`
 	Error     string   `json:"error,omitempty"`
+	// Third-party apps are checked separately (and less often); their failures don't hide OS updates.
+	ThirdPartyError string `json:"third_party_error,omitempty"`
 }
 
 const winCheck = `$s = New-Object -ComObject Microsoft.Update.Session; $r = $s.CreateUpdateSearcher().Search("IsInstalled=0 and IsHidden=0 and Type='Software'"); ` +
@@ -179,11 +181,18 @@ type Checker struct {
 	Run   Run
 	Has   func(string) bool
 	Every time.Duration
+	// Third-party apps: winget on Windows, the catalog on macOS. Checked every ThirdPartyEvery (0: off).
+	Winget          func() string
+	Mac             Mac
+	ThirdPartyEvery time.Duration
 
 	mu     sync.Mutex
 	report *Report
 	busy   bool
 	last   time.Time
+	tp     []Update
+	tpErr  string
+	tpAt   time.Time
 }
 
 // Report is the latest check, or nil before the first one finishes. It also starts one when due.
@@ -200,7 +209,7 @@ func (c *Checker) Report() *Report {
 // Recheck makes the next Report start a fresh check (after an install).
 func (c *Checker) Recheck() {
 	c.mu.Lock()
-	c.last = time.Time{}
+	c.last, c.tpAt = time.Time{}, time.Time{}
 	c.mu.Unlock()
 }
 
@@ -208,14 +217,27 @@ func (c *Checker) check() {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 	ups, err := Check(ctx, c.GOOS, c.Run, c.Has)
-	r := &Report{CheckedAt: time.Now().UTC().Format(time.RFC3339), Available: ups}
-	if r.Available == nil {
-		r.Available = []Update{}
+	c.mu.Lock()
+	tpDue := c.ThirdPartyEvery > 0 && time.Since(c.tpAt) >= c.ThirdPartyEvery
+	c.mu.Unlock()
+	if tpDue {
+		winget := ""
+		if c.Winget != nil {
+			winget = c.Winget()
+		}
+		tp, terr := ThirdParty(ctx, c.GOOS, c.Run, winget, c.Mac)
+		c.mu.Lock()
+		c.tp, c.tpErr, c.tpAt = tp, "", time.Now()
+		if terr != nil {
+			c.tpErr = terr.Error()
+		}
+		c.mu.Unlock()
 	}
+	c.mu.Lock()
+	r := &Report{CheckedAt: time.Now().UTC().Format(time.RFC3339), Available: append(append([]Update{}, ups...), c.tp...), ThirdPartyError: c.tpErr}
 	if err != nil {
 		r.Error = err.Error()
 	}
-	c.mu.Lock()
 	c.report, c.busy = r, false
 	c.mu.Unlock()
 }

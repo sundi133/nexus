@@ -9590,6 +9590,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 64
+          },
+          "third_party": {
+            "type": "boolean",
+            "default": false,
+            "description": "Also keep third-party apps (Chrome, Zoom…) up to date, on the same deadline and window"
           }
         },
         "required": [
@@ -9655,6 +9660,16 @@
               "null"
             ]
           },
+          "apps_pending": {
+            "type": "integer",
+            "description": "Third-party apps with a newer version"
+          },
+          "apps_since": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "overdue": {
             "type": "boolean",
             "description": "Past the patch policy's deadline (false while the policy is off)"
@@ -9712,6 +9727,8 @@
           "security_pending",
           "pending_since",
           "security_since",
+          "apps_pending",
+          "apps_since",
           "overdue",
           "last_install"
         ]
@@ -40699,6 +40716,9 @@
                         "with_security": {
                           "type": "integer"
                         },
+                        "apps_outdated": {
+                          "type": "integer"
+                        },
                         "overdue": {
                           "type": "integer"
                         },
@@ -40711,6 +40731,7 @@
                         "reporting",
                         "up_to_date",
                         "with_security",
+                        "apps_outdated",
                         "overdue",
                         "failing_checks"
                       ]
@@ -40852,6 +40873,20 @@
                           "upgrade": {
                             "type": "boolean",
                             "description": "A major OS upgrade (e.g. the next macOS): shown, but never installed by patching"
+                          },
+                          "third_party": {
+                            "type": "boolean",
+                            "description": "An app, not the OS (Chrome, Zoom…)"
+                          },
+                          "app_id": {
+                            "type": "string",
+                            "maxLength": 200,
+                            "description": "winget ID, or the macOS catalog ID"
+                          },
+                          "current": {
+                            "type": "string",
+                            "maxLength": 200,
+                            "description": "The version installed now"
                           }
                         },
                         "required": [
@@ -40971,7 +41006,7 @@
         "tags": [
           "Devices"
         ],
-        "summary": "Install pending OS updates now",
+        "summary": "Install pending OS updates (and optionally app updates) now",
         "description": "Queues a signed install on the chosen devices that have updates pending (security only, or all). Each runs it on its next check-in (offline devices within a day) and restarts afterwards only if `restart` is `if_needed` and the OS asks for it. Needs `devices:updates` and a recent MFA.",
         "security": [
           {
@@ -41025,6 +41060,11 @@
                       "if_needed"
                     ],
                     "default": "never"
+                  },
+                  "apps": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Also update third-party apps (Chrome, Zoom…)"
                   },
                   "reason": {
                     "type": "string",

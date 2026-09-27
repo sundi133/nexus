@@ -333,7 +333,13 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			return string(out), err
 		},
 		Has: func(n string) bool { _, err := exec.LookPath(n); return err == nil }}
-	runner.ArgExec["updates"] = command.UpdatesAction(command.Actions()["restart"], updateChecker.Recheck)
+	// Third-party apps: winget on Windows, the signed-vendor catalog on macOS, checked daily.
+	updateChecker.ThirdPartyEvery = 24 * time.Hour
+	updateChecker.Winget = func() string { return software.FindWinget(exec.LookPath) }
+	updateChecker.Mac = updates.Mac{Run: updateChecker.Run, Dir: store.Dir, Download: updates.DownloadLatest}
+	runner.ArgExec["updates"] = command.UpdatesAction(command.Actions()["restart"], updateChecker.Recheck, func(ctx context.Context, ids []string) (string, error) {
+		return updates.InstallThirdParty(ctx, runtime.GOOS, updateChecker.Run, software.FindWinget(exec.LookPath), updateChecker.Mac, ids)
+	})
 	collectWithUpdates := func(ctx context.Context) collect.Snapshot {
 		s := collect.Collect(ctx)
 		if r := updateChecker.Report(); r != nil {

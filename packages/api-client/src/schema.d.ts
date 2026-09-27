@@ -23740,6 +23740,7 @@ export interface paths {
                                 reporting: number;
                                 up_to_date: number;
                                 with_security: number;
+                                apps_outdated: number;
                                 overdue: number;
                                 failing_checks: number;
                             };
@@ -23838,6 +23839,12 @@ export interface paths {
                                 restart: boolean;
                                 /** @description A major OS upgrade (e.g. the next macOS): shown, but never installed by patching */
                                 upgrade?: boolean;
+                                /** @description An app, not the OS (Chrome, Zoom…) */
+                                third_party?: boolean;
+                                /** @description winget ID, or the macOS catalog ID */
+                                app_id?: string;
+                                /** @description The version installed now */
+                                current?: string;
                             }[];
                             installs: {
                                 status: string;
@@ -23915,7 +23922,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Install pending OS updates now
+         * Install pending OS updates (and optionally app updates) now
          * @description Queues a signed install on the chosen devices that have updates pending (security only, or all). Each runs it on its next check-in (offline devices within a day) and restarts afterwards only if `restart` is `if_needed` and the OS asks for it. Needs `devices:updates` and a recent MFA.
          */
         post: {
@@ -23948,6 +23955,11 @@ export interface paths {
                          * @enum {string}
                          */
                         restart?: "never" | "if_needed";
+                        /**
+                         * @description Also update third-party apps (Chrome, Zoom…)
+                         * @default false
+                         */
+                        apps?: boolean;
                         reason: string;
                     };
                 };
@@ -30102,6 +30114,11 @@ export interface components {
             /** @description Maintenance window end hour; may wrap past midnight; equal to start means any time */
             window_end: number;
             timezone: string;
+            /**
+             * @description Also keep third-party apps (Chrome, Zoom…) up to date, on the same deadline and window
+             * @default false
+             */
+            third_party: boolean;
         };
         DeviceUpdatesRow: {
             /**
@@ -30119,6 +30136,9 @@ export interface components {
             security_pending: number;
             pending_since: string | null;
             security_since: string | null;
+            /** @description Third-party apps with a newer version */
+            apps_pending: number;
+            apps_since: string | null;
             /** @description Past the patch policy's deadline (false while the policy is off) */
             overdue: boolean;
             last_install: {

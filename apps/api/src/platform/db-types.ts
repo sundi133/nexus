@@ -240,6 +240,8 @@ export interface Database {
     security_updates_pending: Generated<number>;
     updates_pending_since: NullableTimestamp;
     security_updates_since: NullableTimestamp;
+    third_party_pending: Generated<number>;
+    third_party_since: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
     last_ip: Generated<string>;
@@ -443,6 +445,7 @@ export interface Database {
     restart: Generated<"never" | "if_needed">;
     window_start: Generated<number>;
     window_end: Generated<number>;
+    third_party: Generated<boolean>;
     timezone: Generated<string>;
     updated_by: string | null;
     updated_at: Generated<Date>;

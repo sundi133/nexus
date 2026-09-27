@@ -145,4 +145,32 @@ describe("OS patching", () => {
     expect(await checks("old")).toMatchObject({ status: "unknown" });
     expect((await h.call("GET", `/v1/devices/${devices.linux!.id}`, { token: admin })).body.compliance).toBe("non_compliant");
   });
+
+  it("third-party apps: counted apart from OS updates, installed on request and by the policy", async () => {
+    // Windows reports two outdated apps and no OS updates; a failed app check keeps the counts.
+    await checkin("win", { inventory: { updates: { checked_at: new Date().toISOString(), available: [
+      { name: "Google Chrome", app_id: "Google.Chrome", current: "120.0", version: "121.0", security: false, restart: false, third_party: true },
+      { name: "Zoom", app_id: "Zoom.Zoom", current: "5.16", version: "6.0", security: false, restart: false, third_party: true },
+    ] } } });
+    expect((await db.query("SELECT updates_pending, third_party_pending, third_party_since IS NOT NULL AS since FROM devices WHERE id = $1", [devices.win!.id])).rows[0]).toEqual({ updates_pending: 0, third_party_pending: 2, since: true });
+    await checkin("win", { inventory: { updates: { checked_at: new Date().toISOString(), available: [], third_party_error: "winget: source unavailable" } } });
+    expect((await db.query("SELECT third_party_pending FROM devices WHERE id = $1", [devices.win!.id])).rows[0].third_party_pending).toBe(2);
+    const row = (await h.call("GET", "/v1/device-updates", { token: admin })).body.data.find((d: any) => d.hostname === "win");
+    expect(row).toMatchObject({ pending: 0, apps_pending: 2 });
+
+    // Without apps: nothing to do on Windows. With apps: an apps-only command.
+    expect((await h.call("POST", "/v1/device-updates/install", { token: admin, body: { target: { device_ids: [devices.win!.id] }, reason: "Browser CVE" } })).body.queued).toBe(0);
+    expect((await h.call("POST", "/v1/device-updates/install", { token: admin, body: { target: { device_ids: [devices.win!.id] }, apps: true, reason: "Browser CVE" } })).body.queued).toBe(1);
+    const cmd = ((await checkin("win")).commands as { jws: string }[])[0]!;
+    expect(decode(cmd.jws)).toMatchObject({ act: "updates", args: { scope: "none", third_party: true } });
+    await db.query("UPDATE device_commands SET status = 'done', created_at = now() - interval '1 day' WHERE device_id = $1 AND action = 'updates'", [devices.win!.id]);
+
+    // The policy keeps apps up to date too, once they've waited past the deadline.
+    await h.call("PUT", "/v1/patch-policy", { token: admin, body: { enabled: true, scope: "security", deadline_days: 1, restart: "never", window_start: 0, window_end: 0, timezone: "UTC", third_party: true } });
+    await db.query("UPDATE devices SET third_party_since = now() - interval '2 days' WHERE id = $1", [devices.win!.id]);
+    await runPatchPolicies(h.deps);
+    const auto = ((await checkin("win")).commands as { jws: string }[])[0]!;
+    expect(decode(auto.jws)).toMatchObject({ args: { scope: "none", third_party: true } });
+  });
 });
+
