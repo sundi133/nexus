@@ -255,6 +255,41 @@ export interface Database {
     grace_hours: Generated<number>;
     updated_at: Timestamp;
   };
+  browser_tokens: {
+    id: string;
+    org_id: string;
+    name: string;
+    token_hash: Buffer;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+    revoked_at: Date | null;
+  };
+  browser_policies: {
+    org_id: string;
+    apps: Json;
+    dlp: Json;
+    uploads: "allow" | "warn" | "block";
+    message: string;
+    updated_at: Generated<Date>;
+    updated_by: string | null;
+  };
+  browser_events: {
+    id: string;
+    org_id: string;
+    at: Date;
+    received_at: Generated<Date>;
+    user_email: string;
+    user_id: string | null;
+    kind: "visit" | "dlp" | "upload";
+    action: "allowed" | "monitored" | "warned" | "continued" | "blocked";
+    app: string;
+    host: string;
+    detector: string;
+    count: number;
+    detail: string;
+    extension_version: string;
+  };
   device_recovery_keys: {
     id: string;
     org_id: string;

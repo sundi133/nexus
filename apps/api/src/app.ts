@@ -1,3 +1,4 @@
+import { registerBrowserRoutes } from "./browser/routes.js";
 import { registerRetentionRoutes, scheduleRetention } from "./data/retention.js";
 import { registerOrgDeletionRoutes, scheduleOrgDeletions } from "./data/org-deletion.js";
 import { registerOrgExportRoutes } from "./data/org-export.js";
@@ -147,8 +148,10 @@ export function createApp(deps: Deps) {
     Number(process.env.NEXUS_AGENT_QUEUE_WAIT_MS) || 3000,
   );
   const agentRetryAfter = Number(process.env.NEXUS_AGENT_RETRY_AFTER) || 15;
-  app.use("/v1/agent/*", async (c, next) => {
-    if (!/^\/v1\/agent\/(enroll|checkin|events)$/.test(c.req.path) || c.req.method !== "POST") return next();
+  // Browser extensions syncing are fleet traffic too (every managed browser, every minute).
+  const FLEET = /^\/v1\/(agent\/(enroll|checkin|events)|browser\/extension\/sync)$/;
+  app.use("/v1/*", async (c, next) => {
+    if (c.req.method !== "POST" || !FLEET.test(c.req.path)) return next();
     const release = await agentGate.acquire();
     if (!release) {
       metrics.agentShed.inc({ route: c.req.path });
@@ -274,6 +277,7 @@ export function createApp(deps: Deps) {
   registerOrgExportRoutes(app);
   registerOrgDeletionRoutes(app);
   registerRetentionRoutes(app);
+  registerBrowserRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
