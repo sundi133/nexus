@@ -253,10 +253,10 @@ function Stat({ n, label, tone }: { n: number | undefined; label: string; tone?:
 function ProviderMark({ provider }: { provider: Conn["provider"] }) {
   return (
     <div
-      className={cn("flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white", provider === "google" ? "bg-[#1a73e8]" : provider === "entra" ? "bg-[#0078d4]" : provider === "ldap" ? "bg-[#243a5e]" : "bg-fg-muted")}
+      className={cn("flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white", provider === "google" ? "bg-[#1a73e8]" : provider === "entra" ? "bg-[#0078d4]" : provider === "ldap" ? "bg-[#243a5e]" : provider === "bamboohr" ? "bg-[#5d9f16]" : provider === "workday" ? "bg-[#e57a00]" : "bg-fg-muted")}
       aria-hidden
     >
-      {provider === "google" ? "G" : provider === "entra" ? "E" : provider === "ldap" ? "AD" : "S"}
+      {provider === "google" ? "G" : provider === "entra" ? "E" : provider === "ldap" ? "AD" : provider === "bamboohr" ? "B" : provider === "workday" ? "W" : "S"}
     </div>
   );
 }
@@ -487,14 +487,46 @@ const SETUP = {
     "Make the directory reachable from Nexus over LDAPS (port 636) or LDAP with StartTLS. If it isn't reachable from the internet, run the on-prem connector instead (below).",
     "If your domain controllers use an internal CA, paste its certificate so Nexus can verify them.",
   ],
+  bamboohr: [
+    "In BambooHR, sign in as a user who can see all employees (an admin, or a user with a custom access level for reports).",
+    "Open your name (top right) → API Keys → Add New Key, and copy it.",
+    "Nexus reads name, work email, job title, department, supervisor, status and termination date. New hires need a work email to be created.",
+  ],
+  workday: [
+    "Create an integration system user (ISU) with read access to workers, and a custom report (Advanced) listing workers with: Employee ID, work email, first and last name, business title, department or supervisory organization, manager's employee ID, active status and termination date.",
+    "Enable the report as a web service and share it with the ISU. Copy its JSON URL (Actions → Web Service → View URLs), which contains /ccx/service/customreport2/.",
+    "If your report's column names differ from the defaults, rename them under Report columns.",
+  ],
 };
 
-const PROVIDER_LABEL = { google: "Google Workspace", entra: "Microsoft Entra ID", ldap: "Active Directory / LDAP" } as const;
+const WD_FIELDS = [
+  ["employee_id", "Employee_ID", "Employee ID"],
+  ["email", "Email_Address", "Work email"],
+  ["given_name", "First_Name", "First name"],
+  ["family_name", "Last_Name", "Last name"],
+  ["title", "Business_Title", "Title"],
+  ["department", "Department", "Department"],
+  ["manager_id", "Manager_Employee_ID", "Manager's employee ID"],
+  ["active", "Active", "Active (1/0)"],
+  ["termination_date", "Termination_Date", "Termination date"],
+] as const;
+const HR = (p: string) => p === "bamboohr" || p === "workday";
+type Leavers = "suspend" | "offboard" | "none";
+const LEAVERS: [Leavers, string][] = [
+  ["suspend", "Suspend them: signed out everywhere, reversible"],
+  ["offboard", "Offboard them: sessions, admin roles, groups, apps, devices and laptop accounts, for good"],
+  ["none", "Do nothing"],
+];
+
+const PROVIDER_LABEL = { google: "Google Workspace", entra: "Microsoft Entra ID", ldap: "Active Directory / LDAP", bamboohr: "BambooHR", workday: "Workday" } as const;
+type Pick = keyof typeof PROVIDER_LABEL;
 
 function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c: Conn) => void }) {
   const qc = useQueryClient();
   const withStepUp = useStepUp();
-  const [provider, setProvider] = useState<"google" | "entra" | "ldap">("google");
+  const [provider, setProvider] = useState<Pick>("google");
+  const [bamboo, setBamboo] = useState({ subdomain: "", api_key: "" });
+  const [wd, setWd] = useState({ report_url: "", username: "", password: "", fields: {} as Record<string, string> });
   const [ldap, setLdap] = useState({ preset: "active_directory" as "active_directory" | "openldap" | "custom", url: "", start_tls: false, ca_cert: "", bind_dn: "", bind_password: "", base_dn: "", user_base_dn: "", group_base_dn: "", user_search_filter: "", group_search_filter: "", disabled_filter: "", password_auth: false });
   const setL = (v: Partial<typeof ldap>) => (setLdap({ ...ldap, ...v }), setProbe(null));
   const [name, setName] = useState("Google Workspace");
@@ -507,12 +539,16 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
   const [scope, setScope] = useState<"all" | "groups">("all");
   const [filter, setFilter] = useState<string[]>([]);
   const [syncGroups, setSyncGroups] = useState(true);
-  const [deprovision, setDeprovision] = useState<"suspend" | "none">("suspend");
+  const [deprovision, setDeprovision] = useState<Leavers>("suspend");
   const [invite, setInvite] = useState(true);
 
   const opt = (v: string) => (v.trim() ? v.trim() : undefined);
   const creds =
-    provider === "google"
+    provider === "bamboohr"
+      ? ({ provider, subdomain: bamboo.subdomain.trim(), api_key: bamboo.api_key.trim() } as const)
+      : provider === "workday"
+        ? ({ provider, report_url: wd.report_url.trim(), username: wd.username.trim(), password: wd.password, fields: Object.fromEntries(Object.entries(wd.fields).filter(([, v]) => v.trim()).map(([k, v]) => [k, v.trim()])) } as const)
+        : provider === "google"
       ? ({ provider, admin_email: adminEmail.trim(), service_account_key: key } as const)
       : provider === "entra"
         ? ({ provider, tenant_id: tenant.trim(), client_id: clientId.trim(), client_secret: secret } as const)
@@ -554,9 +590,10 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
       else onClose();
     },
   });
-  const pick = (p: "google" | "entra" | "ldap") => {
+  const pick = (p: Pick) => {
     setProvider(p);
     setName(PROVIDER_LABEL[p]);
+    setDeprovision(HR(p) ? "offboard" : "suspend"); // HR is the source of truth for who works here
     setProbe(null);
     test.reset();
   };
@@ -565,8 +602,8 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent title="Connect a directory" description="Nexus only reads your directory. You'll see a preview before anything changes." className="max-w-xl">
         <div className="max-h-[70vh] space-y-5 overflow-y-auto pr-1">
-          <div className="grid grid-cols-3 gap-2">
-            {(["google", "entra", "ldap"] as const).map((p) => (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {(["google", "entra", "ldap", "bamboohr", "workday"] as const).map((p) => (
               <button
                 key={p}
                 type="button"
@@ -584,7 +621,40 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
             ))}
           </ol>
 
-          {provider === "google" ? (
+          {provider === "bamboohr" ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Company subdomain" htmlFor="ds-bamboo-sub" hint="acme in acme.bamboohr.com">
+                <Input id="ds-bamboo-sub" value={bamboo.subdomain} onChange={(e) => (setBamboo({ ...bamboo, subdomain: e.target.value }), setProbe(null))} placeholder="acme" />
+              </Field>
+              <Field label="API key" htmlFor="ds-bamboo-key">
+                <Input id="ds-bamboo-key" type="password" autoComplete="off" value={bamboo.api_key} onChange={(e) => (setBamboo({ ...bamboo, api_key: e.target.value }), setProbe(null))} />
+              </Field>
+            </div>
+          ) : provider === "workday" ? (
+            <div className="space-y-3">
+              <Field label="Report URL (JSON)" htmlFor="ds-wd-url">
+                <Input id="ds-wd-url" value={wd.report_url} onChange={(e) => (setWd({ ...wd, report_url: e.target.value }), setProbe(null))} placeholder="https://wd2-services1.myworkday.com/ccx/service/customreport2/acme/ISU_Nexus/Nexus_Workers" />
+              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Integration user" htmlFor="ds-wd-user">
+                  <Input id="ds-wd-user" value={wd.username} onChange={(e) => (setWd({ ...wd, username: e.target.value }), setProbe(null))} placeholder="ISU_Nexus" />
+                </Field>
+                <Field label="Password" htmlFor="ds-wd-pass">
+                  <Input id="ds-wd-pass" type="password" autoComplete="off" value={wd.password} onChange={(e) => (setWd({ ...wd, password: e.target.value }), setProbe(null))} />
+                </Field>
+              </div>
+              <details className="rounded-md border border-border px-3 py-2">
+                <summary className="cursor-pointer text-[13px] font-medium">Report columns</summary>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {WD_FIELDS.map(([k, def, label]) => (
+                    <Field key={k} label={label} htmlFor={`ds-wd-${k}`}>
+                      <Input id={`ds-wd-${k}`} className="font-mono text-xs" placeholder={def} value={wd.fields[k] ?? ""} onChange={(e) => (setWd({ ...wd, fields: { ...wd.fields, [k]: e.target.value } }), setProbe(null))} />
+                    </Field>
+                  ))}
+                </div>
+              </details>
+            </div>
+          ) : provider === "google" ? (
             <>
               <Field label="Admin email" htmlFor="ds-admin" hint="The service account reads the directory as this admin">
                 <Input id="ds-admin" type="email" value={adminEmail} onChange={(e) => (setAdminEmail(e.target.value), setProbe(null))} placeholder="it-admin@yourcompany.com" />
@@ -657,15 +727,19 @@ function ConnectDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (c:
                 <label className="flex items-start gap-2">
                   <input type="checkbox" className="mt-0.5" checked={syncGroups} onChange={(e) => setSyncGroups(e.target.checked)} />
                   <span>
-                    Sync groups and their members <span className="block text-xs text-fg-muted">Use them to assign apps and policies. Their membership follows the directory.</span>
+                    {HR(provider) ? "Create a group for each department" : "Sync groups and their members"}{" "}
+                    <span className="block text-xs text-fg-muted">Use them to assign apps and policies. Their membership follows {HR(provider) ? "HR" : "the directory"}.</span>
                   </span>
                 </label>
-                <label className="flex items-start gap-2">
-                  <input type="checkbox" className="mt-0.5" checked={deprovision === "suspend"} onChange={(e) => setDeprovision(e.target.checked ? "suspend" : "none")} />
-                  <span>
-                    Suspend people who leave <span className="block text-xs text-fg-muted">When someone is suspended or removed upstream, their Nexus account is suspended and signed out everywhere.</span>
-                  </span>
-                </label>
+                <Field label="When someone leaves" htmlFor="ds-leavers" hint={HR(provider) ? "Someone leaves once HR marks them terminated, or the day after their last day." : "When someone is suspended or removed upstream."}>
+                  <Select id="ds-leavers" className="w-full" value={deprovision} onChange={(e) => setDeprovision(e.target.value as Leavers)}>
+                    {LEAVERS.map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
                 {provider === "ldap" && ldap.password_auth ? null : (
                   <label className="flex items-start gap-2">
                     <input type="checkbox" className="mt-0.5" checked={invite} onChange={(e) => setInvite(e.target.checked)} />
@@ -724,13 +798,13 @@ function PreviewDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Tile n={p.summary.create_users ?? 0} label="new people" />
               <Tile n={(p.summary.update_users ?? 0) + (p.summary.link_users ?? 0)} label="updated or linked" />
-              <Tile n={p.summary.suspend_users ?? 0} label="suspended" tone={p.summary.suspend_users ? "warning" : undefined} />
+              <Tile n={(p.summary.suspend_users ?? 0) + (p.summary.offboard_users ?? 0)} label={p.summary.offboard_users ? "leaving" : "suspended"} tone={p.summary.suspend_users || p.summary.offboard_users ? "warning" : undefined} />
               <Tile n={p.summary.membership_changes ?? 0} label="group changes" />
             </div>
             {p.guard.tripped ? (
               <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
-                {people(p.guard.suspensions)} would be suspended, more than the safety limit of {p.guard.threshold}. Starting this sync approves exactly that many.
+                {people(p.guard.suspensions)} would leave (suspended or offboarded), more than the safety limit of {p.guard.threshold}. Starting this sync approves exactly that many.
               </p>
             ) : null}
             <Section title="New people" items={p.create_users.map((u) => [u.email, u.name])} />
@@ -740,6 +814,8 @@ function PreviewDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) {
               items={p.update_users.map((u) => [u.email, Object.entries(u.changes).map(([k, v]) => `${k.replace("_", " ")}: “${v.from}” → “${v.to}”`).join("; ")])}
             />
             <Section title="Will be suspended" items={p.suspend_users.map((u) => [u.email, u.reason])} tone="warning" />
+            <Section title="Will be offboarded" items={p.offboard_users.map((u) => [u.email, u.reason])} tone="warning" />
+            <Section title="New managers" items={p.managers.map((m) => [m.email, `${m.from ?? "none"} → ${m.to ?? "none"}`])} />
             <Section title="Will be reactivated" items={p.reactivate_users.map((u) => [u.email, ""])} />
             <Section
               title="Groups"
@@ -806,6 +882,7 @@ function SettingsDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) 
   const [ldapPassword, setLdapPassword] = useState("");
   const [passwordAuth, setPasswordAuth] = useState(conn.account.includes("directory passwords"));
   const isLdap = conn.provider === "ldap";
+  const isHr = HR(conn.provider);
   const replacing = !isLdap && (conn.provider === "google" ? key.trim() !== "" : secret !== "");
   const credentials = !replacing
     ? undefined
@@ -819,9 +896,15 @@ function SettingsDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) 
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={syncGroups} onChange={(e) => setSyncGroups(e.target.checked)} /> Sync groups and their members
           </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={deprovision === "suspend"} onChange={(e) => setDeprovision(e.target.checked ? "suspend" : "none")} /> Suspend people who leave
-          </label>
+          <Field label="When someone leaves" htmlFor="st-leavers">
+            <Select id="st-leavers" className="w-full" value={deprovision} onChange={(e) => setDeprovision(e.target.value as Leavers)}>
+              {LEAVERS.map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </Select>
+          </Field>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={invite} onChange={(e) => setInvite(e.target.checked)} /> Email new people an invitation
           </label>
@@ -848,7 +931,8 @@ function SettingsDialog({ conn, onClose }: { conn: Conn; onClose: () => void }) 
               </Field>
             </>
           ) : null}
-          <details className={cn("rounded-md border border-border px-3 py-2", isLdap && "hidden")}>
+          {isHr ? <p className="text-xs text-fg-muted">To use a new {conn.provider === "bamboohr" ? "API key" : "password or report"}, connect {conn.provider_name} again with it and remove this connection: people are matched again by email.</p> : null}
+          <details className={cn("rounded-md border border-border px-3 py-2", (isLdap || isHr) && "hidden")}>
             <summary className="cursor-pointer text-[13px] font-medium">Replace credentials</summary>
             <div className="mt-3 space-y-3">
               {conn.provider === "google" ? (

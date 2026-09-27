@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { Button, Card } from "@/components/ui";
 import { errorMessage, unwrap } from "@/lib/api";
+import { requestIdFromLink } from "@/lib/biometrics";
 import { useSession } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 
@@ -15,18 +16,21 @@ export default function Home() {
   const t = useTheme();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [inbox, setInbox] = useState<Notification[]>([]);
+  const [toApprove, setToApprove] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (session.status !== "paired") return;
     try {
-      const [c, n] = await Promise.all([
+      const [c, n, a] = await Promise.all([
         unwrap(session.api.GET("/v1/me/mfa-challenges")),
         unwrap(session.api.GET("/v1/me/notifications", { params: { query: { limit: 20, filter: "all" } } })),
+        unwrap(session.api.GET("/v1/access/requests", { params: { query: { view: "approvals" } } })),
       ]);
       setChallenges(c.data);
       setInbox(n.data);
+      setToApprove(a.data.length);
       setError(null);
     } catch (err) {
       if (!session.onUnauthorized(err)) setError(errorMessage(err));
@@ -82,6 +86,15 @@ export default function Home() {
             </Pressable>
           ))}
 
+          {toApprove ? (
+            <Pressable accessibilityRole="button" onPress={() => router.push("/approvals")} style={[styles.pending, { backgroundColor: t.bg, borderWidth: 1, borderColor: t.primary }]}>
+              <Text style={[styles.pendingTitle, { color: t.fg }]}>
+                {toApprove} request{toApprove === 1 ? "" : "s"} to approve
+              </Text>
+              <Text style={{ color: t.fgMuted, marginTop: 2 }}>Apps, blocked apps and software people asked for</Text>
+            </Pressable>
+          ) : null}
+
           {error ? <Text style={{ color: t.danger }}>{error}</Text> : null}
           <Text style={[styles.section, { color: t.fgMuted }]}>NOTIFICATIONS</Text>
         </View>
@@ -89,14 +102,24 @@ export default function Home() {
       data={inbox}
       keyExtractor={(n) => n.id}
       renderItem={({ item }) => (
-        <View style={[styles.row, { borderColor: t.border, backgroundColor: t.bg }]}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!requestIdFromLink(item.link) && item.category !== "access.approval"}
+          onPress={() => {
+            const request = requestIdFromLink(item.link);
+            if (request) router.push({ pathname: "/request/[id]", params: { id: request } });
+            else if (item.category === "access.approval") router.push("/approvals");
+          }}
+          style={[styles.row, { borderColor: t.border, backgroundColor: t.bg }]}
+        >
           <View style={[styles.dot, { backgroundColor: item.read ? "transparent" : item.severity === "critical" ? t.danger : item.severity === "warning" ? t.warning : t.primary }]} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: t.fg, fontWeight: item.read ? "400" : "600" }}>{item.title}</Text>
             {item.body ? <Text style={{ color: t.fgMuted, marginTop: 2 }}>{item.body}</Text> : null}
             <Text style={{ color: t.fgSubtle, marginTop: 4, fontSize: 12 }}>{new Date(item.created_at).toLocaleString()}</Text>
+            {requestIdFromLink(item.link) ? <Text style={{ color: t.primary, marginTop: 6, fontWeight: "600" }}>Request access →</Text> : null}
           </View>
-        </View>
+        </Pressable>
       )}
       ListEmptyComponent={<Text style={{ color: t.fgMuted, textAlign: "center", padding: 24 }}>You're all caught up.</Text>}
       ListFooterComponent={

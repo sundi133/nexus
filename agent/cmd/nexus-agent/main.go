@@ -33,6 +33,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
+	"github.com/votal-ai/nexus/agent/internal/desktop"
 	"github.com/votal-ai/nexus/agent/internal/enforce"
 	"github.com/votal-ai/nexus/agent/internal/events"
 	"github.com/votal-ai/nexus/agent/internal/identity"
@@ -300,6 +301,17 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			}
 			return apps.Apply(context.Background(), items)
 		}}
+	// The person at the computer hears about blocked apps from the OS, and how to ask for them.
+	notifier := desktop.Default(func(ctx context.Context, name string, args ...string) error {
+		return exec.CommandContext(ctx, name, args...).Run()
+	})
+	enforcer.Stopped = func(ruleID, ruleName, user, path string) {
+		app := filepath.Base(path)
+		if i := strings.Index(path, ".app/"); i > 0 {
+			app = strings.TrimSuffix(filepath.Base(path[:i+4]), ".app")
+		}
+		notifier.Notify(ruleID, user, "Blocked by your organization", fmt.Sprintf("%s was closed (%s). If you need it for work, request access in Nexus.", app, ruleName))
+	}
 	if users != nil {
 		enforcer.OfferPassword = users.Offer
 		enforcer.ApplyAccounts = func(want []accounts.Account) []accounts.Status {

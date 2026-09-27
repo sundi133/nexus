@@ -1023,7 +1023,9 @@
             "enum": [
               "app",
               "group",
-              "role"
+              "role",
+              "block_exception",
+              "software"
             ]
           },
           "resource_id": {
@@ -1233,7 +1235,9 @@
                 "enum": [
                   "app",
                   "group",
-                  "role"
+                  "role",
+                  "block_exception",
+                  "software"
                 ]
               },
               "id": {
@@ -6257,7 +6261,9 @@
               "google",
               "entra",
               "scim",
-              "ldap"
+              "ldap",
+              "bamboohr",
+              "workday"
             ]
           },
           "provider_name": {
@@ -6291,9 +6297,11 @@
             "type": "string",
             "enum": [
               "suspend",
+              "offboard",
               "none"
             ],
-            "default": "suspend"
+            "default": "suspend",
+            "description": "What happens to leavers: suspend, offboard (sessions, roles, groups, apps and devices, for good), or nothing"
           },
           "invite_new_users": {
             "type": "boolean",
@@ -6646,6 +6654,52 @@
               ]
             }
           },
+          "offboard_users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "reason"
+              ]
+            }
+          },
+          "managers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "email",
+                "from",
+                "to"
+              ]
+            }
+          },
           "reactivate_users": {
             "type": "array",
             "items": {
@@ -6718,6 +6772,8 @@
           "link_users",
           "update_users",
           "suspend_users",
+          "offboard_users",
+          "managers",
           "reactivate_users",
           "groups",
           "skipped"
@@ -9725,6 +9781,21 @@
                     "null"
                   ]
                 },
+                "user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f",
+                  "description": "One person's devices (an approved request)"
+                },
+                "user_email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "created_at": {
                   "type": "string"
                 }
@@ -9734,6 +9805,8 @@
                 "action",
                 "group_id",
                 "group_name",
+                "user_id",
+                "user_email",
                 "created_at"
               ]
             }
@@ -9844,6 +9917,224 @@
           "password_synced",
           "reported_at",
           "created_at"
+        ]
+      },
+      "AppleMdmStatus": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "description": "Macs can enroll: the push certificate is in place"
+          },
+          "csr_pending": {
+            "type": "boolean"
+          },
+          "push": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "topic": {
+                "type": "string"
+              },
+              "expires_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "topic",
+              "expires_at"
+            ]
+          },
+          "ca_fingerprint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "devices": {
+            "type": "object",
+            "properties": {
+              "enrolled": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "enrolled",
+              "total"
+            ]
+          },
+          "enroll_url_base": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ready",
+          "csr_pending",
+          "push",
+          "ca_fingerprint",
+          "devices",
+          "enroll_url_base"
+        ]
+      },
+      "AppleMdmLink": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "uses": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "revoked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "uses",
+          "created_at",
+          "expires_at",
+          "revoked"
+        ]
+      },
+      "AppleMdmDevice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "device_name": {
+            "type": "string"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "os_version": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "authenticated",
+              "enrolled",
+              "checked_out"
+            ]
+          },
+          "device_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f",
+            "description": "The same Mac's Nexus agent device, matched by serial"
+          },
+          "bootstrap_token": {
+            "type": "boolean"
+          },
+          "filevault": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "enrolled_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_seen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending_commands": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "device_name",
+          "serial",
+          "model",
+          "os_version",
+          "status",
+          "device_id",
+          "bootstrap_token",
+          "filevault",
+          "enrolled_at",
+          "last_seen_at",
+          "pending_commands"
+        ]
+      },
+      "AppleMdmCommand": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "request_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {}
+        },
+        "required": [
+          "id",
+          "request_type",
+          "status",
+          "error",
+          "reason",
+          "requested_by",
+          "created_at",
+          "finished_at"
         ]
       },
       "DevicePage": {
@@ -14278,7 +14569,7 @@
         "tags": [
           "Access requests"
         ],
-        "summary": "Make an app, group or admin role requestable (requires recent MFA)",
+        "summary": "Make an app, group, admin role, blocked-app exception or software requestable (requires recent MFA)",
         "security": [
           {
             "bearer": []
@@ -14296,7 +14587,9 @@
                     "enum": [
                       "app",
                       "group",
-                      "role"
+                      "role",
+                      "block_exception",
+                      "software"
                     ]
                   },
                   "resource_id": {
@@ -29489,6 +29782,126 @@
                         ]
                       }
                     ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "subdomain": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "bamboohr"
+                        ]
+                      },
+                      "api_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "A BambooHR API key of a user who can run reports on all employees"
+                      }
+                    },
+                    "required": [
+                      "subdomain",
+                      "provider",
+                      "api_key"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "report_url": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "format": "uri",
+                        "description": "The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})"
+                      },
+                      "fields": {
+                        "type": "object",
+                        "properties": {
+                          "employee_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "email": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "given_name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "family_name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "department": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "manager_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "active": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "termination_date": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          }
+                        },
+                        "default": {}
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "workday"
+                        ]
+                      },
+                      "username": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "The integration system user (ISU) the report is shared with"
+                      },
+                      "password": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "report_url",
+                      "provider",
+                      "username",
+                      "password"
+                    ]
                   }
                 ]
               }
@@ -29749,6 +30162,126 @@
                             ]
                           }
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "subdomain": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "bamboohr"
+                            ]
+                          },
+                          "api_key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "A BambooHR API key of a user who can run reports on all employees"
+                          }
+                        },
+                        "required": [
+                          "subdomain",
+                          "provider",
+                          "api_key"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "report_url": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "format": "uri",
+                            "description": "The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})"
+                          },
+                          "fields": {
+                            "type": "object",
+                            "properties": {
+                              "employee_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "email": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "given_name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "family_name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "department": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "manager_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "active": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "termination_date": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              }
+                            },
+                            "default": {}
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "workday"
+                            ]
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "The integration system user (ISU) the report is shared with"
+                          },
+                          "password": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": [
+                          "report_url",
+                          "provider",
+                          "username",
+                          "password"
+                        ]
                       }
                     ]
                   },
@@ -29778,9 +30311,11 @@
                         "type": "string",
                         "enum": [
                           "suspend",
+                          "offboard",
                           "none"
                         ],
-                        "default": "suspend"
+                        "default": "suspend",
+                        "description": "What happens to leavers: suspend, offboard (sessions, roles, groups, apps and devices, for good), or nothing"
                       },
                       "invite_new_users": {
                         "type": "boolean",
@@ -29930,6 +30465,7 @@
                     "type": "string",
                     "enum": [
                       "suspend",
+                      "offboard",
                       "none"
                     ]
                   },
@@ -30034,6 +30570,126 @@
                               "bind_password"
                             ]
                           }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "subdomain": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "bamboohr"
+                            ]
+                          },
+                          "api_key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "A BambooHR API key of a user who can run reports on all employees"
+                          }
+                        },
+                        "required": [
+                          "subdomain",
+                          "provider",
+                          "api_key"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "report_url": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "format": "uri",
+                            "description": "The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})"
+                          },
+                          "fields": {
+                            "type": "object",
+                            "properties": {
+                              "employee_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "email": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "given_name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "family_name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "department": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "manager_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "active": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "termination_date": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              }
+                            },
+                            "default": {}
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "workday"
+                            ]
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "The integration system user (ISU) the report is shared with"
+                          },
+                          "password": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": [
+                          "report_url",
+                          "provider",
+                          "username",
+                          "password"
                         ]
                       }
                     ]
@@ -41522,6 +42178,899 @@
                   },
                   "required": [
                     "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Whether Macs can enroll, and how many have",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleMdmStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/push-csr": {
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Make the key and CSR for the Apple MDM push certificate",
+        "description": "Returns a PEM CSR. Have it signed by an MDM vendor certificate, upload the result to Apple's Push Certificates Portal, then upload Apple's certificate here. Making a new CSR doesn't affect a certificate already in place until you upload a new one.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "csr": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "csr"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/push-cert": {
+      "put": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Upload the MDM push certificate from Apple",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "certificate": {
+                    "type": "string",
+                    "minLength": 100,
+                    "maxLength": 20000,
+                    "description": "The PEM certificate Apple's Push Certificates Portal issued"
+                  }
+                },
+                "required": [
+                  "certificate"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "push": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "topic": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "topic",
+                        "expires_at"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "push"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/enrollment-links": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Enrollment links",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AppleMdmLink"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Make an enrollment link (shown once)",
+        "description": "Opening the link on a Mac downloads the enrollment profile; installing it in System Settings enrolls the Mac.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "expires_in_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365,
+                    "default": 30
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/AppleMdmLink"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/enrollment-links/{id}": {
+      "delete": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Revoke an enrollment link (enrolled Macs stay enrolled)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/devices": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Macs enrolled in Nexus MDM",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AppleMdmDevice"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/devices/{id}/commands": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "A Mac's MDM commands and their results",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AppleMdmCommand"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Send an MDM command to a Mac",
+        "description": "Queues the command and wakes the Mac through APNs. Lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request_type": {
+                    "type": "string",
+                    "enum": [
+                      "DeviceInformation",
+                      "SecurityInfo",
+                      "InstalledApplicationList",
+                      "ProfileList",
+                      "DeviceLock",
+                      "RestartDevice",
+                      "ShutDownDevice",
+                      "ScheduleOSUpdate",
+                      "EraseDevice"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "confirm": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "request_type"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "pin": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "push_error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "pin",
+                    "push_error"
                   ]
                 }
               }

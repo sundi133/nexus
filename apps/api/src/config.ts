@@ -28,6 +28,8 @@ export type Config = {
   googleAdminBase: string;
   entraLoginBase: string;
   graphBase: string;
+  bamboohrBase: string;
+  appleMdmPushUrl: string; // APNs for MDM (overridable only for tests)
   // On-call paging endpoints (overridable only for tests).
   pagerdutyEventsUrl: string;
   opsgenieBase: { us: string; eu: string };
@@ -113,6 +115,8 @@ export function loadConfig(env = process.env): Config {
     googleAdminBase: env.NEXUS_GOOGLE_ADMIN_BASE ?? "https://admin.googleapis.com",
     entraLoginBase: env.NEXUS_ENTRA_LOGIN_BASE ?? "https://login.microsoftonline.com",
     graphBase: env.NEXUS_GRAPH_BASE ?? "https://graph.microsoft.com",
+    bamboohrBase: env.NEXUS_BAMBOOHR_BASE ?? "https://api.bamboohr.com/api/gateway.php",
+    appleMdmPushUrl: env.NEXUS_APPLE_MDM_PUSH_URL ?? "https://api.push.apple.com",
     pagerdutyEventsUrl: env.NEXUS_PAGERDUTY_EVENTS_URL ?? "https://events.pagerduty.com/v2/enqueue",
     opsgenieBase: { us: env.NEXUS_OPSGENIE_BASE ?? "https://api.opsgenie.com", eu: env.NEXUS_OPSGENIE_EU_BASE ?? "https://api.eu.opsgenie.com" },
     allowPrivateOutbound: mode !== "prod" && env.NEXUS_ALLOW_PRIVATE_OUTBOUND !== "false",

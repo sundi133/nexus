@@ -10,6 +10,7 @@ import { badRequest, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, isoOrNull, json, problemResponses } from "../schemas.js";
 import { commandKey, sign } from "./commands.js";
+import { notifyUsers } from "../notify/send.js";
 import { getPolicies } from "./service.js";
 import { type PolicySoftware, recordSoftware, SoftwareReport, softwareFor } from "./software-deploy.js";
 import { AccountsReport, accountsFor, type PolicyAccount, recordAccounts } from "./local-accounts.js";
@@ -93,7 +94,12 @@ async function rulesFor(tx: Tx, device: { id: string; platform: DevicePlatform; 
   const groups = device.primary_user_id
     ? new Set((await tx.selectFrom("group_members").select("group_id").where("user_id", "=", device.primary_user_id).execute()).map((g) => g.group_id))
     : new Set<string>();
+  // Exceptions granted to the device's user (approved requests).
+  const excepted = device.primary_user_id
+    ? new Set((await tx.selectFrom("enforcement_exceptions").select("rule_id").where("user_id", "=", device.primary_user_id).execute()).map((e) => e.rule_id))
+    : new Set<string>();
   return rules
+    .filter((r) => !excepted.has(r.id))
     .filter((r) => r.platforms.includes(device.platform))
     .filter((r) => r.target.all || (r.target.group_ids ?? []).some((g) => groups.has(g)))
     .map((r) => ({ id: r.id, name: r.name, kind: r.kind, match: r.match, value: r.value, mode: r.kind === "domain" ? "block" : r.mode }));
@@ -191,6 +197,7 @@ export async function recordEnforcement(tx: Tx, deps: Deps, device: { id: string
   if (rep.recovery_keys.length) await escrowKeys(tx, deps, device, rep.recovery_keys, meta);
   if (!rep.events.length) return;
   const known = new Map((await tx.selectFrom("enforcement_rules").select(["id", "name"]).execute()).map((r) => [r.id, r.name]));
+  await tellUser(tx, device, rep.events.filter((e) => e.action === "terminated" && known.has(e.rule_id)), known);
   for (const e of rep.events) {
     const ruleId = known.has(e.rule_id) ? e.rule_id : null;
     const name = known.get(e.rule_id) ?? "";
@@ -204,6 +211,36 @@ export async function recordEnforcement(tx: Tx, deps: Deps, device: { id: string
       actor: { type: "system", id: null, display: "Nexus agent" },
       target: { type: "device", id: device.id, display: device.hostname },
       details: { rule_id: ruleId, rule: name, subject: e.subject, user: e.user, count: e.count, detail: e.detail },
+    });
+  }
+}
+
+/**
+ * Tells the device's user that an app was stopped, and whether they can ask for it (a requestable
+ * exception in the access catalog). At most once a day per app, however often it's relaunched.
+ */
+async function tellUser(tx: Tx, device: { id: string; org_id: string; hostname: string }, stopped: z.infer<typeof EnforcementReport>["events"], names: Map<string, string>) {
+  if (!stopped.length) return;
+  const d = await tx.selectFrom("devices").select("primary_user_id").where("id", "=", device.id).executeTakeFirst();
+  if (!d?.primary_user_id) return;
+  for (const ruleId of new Set(stopped.map((e) => e.rule_id))) {
+    const recent = await tx
+      .selectFrom("notifications")
+      .select("id")
+      .where("recipient_user_id", "=", d.primary_user_id)
+      .where("category", "=", "device.app_blocked")
+      .where("entity_id", "=", ruleId)
+      .where("created_at", ">", new Date(Date.now() - 24 * 3600_000))
+      .executeTakeFirst();
+    if (recent) continue;
+    const catalog = await tx.selectFrom("access_catalog").select("id").where("resource_type", "=", "block_exception").where("resource_id", "=", ruleId).where("enabled", "=", true).executeTakeFirst();
+    const app = stopped.find((e) => e.rule_id === ruleId)!.subject.split(/[\\/]/).pop() || names.get(ruleId)!;
+    await notifyUsers(tx, device.org_id, [d.primary_user_id], {
+      category: "device.app_blocked",
+      title: `${app} was stopped on ${device.hostname}`,
+      body: catalog ? `Your organization blocks it (${names.get(ruleId)}). If you need it for work, request access.` : `Your organization blocks it (${names.get(ruleId)}). Ask IT if you need it for work.`,
+      entity: { type: "enforcement_rule", id: ruleId },
+      link: catalog ? `/access-requests?request=${catalog.id}` : "/my-devices",
     });
   }
 }

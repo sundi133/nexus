@@ -1,10 +1,10 @@
 import type { Schemas } from "@nexus/api-client";
-import * as LocalAuthentication from "expo-local-authentication";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button, Card, ErrorText } from "@/components/ui";
 import { errorMessage, unwrap } from "@/lib/api";
+import { confirmWithBiometrics } from "@/lib/biometrics";
 import { signDecision } from "@/lib/keys";
 import { useSession } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
@@ -15,15 +15,6 @@ function describeClient(ua: string) {
   const browser = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "A browser";
   const os = /Mac OS X/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Linux/.test(ua) ? "Linux" : "";
   return os ? `${browser} on ${os}` : browser;
-}
-
-/** Biometric (or device passcode) gate before the private key is used. */
-async function confirmWithBiometrics(prompt: string) {
-  const hasHardware = await LocalAuthentication.hasHardwareAsync();
-  const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
-  if (!enrolled) return true; // no biometrics set up: the device unlock already protects the keystore
-  const r = await LocalAuthentication.authenticateAsync({ promptMessage: prompt, cancelLabel: "Cancel" });
-  return r.success;
 }
 
 export default function Approve() {
