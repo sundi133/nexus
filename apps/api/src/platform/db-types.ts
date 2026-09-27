@@ -305,6 +305,72 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
   };
+  apple_mdm_settings: {
+    org_id: string;
+    ca_cert: string;
+    ca_key: Buffer;
+    push_key: Buffer | null;
+    push_key_pending: Buffer | null;
+    push_csr: string | null;
+    push_cert: string | null;
+    push_topic: string | null;
+    push_expires_at: NullableTimestamp;
+    updated_at: Generated<Date>;
+  };
+  apple_mdm_enroll_links: {
+    id: string;
+    org_id: string;
+    name: string;
+    token_hash: Buffer;
+    uses: Generated<number>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    expires_at: Date;
+    revoked_at: NullableTimestamp;
+  };
+  apple_mdm_identities: {
+    fingerprint: string;
+    org_id: string;
+    link_id: string | null;
+    issued_at: Generated<Date>;
+  };
+  apple_mdm_devices: {
+    id: string;
+    org_id: string;
+    udid: string;
+    identity_fp: string;
+    serial: Generated<string>;
+    model: Generated<string>;
+    device_name: Generated<string>;
+    os_version: Generated<string>;
+    topic: Generated<string>;
+    push_token: string | null;
+    push_magic: string | null;
+    unlock_token: Buffer | null;
+    bootstrap_token: Buffer | null;
+    status: Generated<"authenticated" | "enrolled" | "checked_out">;
+    device_id: string | null;
+    info: Json<Record<string, unknown>>;
+    security: Json<Record<string, unknown>>;
+    enrolled_at: NullableTimestamp;
+    last_seen_at: NullableTimestamp;
+    created_at: Generated<Date>;
+  };
+  apple_mdm_commands: {
+    id: string;
+    org_id: string;
+    mdm_device_id: string;
+    request_type: string;
+    command: Json<Record<string, unknown>>;
+    status: Generated<"queued" | "sent" | "acknowledged" | "error" | "notnow" | "canceled">;
+    result: Json<unknown> | null;
+    error: Generated<string>;
+    reason: Generated<string>;
+    requested_by: string | null;
+    created_at: Generated<Date>;
+    sent_at: NullableTimestamp;
+    finished_at: NullableTimestamp;
+  };
   device_accounts: {
     id: string;
     org_id: string;
