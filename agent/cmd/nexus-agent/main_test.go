@@ -95,3 +95,22 @@ func TestAwaitEnrollmentFromInstallerConfig(t *testing.T) {
 		t.Fatalf("state folder is %v", fi.Mode().Perm())
 	}
 }
+
+func TestWriteEnrollConfigRoundTrips(t *testing.T) {
+	store := state.Store{Dir: t.TempDir()}
+	if err := writeEnrollConfig(store, "https://api.nexus.example.com", "nxe_abc123"); err != nil {
+		t.Fatal(err)
+	}
+	server, token, err := readConfig(store.EnrollConfig())
+	if err != nil || server != "https://api.nexus.example.com" || token != "nxe_abc123" {
+		t.Fatalf("read back %q %q %v", server, token, err)
+	}
+	if st, _ := os.Stat(store.EnrollConfig()); runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 {
+		t.Errorf("mode %v", st.Mode().Perm())
+	}
+	for _, bad := range [][2]string{{"", "nxe_x"}, {"https://x", ""}, {"https://x", "not-a-token"}, {"https://x", "nxe_a\ntoken=nxe_b"}} {
+		if writeEnrollConfig(store, bad[0], bad[1]) == nil {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+}

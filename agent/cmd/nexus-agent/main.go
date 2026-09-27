@@ -83,6 +83,15 @@ func main() {
 		config := fs.String("config", "", "file with server= and token= lines (MDM deployments); deleted after use")
 		_ = fs.Parse(args)
 		err = install(ctx, state.Store{Dir: *stateDir}, *server, *token, *config)
+	case "write-enroll-config":
+		// Used by the Windows installer (a step whose command line it doesn't log): writes the
+		// enroll.conf the service enrolls from, without the token passing through the MSI log.
+		server := fs.String("server", "", "Nexus API URL")
+		token := fs.String("token", "", "enrollment token (nxe_…)")
+		_ = fs.Parse(args)
+		if err = requireAdmin(); err == nil {
+			err = writeEnrollConfig(state.Store{Dir: *stateDir}, *server, *token)
+		}
 	case "uninstall":
 		purge := fs.Bool("purge", false, "also delete the device key and enrollment")
 		_ = fs.Parse(args)
@@ -472,6 +481,28 @@ func uninstall(store state.Store, purge bool) error {
 	}
 	fmt.Println("Removed the agent. Its device key is kept, so reinstalling resumes the same device (use --purge to delete it).")
 	return nil
+}
+
+// writeEnrollConfig writes server= and token= lines for the service to enroll from (it deletes the file after).
+func writeEnrollConfig(store state.Store, server, token string) error {
+	server, token = strings.TrimSpace(server), strings.TrimSpace(token)
+	if server == "" || token == "" {
+		return errors.New("--server and --token are required")
+	}
+	if !strings.HasPrefix(token, "nxe_") || strings.ContainsAny(token, " \t\r\n=") {
+		return errors.New("that isn't an enrollment token (nxe_…)")
+	}
+	if strings.ContainsAny(server, " \t\r\n") {
+		return errors.New("invalid server URL")
+	}
+	if err := os.MkdirAll(store.Dir, 0o700); err != nil {
+		return err
+	}
+	tmp := store.EnrollConfig() + ".tmp"
+	if err := os.WriteFile(tmp, []byte("server="+server+"\ntoken="+token+"\n"), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, store.EnrollConfig())
 }
 
 // readConfig parses `server=` / `token=` lines, as an MDM drops them before installing the package.
