@@ -68,4 +68,4 @@ Viewing the scores and the graph needs organization-wide `users:read` and `devic
 
 - Scores are computed when you open the page. That's fine for thousands of people; beyond that they'd come from the hourly stored scores.
 - The graph starts from people. Unassigned devices and agents without an owner don't appear yet.
-- MCP clients that people connect through the gateway themselves aren't modelled: only agents go through the gateway today.
+- People's own AI clients connected through the gateway ([MCP-FOR-PEOPLE.md](MCP-FOR-PEOPLE.md)) aren't drawn in the graph yet; their calls are in the audit log as the person.

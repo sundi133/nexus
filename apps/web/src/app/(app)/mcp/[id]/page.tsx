@@ -88,8 +88,11 @@ export default function McpServerPage({ params }: { params: Promise<{ id: string
         <div className="mb-4 rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-[13px] text-danger">Nexus couldn't read the tools: {s.last_sync_error}</div>
       ) : null}
       <Card className="mb-4 p-4">
-        <CopyField label="Agents connect to" value={s.endpoint} />
-        <p className="mt-2 text-xs text-fg-muted">Streamable HTTP. Agents send a Nexus token (client credentials, audience this URL or the gateway). Tools they're not allowed to use don't appear.</p>
+        <CopyField label="Agents and AI clients connect to" value={s.endpoint} />
+        <p className="mt-2 text-xs text-fg-muted">
+          Streamable HTTP. Agents send a Nexus token (client credentials). People add this address to their AI client and sign in with Nexus once: MFA and conditional access apply, and they see only the tools their rules allow.
+        </p>
+        <ConnectClients name={s.slug} endpoint={s.endpoint} />
       </Card>
 
       <Tabs defaultValue={pending.length ? "tools" : permissions.length ? "tools" : "permissions"}>
@@ -249,7 +252,7 @@ function PermissionsTab({ serverId, tools, permissions, manage, onChanged }: { s
   return (
     <>
       <div className="mb-3 flex items-center gap-2">
-        <p className="flex-1 text-[13px] text-fg-muted">Deny by default. An agent can call a tool when an allow rule matches and no deny rule does.</p>
+        <p className="flex-1 text-[13px] text-fg-muted">Deny by default. An agent, or a person in their own AI client, can call a tool when an allow rule matches and no deny rule does.</p>
         {manage ? (
           <Button size="sm" variant="primary" onClick={() => setAdding(true)}>
             <Plus /> Add rule
@@ -277,7 +280,7 @@ function PermissionsTab({ serverId, tools, permissions, manage, onChanged }: { s
             ))}
           </ul>
         ) : (
-          <EmptyState title="No rules yet" description="No agent can call these tools until you allow it." />
+          <EmptyState title="No rules yet" description="No agent or person can call these tools until you allow it." />
         )}
       </Card>
       {adding ? <RuleDialog serverId={serverId} tools={tools} onClose={() => setAdding(false)} onSaved={onChanged} /> : null}
@@ -289,9 +292,14 @@ type Cond = { argument: string; op: "equals" | "in" | "not_in" | "prefix"; value
 
 function RuleDialog({ serverId, tools, onClose, onSaved }: { serverId: string; tools: Tool[]; onClose: () => void; onSaved: () => void }) {
   const agents = useQuery({ queryKey: ["agents", {}], queryFn: () => unwrap(api.GET("/v1/agents")) });
+  const people = useQuery({ queryKey: ["users", { limit: 200 }], queryFn: () => unwrap(api.GET("/v1/users", { params: { query: { limit: 200 } } })) });
+  const groups = useQuery({ queryKey: ["groups", {}], queryFn: () => unwrap(api.GET("/v1/groups")) });
   const [effect, setEffect] = useState<"allow" | "deny">("allow");
-  const [subject, setSubject] = useState<"all_agents" | "agent" | "agent_tag">("agent");
+  const [subject, setSubject] = useState<"all_agents" | "agent" | "agent_tag" | "group" | "user" | "all_people">("agent");
   const [agentId, setAgentId] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const [personEmail, setPersonEmail] = useState("");
+  const personId = (people.data?.data ?? []).find((u) => u.email.toLowerCase() === personEmail.trim().toLowerCase())?.id ?? "";
   const [tag, setTag] = useState("");
   const [allTools, setAllTools] = useState(true);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -307,7 +315,16 @@ function RuleDialog({ serverId, tools, onClose, onSaved }: { serverId: string; t
           params: { path: { id: serverId } },
           body: {
             effect,
-            subject: subject === "agent" ? { type: "agent", id: agentId } : subject === "agent_tag" ? { type: "agent_tag", tag } : { type: "all_agents" },
+            subject:
+              subject === "agent"
+                ? { type: "agent", id: agentId }
+                : subject === "agent_tag"
+                  ? { type: "agent_tag", tag }
+                  : subject === "group"
+                    ? { type: "group", id: groupId }
+                    : subject === "user"
+                      ? { type: "user", id: personId }
+                      : { type: subject },
             tools: allTools ? ["*"] : [...picked],
             risks: anyRisk ? null : [...risks],
             conditions: conds.filter((c) => c.argument.trim()).map((c) => ({ argument: c.argument.trim(), op: c.op, values: c.values.split(",").map((v) => v.trim()).filter(Boolean) })),
@@ -317,7 +334,7 @@ function RuleDialog({ serverId, tools, onClose, onSaved }: { serverId: string; t
       ),
     onSuccess: () => (onSaved(), toast.success("Rule added"), onClose()),
   });
-  const ready = (subject !== "agent" || !!agentId) && (subject !== "agent_tag" || !!tag.trim()) && (allTools || picked.size > 0) && (anyRisk || risks.size > 0) && conds.every((c) => !c.argument.trim() || c.values.trim());
+  const ready = (subject !== "agent" || !!agentId) && (subject !== "agent_tag" || !!tag.trim()) && (subject !== "group" || !!groupId) && (subject !== "user" || !!personId) && (allTools || picked.size > 0) && (anyRisk || risks.size > 0) && conds.every((c) => !c.argument.trim() || c.values.trim());
   const tags = [...new Set((agents.data?.data ?? []).flatMap((a) => a.tags))];
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -329,9 +346,16 @@ function RuleDialog({ serverId, tools, onClose, onSaved }: { serverId: string; t
               <option value="deny">Deny</option>
             </Select>
             <Select aria-label="Who" value={subject} onChange={(e) => setSubject(e.target.value as typeof subject)}>
-              <option value="agent">the agent</option>
-              <option value="agent_tag">agents tagged</option>
-              <option value="all_agents">every agent</option>
+              <optgroup label="AI agents">
+                <option value="agent">the agent</option>
+                <option value="agent_tag">agents tagged</option>
+                <option value="all_agents">every agent</option>
+              </optgroup>
+              <optgroup label="People, in their own AI clients">
+                <option value="group">people in the group</option>
+                <option value="user">the person</option>
+                <option value="all_people">everyone</option>
+              </optgroup>
             </Select>
             {subject === "agent" ? (
               <Select aria-label="Agent" value={agentId} onChange={(e) => setAgentId(e.target.value)}>
@@ -342,6 +366,24 @@ function RuleDialog({ serverId, tools, onClose, onSaved }: { serverId: string; t
                   </option>
                 ))}
               </Select>
+            ) : subject === "group" ? (
+              <Select aria-label="Group" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+                <option value="">Choose…</option>
+                {(groups.data?.data ?? []).map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+            ) : subject === "user" ? (
+              <>
+                <Input aria-label="Person's email" className="w-64" list="people-emails" value={personEmail} onChange={(e) => setPersonEmail(e.target.value)} placeholder="name@company.com" />
+                <datalist id="people-emails">
+                  {(people.data?.data ?? []).map((u) => (
+                    <option key={u.id} value={u.email} />
+                  ))}
+                </datalist>
+              </>
             ) : subject === "agent_tag" ? (
               <>
                 <Input aria-label="Tag" className="w-40" list="agent-tags" value={tag} onChange={(e) => setTag(e.target.value.toLowerCase())} placeholder="support" />
@@ -484,5 +526,31 @@ function TryTab({ serverId, tools }: { serverId: string; tools: Tool[] }) {
       </div>
       <ErrorBanner error={sim.error} />
     </Card>
+  );
+}
+
+/** Ready-to-paste configuration for the AI clients people use. */
+function ConnectClients({ name, endpoint }: { name: string; endpoint: string }) {
+  const [client, setClient] = useState<"cursor" | "claude" | "vscode" | "claude_code">("cursor");
+  const snippets = {
+    cursor: { where: "~/.cursor/mcp.json (or Settings → MCP → Add)", text: JSON.stringify({ mcpServers: { [name]: { url: endpoint } } }, null, 2) },
+    claude: { where: "Claude Desktop: Settings → Connectors → Add custom connector, and paste the address", text: endpoint },
+    vscode: { where: ".vscode/mcp.json (or MCP: Add Server → HTTP)", text: JSON.stringify({ servers: { [name]: { type: "http", url: endpoint } } }, null, 2) },
+    claude_code: { where: "Claude Code, in a terminal", text: `claude mcp add --transport http ${name} ${endpoint}` },
+  } as const;
+  const labels = { cursor: "Cursor", claude: "Claude Desktop", vscode: "VS Code", claude_code: "Claude Code" } as const;
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="mr-1 font-medium">Connect from</span>
+        {(Object.keys(labels) as (keyof typeof labels)[]).map((k) => (
+          <button key={k} type="button" onClick={() => setClient(k)} className={cn("rounded px-2 py-0.5", client === k ? "bg-primary text-white" : "text-fg-muted hover:bg-bg-subtle")}>
+            {labels[k]}
+          </button>
+        ))}
+      </div>
+      <p className="mb-1 text-xs text-fg-muted">{snippets[client].where}. The client opens a Nexus sign-in the first time.</p>
+      <pre className="overflow-x-auto rounded-md border border-border bg-bg-subtle p-2.5 font-mono text-[11px]">{snippets[client].text}</pre>
+    </div>
   );
 }

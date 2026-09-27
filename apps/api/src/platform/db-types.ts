@@ -174,7 +174,9 @@ export interface Database {
     id: string;
     org_id: string;
     code_hash: Buffer;
-    app_id: string;
+    app_id: string | null;
+    mcp_client_id: Generated<string | null>;
+    resource: Generated<string | null>;
     user_id: string;
     session_id: string | null;
     redirect_uri: string;
@@ -254,6 +256,36 @@ export interface Database {
     mode: Generated<"audit" | "enforce">;
     grace_hours: Generated<number>;
     updated_at: Timestamp;
+  };
+  mcp_clients: {
+    id: string;
+    org_id: string;
+    client_id: string;
+    name: string;
+    redirect_uris: string[];
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+  };
+  mcp_grants: {
+    id: string;
+    org_id: string;
+    user_id: string;
+    client_id: string;
+    resource: string;
+    refresh_hash: Buffer;
+    previous_hash: Buffer | null;
+    created_at: Generated<Date>;
+    last_used_at: Generated<Date>;
+    expires_at: Date;
+    revoked_at: Date | null;
+  };
+  mcp_dlp_policies: {
+    org_id: string;
+    arguments: Json;
+    results: Json;
+    custom: Json<unknown[]>;
+    updated_at: Generated<Date>;
+    updated_by: string | null;
   };
   browser_tokens: {
     id: string;
@@ -830,7 +862,7 @@ export interface Database {
     org_id: string;
     server_id: string;
     effect: "allow" | "deny";
-    subject_type: "all_agents" | "agent" | "agent_tag";
+    subject_type: "all_agents" | "agent" | "agent_tag" | "all_people" | "user" | "group";
     subject_id: string | null;
     subject_tag: string | null;
     tools: string[];

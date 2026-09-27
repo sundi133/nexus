@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
+import { McpDataProtectionCard } from "@/components/features/mcp-data-protection";
 import { useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/input";
@@ -76,6 +77,7 @@ export default function McpServersPage() {
           </Table>
         )}
       </Card>
+      <McpDataProtectionCard />
       {adding ? <AddServerDialog onClose={() => setAdding(false)} /> : null}
     </>
   );

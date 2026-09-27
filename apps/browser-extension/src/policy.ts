@@ -1,4 +1,4 @@
-import { type Custom, type Finding, scan } from "./detectors.js";
+import { type Custom, type Finding, scan } from "@nexus/dlp";
 
 /** The organization's policy, as the server sends it. */
 export type AppAction = "allow" | "warn" | "block";

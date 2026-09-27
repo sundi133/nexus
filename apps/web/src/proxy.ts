@@ -15,5 +15,6 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!bff|oidc|saml|federation|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico)$).*)"],
+  // .well-known: OAuth discovery for AI clients (no cookies, never a sign-in page).
+  matcher: ["/((?!bff|oidc|saml|federation|\\.well-known|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|ico)$).*)"],
 };

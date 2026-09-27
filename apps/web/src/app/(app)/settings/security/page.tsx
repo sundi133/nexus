@@ -7,6 +7,7 @@ import { Fingerprint, KeyRound, Plus, Smartphone, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { MfaEnroll } from "@/components/features/mfa-enroll";
+import { MyAIClientsCard } from "@/components/features/mcp-connections";
 import { SessionsTable } from "@/components/features/sessions-table";
 import { useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,8 @@ export default function SecurityPage() {
         <RecoveryCodesCard hasFactor={verified.length > 0} />
         <ChangePasswordCard />
         <NotificationPrefsCard />
+        <MyAIClientsCard />
+
         <Card className="overflow-hidden">
           <CardHeader title="Where you're signed in" description="Web, mobile and CLI sessions." />
           {sessions.data?.data.length ? <SessionsTable sessions={sessions.data.data} onRevoke={(id) => revoke.mutate(id)} /> : null}
