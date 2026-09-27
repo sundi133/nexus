@@ -31,19 +31,49 @@ export class Realtime {
         this.emitter.emit(`session:${ch.session_id}`, { kind: "challenge", data: ch });
       }
     });
-    client.on("error", () => this.reconnect());
-    client.on("end", () => this.reconnect());
-    await client.connect();
-    await client.query("LISTEN nexus_inbox");
-    await client.query("LISTEN nexus_challenge");
+    // A lost connection (a restart, a failover) reconnects; events from a client we've given up
+    // on are ignored, so one outage never starts more than one reconnect loop.
+    client.on("error", () => this.client === client && this.reconnect());
+    client.on("end", () => this.client === client && this.reconnect());
+    try {
+      await client.connect();
+      await client.query("LISTEN nexus_inbox");
+      await client.query("LISTEN nexus_challenge");
+    } catch (err) {
+      client.removeAllListeners();
+      client.on("error", () => {}); // a late error from the dead socket must not crash the process
+      await client.end().catch(() => {});
+      throw err;
+    }
     this.client = client;
   }
 
+  private reconnecting = false;
+
+  /** One retry loop at a time, backing off from 1 s to 30 s until the database answers. */
   private reconnect() {
-    if (this.stopped) return;
+    if (this.stopped || this.reconnecting) return;
+    this.reconnecting = true;
+    const old = this.client;
     this.client = null;
-    setTimeout(() => this.start().catch(() => this.reconnect()), 1000);
+    if (old) {
+      old.removeAllListeners();
+      old.on("error", () => {});
+      void old.end().catch(() => {});
+    }
+    const attempt = (delay: number) => {
+      this.retry = setTimeout(() => {
+        if (this.stopped) return void (this.reconnecting = false);
+        this.start().then(
+          () => (this.reconnecting = false),
+          () => attempt(Math.min(delay * 2, 30_000)),
+        );
+      }, delay);
+    };
+    attempt(1000);
   }
+
+  private retry: NodeJS.Timeout | null = null;
 
   subscribe(key: `user:${string}` | `session:${string}`, fn: (e: RealtimeEvent) => void): () => void {
     this.emitter.on(key, fn);
@@ -52,6 +82,7 @@ export class Realtime {
 
   async stop() {
     this.stopped = true;
+    if (this.retry) clearTimeout(this.retry);
     await this.client?.end().catch(() => {});
   }
 }
