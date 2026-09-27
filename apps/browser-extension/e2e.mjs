@@ -84,6 +84,8 @@ if (!existsSync(join(ext, "manifest.json"))) fail("build first: node build.mjs")
 const profile = mkdtempSync(join(tmpdir(), "nexus-ext-"));
 const chrome = spawn(findChromium(), [
   "--headless=new", `--user-data-dir=${profile}`, "--remote-debugging-port=0", "--no-first-run", "--no-default-browser-check",
+  // CI runners (Ubuntu 24.04's AppArmor) don't allow Chromium's sandbox; a throwaway VM is the sandbox there.
+  ...(process.env.CI ? ["--no-sandbox"] : []),
   `--disable-extensions-except=${ext}`, `--load-extension=${ext}`, "--host-resolver-rules=MAP *.localhost 127.0.0.1", "about:blank",
 ], { stdio: ["ignore", "ignore", "pipe"] });
 const wsUrl = await new Promise((resolveUrl, reject) => {
