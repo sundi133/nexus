@@ -67,7 +67,7 @@ export function DeviceActions({ device: d }: { device: Device }) {
           <MenuItem onSelect={() => setConfirm("restart")}>
             <Power className="size-4" /> Restart
           </MenuItem>
-          {d.platform === "macos" ? (
+          {d.platform === "macos" || d.platform === "windows" ? (
             <MenuItem onSelect={() => router.push(`/devices/${d.id}/assist`)}>
               <MonitorPlay className="size-4" /> Remote Assist
             </MenuItem>

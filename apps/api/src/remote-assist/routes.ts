@@ -109,7 +109,7 @@ export function registerRemoteAssistRoutes(app: App) {
         requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0);
         const d = await tx.selectFrom("devices").select(["hostname", "platform", "last_seen_at"]).where("id", "=", id).where("status", "=", "active").executeTakeFirst();
         if (!d) throw notFound("Device");
-        if (d.platform !== "macos") throw conflict("unsupported_platform", "Remote Assist works on Macs for now");
+        if (d.platform !== "macos" && d.platform !== "windows") throw conflict("unsupported_platform", "Remote Assist works on Macs and Windows PCs for now");
         if (!d.last_seen_at || Date.now() - d.last_seen_at.getTime() > ONLINE_WINDOW_MS) throw conflict("device_offline", `${d.hostname} isn't online, so nobody can allow the request`);
         await settleExpired(tx, { deviceId: id });
         const open = await tx.selectFrom("remote_assist_sessions").select("id").where("device_id", "=", id).where("status", "in", ["asking", "active"]).executeTakeFirst();

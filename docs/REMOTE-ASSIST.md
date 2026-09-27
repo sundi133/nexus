@@ -1,6 +1,6 @@
 # Remote Assist
 
-See and control a Mac's screen from the Nexus console to help the person using it. **They're asked first**, can end it at any time, and every step is audited.
+See and control a Mac's or Windows PC's screen from the Nexus console to help the person using it. **They're asked first**, can end it at any time, and every step is audited.
 
 ## Using it
 
@@ -19,6 +19,18 @@ Only the person who asked can view. The person at the Mac allowed *them*, not ev
 - If they allow it, the agent turns on macOS **Screen Sharing** for the session, and turns it back off afterwards if it was off before.
 - While the session runs, macOS shows its own screen-sharing indicator in the menu bar. The agent keeps an **End Session** prompt on screen.
 - The agent opens outbound connections to Nexus only. Nothing listens on the network: Screen Sharing is reached on `127.0.0.1:5900`, and the agent connects nowhere else.
+
+## What happens on a Windows PC
+
+Windows has no built-in screen sharing to borrow, so the Nexus agent brings its own:
+
+- **The prompt:** the agent (a service) shows the Allow / Don't Allow prompt in the signed-in person's session. **No** is the default, and it times out after a minute.
+- **The helper:** if they allow it, the agent starts a helper (the same Nexus program) in their session. The helper captures the screen, every monitor, and applies your keyboard and mouse.
+- **The connection:** the helper reaches the agent only on loopback, and proves itself with a one-time secret. It serves the screen in the standard RFB (VNC) format, sending only what changed, compressed, to the same relay and browser viewer as for Macs.
+- **While it runs:** a message stays on screen saying someone can see it. Clicking **OK** ends the session.
+- **Afterwards:** the helper is stopped when the session ends, whoever ends it.
+
+There's no Windows password to type: the person at the PC allowing it is the check.
 
 ## Audit
 
@@ -50,7 +62,9 @@ browser ──wss──▶ Nexus API relay ◀──wss── agent ──tcp─
 
 ## Limits
 
-- **Macs only.** Windows (Quick Assist-style) and Linux are on the roadmap.
+- **Macs and Windows PCs.** Linux is on the roadmap.
+- **Windows secure screens aren't shown:** the lock screen and UAC prompts (the viewer keeps the last picture). The clipboard isn't shared.
+- **Windows was verified two ways, not on a live PC.** The screen server passes with the real in-browser viewer (noVNC in Chromium); the Windows screen capture and input are compile-checked for 64-bit, 32-bit and ARM.
 - **No sound, file transfer or chat.** Use your usual call tool alongside.
 - **Mac sign-in:** macOS Screen Sharing needs an account on the Mac to sign in with.
 - **Relay affinity:** the relay runs inside the API process, so a session lives on one instance (see above).
