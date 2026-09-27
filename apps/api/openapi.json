@@ -9559,7 +9559,7 @@
           },
           "overdue": {
             "type": "boolean",
-            "description": "Past the patch policy's deadline"
+            "description": "Past the patch policy's deadline (false while the policy is off)"
           },
           "last_install": {
             "type": [

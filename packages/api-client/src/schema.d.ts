@@ -28195,7 +28195,7 @@ export interface components {
             security_pending: number;
             pending_since: string | null;
             security_since: string | null;
-            /** @description Past the patch policy's deadline */
+            /** @description Past the patch policy's deadline (false while the policy is off) */
             overdue: boolean;
             last_install: {
                 status: string;
