@@ -23,6 +23,11 @@ export const SEALED: Target[] = [
   { table: "command_keys", pk: "org_id", column: "private_key", aad: (r) => `command_key:${r.org_id}` },
   { table: "device_recovery_keys", pk: "id", column: "sealed", aad: (r) => `recovery_key:${r.id}` },
   { table: "radius_clients", pk: "id", column: "secret", aad: (r) => `radius_client:${r.id}` },
+  { table: "apple_mdm_settings", pk: "org_id", column: "ca_key", aad: (r) => `apple_mdm_ca:${r.org_id}` },
+  { table: "apple_mdm_settings", pk: "org_id", column: "push_key", aad: (r) => `apple_mdm_push:${r.org_id}` },
+  { table: "apple_mdm_settings", pk: "org_id", column: "push_key_pending", aad: (r) => `apple_mdm_push:${r.org_id}` },
+  { table: "apple_mdm_devices", pk: "id", column: "unlock_token", aad: (r) => `apple_mdm_unlock:${r.id}` },
+  { table: "apple_mdm_devices", pk: "id", column: "bootstrap_token", aad: (r) => `apple_mdm_bootstrap:${r.id}` },
 ];
 
 export type ResealReport = { table: string; checked: number; resealed: number; failed: string[] }[];
