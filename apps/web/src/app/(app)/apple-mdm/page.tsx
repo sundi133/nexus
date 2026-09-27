@@ -20,17 +20,42 @@ import { useCan } from "@/lib/queries";
 import { formatDateTime, timeAgo } from "@/lib/utils";
 
 type Mac = Schemas["AppleMdmDevice"];
-type RequestType = "DeviceInformation" | "SecurityInfo" | "InstalledApplicationList" | "ProfileList" | "DeviceLock" | "RestartDevice" | "ShutDownDevice" | "ScheduleOSUpdate" | "EraseDevice";
+type RequestType =
+  | "DeviceInformation"
+  | "SecurityInfo"
+  | "InstalledApplicationList"
+  | "ProfileList"
+  | "DeviceLock"
+  | "RestartDevice"
+  | "ShutDownDevice"
+  | "ScheduleOSUpdate"
+  | "EraseDevice"
+  | "ClearPasscode"
+  | "EnableLostMode"
+  | "PlayLostModeSound"
+  | "DeviceLocation"
+  | "DisableLostMode";
+type Platform = Mac["platform"];
 type Perm = Parameters<ReturnType<typeof useCan>>[0];
-const ACTIONS: { type: RequestType; label: string; perm: Perm; danger?: boolean }[] = [
-  { type: "DeviceInformation", label: "Refresh details", perm: "devices:read" },
-  { type: "SecurityInfo", label: "Refresh security info", perm: "devices:read" },
-  { type: "InstalledApplicationList", label: "List installed apps", perm: "devices:read" },
-  { type: "ScheduleOSUpdate", label: "Install macOS updates", perm: "devices:updates" },
-  { type: "RestartDevice", label: "Restart", perm: "devices:actions" },
-  { type: "DeviceLock", label: "Lock", perm: "devices:actions", danger: true },
-  { type: "EraseDevice", label: "Erase", perm: "devices:wipe", danger: true },
+const ALL: Platform[] = ["macos", "ios", "ipados"];
+const MOBILE: Platform[] = ["ios", "ipados"];
+/** What can be sent to which kind of device (Lost Mode and clearing a passcode are iPhone and iPad only). */
+const ACTIONS: { type: RequestType; label: string; perm: Perm; platforms: Platform[]; danger?: boolean; lost?: boolean }[] = [
+  { type: "DeviceInformation", label: "Refresh details", perm: "devices:read", platforms: ALL },
+  { type: "SecurityInfo", label: "Refresh security info", perm: "devices:read", platforms: ALL },
+  { type: "InstalledApplicationList", label: "List installed apps", perm: "devices:read", platforms: ALL },
+  { type: "ScheduleOSUpdate", label: "Install OS updates", perm: "devices:updates", platforms: ALL },
+  { type: "RestartDevice", label: "Restart", perm: "devices:actions", platforms: ALL },
+  { type: "DeviceLock", label: "Lock", perm: "devices:actions", platforms: ALL, danger: true },
+  { type: "ClearPasscode", label: "Clear passcode", perm: "devices:actions", platforms: MOBILE, danger: true },
+  { type: "EnableLostMode", label: "Turn on Lost Mode", perm: "devices:actions", platforms: MOBILE, danger: true, lost: false },
+  { type: "DeviceLocation", label: "Locate", perm: "devices:actions", platforms: MOBILE, lost: true },
+  { type: "PlayLostModeSound", label: "Play a sound", perm: "devices:actions", platforms: MOBILE, lost: true },
+  { type: "DisableLostMode", label: "Turn off Lost Mode", perm: "devices:actions", platforms: MOBILE, lost: true },
+  { type: "EraseDevice", label: "Erase", perm: "devices:wipe", platforms: ALL, danger: true },
 ];
+const KIND: Record<Platform, string> = { macos: "Mac", ios: "iPhone", ipados: "iPad", other: "Device" };
+
 const STATUS: Record<Mac["status"], { label: string; tone: "success" | "neutral" | "warning" }> = {
   enrolled: { label: "enrolled", tone: "success" },
   authenticated: { label: "enrolling", tone: "warning" },
@@ -43,12 +68,13 @@ export default function AppleMdmPage() {
   const devices = useQuery({ queryKey: ["apple-mdm-devices"], queryFn: () => unwrap(api.GET("/v1/apple-mdm/devices")), refetchInterval: 20_000 });
   const [acting, setActing] = useState<{ mac: Mac; type: RequestType } | null>(null);
   const [history, setHistory] = useState<Mac | null>(null);
+  const [owning, setOwning] = useState<Mac | null>(null);
   const s = status.data;
   return (
     <>
       <PageHeader
         title="Apple MDM"
-        description="Nexus as the device management server for your Macs: enroll them with a profile, then lock, erase, restart and update them, and keep their bootstrap token for macOS updates and FileVault. Works alongside the Nexus agent on the same Mac (matched by serial number)."
+        description="Nexus as the device management server for your Macs, iPhones and iPads: enroll them with a profile, push configuration profiles, and lock, erase, restart and update them. On iPhones and iPads, also clear a forgotten passcode and use Lost Mode. Works alongside the Nexus agent on the same Mac (matched by serial number)."
       />
       {status.isPending ? (
         <Skeleton className="h-40" />
@@ -61,13 +87,13 @@ export default function AppleMdmPage() {
           {s.ready ? <AdeCard /> : null}
           {s.ready ? <MdmProfiles /> : null}
           <Card className="overflow-hidden">
-            <CardHeader title="Enrolled Macs" description={`${s.devices.enrolled} enrolled`} />
+            <CardHeader title="Enrolled devices" description={`${s.devices.enrolled} enrolled`} />
             {devices.data?.data.length ? (
               <Table>
                 <THead>
                   <tr>
-                    <TH>Mac</TH>
-                    <TH>macOS</TH>
+                    <TH>Device</TH>
+                    <TH>OS</TH>
                     <TH>Status</TH>
                     <TH>Security</TH>
                     <TH>Last check-in</TH>
@@ -79,10 +105,22 @@ export default function AppleMdmPage() {
                     <TR key={d.id}>
                       <TD>
                         <button type="button" className="text-left font-medium hover:underline" onClick={() => setHistory(d)}>
-                          {d.device_name || d.serial || "Mac"}
+                          {d.device_name || d.serial || KIND[d.platform]}
                         </button>
                         <span className="block text-xs text-fg-muted">
-                          {d.model} · {d.serial}
+                          {KIND[d.platform]} · {d.model} · {d.serial}
+                          {d.platform !== "macos" ? (
+                            <>
+                              {" · "}
+                              {can("devices:write") ? (
+                                <button type="button" className="hover:underline" onClick={() => setOwning(d)}>
+                                  {d.assigned_user ? d.assigned_user.email : "assign to someone"}
+                                </button>
+                              ) : (
+                                (d.assigned_user?.email ?? "unassigned")
+                              )}
+                            </>
+                          ) : null}
                           {d.device_id ? (
                             <>
                               {" · "}
@@ -99,8 +137,22 @@ export default function AppleMdmPage() {
                         {d.pending_commands ? <span className="ml-1.5 text-xs text-fg-muted">{d.pending_commands} pending</span> : null}
                       </TD>
                       <TD className="text-xs text-fg-muted">
-                        {d.filevault === null ? "—" : d.filevault ? "FileVault on" : "FileVault off"}
-                        {d.bootstrap_token ? " · bootstrap token" : ""}
+                        {d.platform === "macos" ? (
+                          <>
+                            {d.filevault === null ? "—" : d.filevault ? "FileVault on" : "FileVault off"}
+                            {d.bootstrap_token ? " · bootstrap token" : ""}
+                          </>
+                        ) : (
+                          <>
+                            {d.passcode === null ? "—" : d.passcode ? "Passcode set" : "No passcode"}
+                            {d.supervised ? " · supervised" : ""}
+                          </>
+                        )}
+                        {d.lost_mode ? (
+                          <span className="ml-1.5">
+                            <StatusPill tone="danger">Lost Mode</StatusPill>
+                          </span>
+                        ) : null}
                       </TD>
                       <TD className="text-fg-muted">{d.last_seen_at ? timeAgo(d.last_seen_at) : "—"}</TD>
                       <TD className="text-right">
@@ -111,7 +163,7 @@ export default function AppleMdmPage() {
                             onChange={(e) => e.target.value && setActing({ mac: d, type: e.target.value as RequestType })}
                           >
                             <option value="">Actions…</option>
-                            {ACTIONS.filter((a) => can(a.perm)).map((a) => (
+                            {ACTIONS.filter((a) => can(a.perm) && a.platforms.includes(d.platform) && (a.lost === undefined || a.lost === d.lost_mode)).map((a) => (
                               <option key={a.type} value={a.type}>
                                 {a.label}
                               </option>
@@ -124,13 +176,18 @@ export default function AppleMdmPage() {
                 </tbody>
               </Table>
             ) : (
-              <EmptyState icon={<Apple className="size-5" />} title="No Macs enrolled yet" description={s.ready ? "Open an enrollment link on a Mac and install the profile in System Settings." : "Set up the push certificate first."} />
+              <EmptyState
+                icon={<Apple className="size-5" />}
+                title="No devices enrolled yet"
+                description={s.ready ? "Open an enrollment link on a Mac (then System Settings), or in Safari on an iPhone or iPad (then Settings → Profile Downloaded), and install the profile." : "Set up the push certificate first."}
+              />
             )}
           </Card>
         </div>
       )}
       {acting ? <CommandDialog mac={acting.mac} type={acting.type} onClose={() => setActing(null)} /> : null}
       {history ? <HistoryDialog mac={history} onClose={() => setHistory(null)} /> : null}
+      {owning ? <OwnerDialog device={owning} onClose={() => setOwning(null)} /> : null}
     </>
   );
 }
@@ -264,7 +321,11 @@ function CommandDialog({ mac, type, onClose }: { mac: Mac; type: RequestType; on
   const readOnly = action.perm === "devices:read";
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
+  const [phone, setPhone] = useState("");
   const [confirm, setConfirm] = useState("");
+  const kind = KIND[mac.platform];
+  const onScreen = type === "EnableLostMode" || type === "DeviceLock";
+  const withPhone = mac.platform !== "macos" && (type === "DeviceLock" || type === "EnableLostMode");
   const [pin, setPin] = useState<string | null>(null);
   const send = useMutation({
     mutationFn: () =>
@@ -272,13 +333,13 @@ function CommandDialog({ mac, type, onClose }: { mac: Mac; type: RequestType; on
         unwrap(
           api.POST("/v1/apple-mdm/devices/{id}/commands", {
             params: { path: { id: mac.id } },
-            body: { request_type: type, reason, ...(type === "DeviceLock" && message ? { message } : {}), ...(type === "EraseDevice" ? { confirm } : {}) },
+            body: { request_type: type, reason, ...(onScreen && message ? { message } : {}), ...(withPhone && phone ? { phone } : {}), ...(type === "EraseDevice" ? { confirm } : {}) },
           }),
         ),
       ),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["apple-mdm-devices"] });
-      if (r.push_error) toast.warning("Queued, but the Mac couldn't be woken", { description: `${r.push_error}. It runs the next time the Mac checks in.` });
+      if (r.push_error) toast.warning(`Queued, but the ${kind} couldn't be woken`, { description: `${r.push_error}. It runs the next time the ${kind} checks in.` });
       else toast.success(`${action.label}: sent to ${mac.device_name || mac.serial}`);
       if (r.pin) setPin(r.pin);
       else onClose();
@@ -286,11 +347,24 @@ function CommandDialog({ mac, type, onClose }: { mac: Mac; type: RequestType; on
   });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent title={`${action.label}: ${mac.device_name || mac.serial}`} description={type === "EraseDevice" ? "Erases everything on this Mac. This can't be undone." : readOnly ? "The Mac answers at its next check-in." : "Sent through MDM; the Mac acts on it right away if it's online."}>
+      <DialogContent
+        title={`${action.label}: ${mac.device_name || mac.serial}`}
+        description={
+          type === "EraseDevice"
+            ? `Erases everything on this ${kind}. This can't be undone.`
+            : type === "EnableLostMode"
+              ? "Locks it and shows your message and number. Only in Lost Mode can Nexus locate it. Needs a supervised iPhone or iPad."
+              : type === "ClearPasscode"
+                ? "Removes the passcode, so the person can open it and set a new one. Use it only once you've confirmed who's asking."
+                : readOnly
+                  ? `The ${kind} answers at its next check-in.`
+                  : `Sent through MDM; the ${kind} acts on it right away if it's online.`
+        }
+      >
         {pin ? (
           <div className="space-y-2 text-[13px]">
             <p className="flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-success" /> The Mac will ask for this PIN. It&apos;s shown only now.
+              <ShieldCheck className="size-4 text-success" /> The {kind} will ask for this PIN. It&apos;s shown only now.
             </p>
             <p className="text-center font-mono text-3xl tracking-[0.3em]">{pin}</p>
             <div className="flex justify-end">
@@ -307,9 +381,14 @@ function CommandDialog({ mac, type, onClose }: { mac: Mac; type: RequestType; on
                 <Input id="mc-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
               </Field>
             ) : null}
-            {type === "DeviceLock" ? (
+            {onScreen ? (
               <Field label="Message on the lock screen" htmlFor="mc-msg">
                 <Input id="mc-msg" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. Please call IT at 555-0100" />
+              </Field>
+            ) : null}
+            {withPhone ? (
+              <Field label="Phone number to show" htmlFor="mc-phone">
+                <Input id="mc-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 555 0100" />
               </Field>
             ) : null}
             {type === "EraseDevice" ? (
@@ -337,7 +416,7 @@ function HistoryDialog({ mac, onClose }: { mac: Mac; onClose: () => void }) {
   const tone = (s: string) => (s === "acknowledged" ? "success" : s === "error" ? "danger" : s === "canceled" ? "neutral" : "warning") as "success" | "danger" | "neutral" | "warning";
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent title={mac.device_name || mac.serial} description={`${mac.model} · ${mac.serial} · macOS ${mac.os_version}`} className="max-w-2xl">
+      <DialogContent title={mac.device_name || mac.serial} description={`${KIND[mac.platform]} · ${mac.model} · ${mac.serial} · ${mac.platform === "macos" ? "macOS" : mac.platform === "ipados" ? "iPadOS" : "iOS"} ${mac.os_version}`} className="max-w-2xl">
         <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto rounded-md border border-border text-[13px]">
           {q.data?.data.map((c) => (
             <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5">
@@ -348,11 +427,57 @@ function HistoryDialog({ mac, onClose }: { mac: Mac; onClose: () => void }) {
                   {c.reason ? ` · ${c.reason}` : ""}
                   {c.error ? ` · ${c.error}` : ""}
                 </span>
+                {c.request_type === "DeviceLocation" && c.status === "acknowledged" && (c.result as { Latitude?: number })?.Latitude !== undefined ? (
+                  <a
+                    className="block text-xs text-primary hover:underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    href={`https://www.openstreetmap.org/?mlat=${(c.result as { Latitude: number }).Latitude}&mlon=${(c.result as { Longitude: number }).Longitude}#map=16/${(c.result as { Latitude: number }).Latitude}/${(c.result as { Longitude: number }).Longitude}`}
+                  >
+                    {(c.result as { Latitude: number }).Latitude.toFixed(5)}, {(c.result as { Longitude: number }).Longitude.toFixed(5)} · open map
+                  </a>
+                ) : null}
               </span>
               <StatusPill tone={tone(c.status)}>{c.status}</StatusPill>
             </li>
           ))}
         </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Whose iPhone or iPad this is: profiles for their groups follow it. */
+function OwnerDialog({ device, onClose }: { device: Mac; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [q, setQ] = useState("");
+  const users = useQuery({ queryKey: ["users", "picker", q], enabled: q.length > 1, queryFn: () => unwrap(api.GET("/v1/users", { params: { query: { q, limit: 8, status: "active" } } })) });
+  const save = useMutation({
+    mutationFn: (userId: string | null) => unwrap(api.PUT("/v1/apple-mdm/devices/{id}/user", { params: { path: { id: device.id } }, body: { user_id: userId } })),
+    onSuccess: () => (qc.invalidateQueries({ queryKey: ["apple-mdm-devices"] }), onClose()),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent title={`Whose is ${device.device_name || device.serial}?`} description="Profiles targeted at their groups are installed on it.">
+        <div className="space-y-2">
+          <Input autoFocus placeholder="Search people" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Person" />
+          <ErrorBanner error={save.error} />
+          <ul className="divide-y divide-border text-[13px]">
+            {users.data?.data.map((u) => (
+              <li key={u.id} className="flex items-center justify-between py-1.5">
+                <span>{u.display_name || u.email}</span>
+                <Button size="sm" loading={save.isPending} onClick={() => save.mutate(u.id)}>
+                  Assign
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {device.assigned_user ? (
+            <Button size="sm" variant="ghost" onClick={() => save.mutate(null)}>
+              Clear (now {device.assigned_user.email})
+            </Button>
+          ) : null}
+        </div>
       </DialogContent>
     </Dialog>
   );

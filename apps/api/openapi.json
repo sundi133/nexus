@@ -10173,6 +10173,52 @@
             "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f",
             "description": "The same Mac's Nexus agent device, matched by serial"
           },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "macos",
+              "ios",
+              "ipados",
+              "other"
+            ]
+          },
+          "assigned_user": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email"
+            ],
+            "description": "Whose iPhone or iPad it is (Macs follow their agent's user)"
+          },
+          "lost_mode": {
+            "type": "boolean"
+          },
+          "passcode": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "iPhone and iPad: a passcode is set"
+          },
+          "supervised": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "bootstrap_token": {
             "type": "boolean"
           },
@@ -10206,6 +10252,11 @@
           "os_version",
           "status",
           "device_id",
+          "platform",
+          "assigned_user",
+          "lost_mode",
+          "passcode",
+          "supervised",
           "bootstrap_token",
           "filevault",
           "enrolled_at",
@@ -10302,6 +10353,18 @@
               }
             }
           },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "macos",
+                "ios",
+                "ipados"
+              ]
+            },
+            "description": "The kinds of device it's installed on"
+          },
           "counts": {
             "type": "object",
             "properties": {
@@ -10332,6 +10395,7 @@
           "payload_types",
           "source",
           "target",
+          "platforms",
           "counts",
           "updated_at"
         ]
@@ -43963,7 +44027,7 @@
         "tags": [
           "Apple MDM"
         ],
-        "summary": "Macs enrolled in Nexus MDM",
+        "summary": "Macs, iPhones and iPads enrolled in Nexus MDM",
         "security": [
           {
             "bearer": []
@@ -44145,8 +44209,8 @@
         "tags": [
           "Apple MDM"
         ],
-        "summary": "Send an MDM command to a Mac",
-        "description": "Queues the command and wakes the Mac through APNs. Lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.",
+        "summary": "Send an MDM command to a Mac, iPhone or iPad",
+        "description": "Queues the command and wakes the device through APNs. On a Mac, lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). iPhones and iPads also take ClearPasscode, EnableLostMode (with a message and phone number), DeviceLocation and PlayLostModeSound (in Lost Mode) and DisableLostMode; Lost Mode, restart, shut down and OS updates need a supervised iPhone or iPad. Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.",
         "security": [
           {
             "bearer": []
@@ -44182,7 +44246,12 @@
                       "RestartDevice",
                       "ShutDownDevice",
                       "ScheduleOSUpdate",
-                      "EraseDevice"
+                      "EraseDevice",
+                      "ClearPasscode",
+                      "EnableLostMode",
+                      "PlayLostModeSound",
+                      "DeviceLocation",
+                      "DisableLostMode"
                     ]
                   },
                   "reason": {
@@ -44193,6 +44262,11 @@
                   "message": {
                     "type": "string",
                     "maxLength": 200
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "description": "Lock and Lost Mode: a number shown on the screen"
                   },
                   "confirm": {
                     "type": "string",
@@ -44238,6 +44312,110 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/devices/{id}/user": {
+      "put": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Say whose iPhone or iPad this is (profiles for their groups follow)",
+        "description": "Macs usually get their person from the Nexus agent; phones and tablets have no agent. `user_id: null` clears it.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Assigned"
           },
           "400": {
             "description": "Invalid request",
@@ -44444,6 +44622,22 @@
                       "all": true
                     },
                     "description": "Every enrolled Mac, or the Macs of people in these groups"
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "macos",
+                        "ios",
+                        "ipados"
+                      ]
+                    },
+                    "minItems": 1,
+                    "default": [
+                      "macos"
+                    ],
+                    "description": "Which kinds of device to install it on"
                   }
                 },
                 "required": [
@@ -44524,7 +44718,7 @@
           "Apple MDM"
         ],
         "summary": "Build a configuration profile from a template",
-        "description": "Templates: screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, wifi {ssid, password, hidden}, software_update {}, login_message {message}.",
+        "description": "Templates: passcode {min_length, auto_lock_minutes} (Mac, iPhone, iPad), wifi {ssid, password, hidden} (Mac, iPhone, iPad), screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, software_update {}, login_message {message} (Mac only).",
         "security": [
           {
             "bearer": []
@@ -44545,6 +44739,7 @@
                   "kind": {
                     "type": "string",
                     "enum": [
+                      "passcode",
                       "screen_lock",
                       "firewall",
                       "wifi",

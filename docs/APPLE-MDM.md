@@ -1,4 +1,4 @@
-# Apple MDM (macOS)
+# Apple MDM (Mac, iPhone, iPad)
 
 Nexus can be the device management (MDM) server for your Macs, next to the Nexus agent on the same machines. **Devices → Apple MDM** enrolls Macs, sends MDM commands (lock, erase, restart, macOS updates, inventory), and escrows each Mac's **bootstrap token**. That token lets macOS install updates and give new accounts a FileVault SecureToken without a person's password.
 
@@ -28,8 +28,12 @@ In Setup Assistant, a Mac sends its signed machine info to this organization's e
 ## Configuration profiles
 
 Under **Configuration profiles → Add profile**, build one from a template or upload your own `.mobileconfig`:
-- **Templates:** screen lock, firewall, a Wi-Fi network, automatic macOS updates, and a login-window message.
-- **Targeting:** every Mac, or the Macs of people in a group (through each Mac's Nexus agent user).
+- **Templates for Macs, iPhones and iPads:** a passcode (minimum length, auto-lock after 1–5 minutes idle) and a Wi-Fi network.
+- **Templates for Macs only:** screen lock, firewall, automatic macOS updates, and a login-window message.
+- **Uploads:** you choose which kinds of device a `.mobileconfig` is for.
+- **Targeting:** every device the profile is made for, or the devices of people in a group. A Mac belongs to its Nexus agent's user; an iPhone or iPad belongs to the person you assign it to.
+
+Each profile is installed only on the kinds of device it's made for: an iPhone never gets a Mac firewall payload.
 
 Nexus keeps each Mac in step:
 - It installs a profile where it's missing or has changed, and removes it where it's no longer wanted.
@@ -38,6 +42,18 @@ Nexus keeps each Mac in step:
 
 Payloads are stored sealed, since they can contain Wi-Fi passwords. Profiles that would enroll the Mac in another MDM are refused. This needs `devices:enforce` and a recent MFA.
 
+## iPhone and iPad
+
+iPhones and iPads enroll with the same enrollment links, and the same Apple Business Manager setup for zero-touch:
+
+1. Open the link in **Safari** on the device.
+2. Go to **Settings → Profile Downloaded** and install the profile.
+
+Nexus tells a device's kind from what it reports.
+
+- **Owner:** phones and tablets have no Nexus agent, so choose **assign to someone** in the device list. Profiles for that person's groups then follow the device.
+- **Security:** the list shows whether a passcode is set, and whether the device is supervised.
+
 ## What you can do
 
 | Command | Permission | Notes |
@@ -45,8 +61,13 @@ Payloads are stored sealed, since they can contain Wi-Fi passwords. Profiles tha
 | Refresh details, security info, installed apps | `devices:read` | |
 | Install macOS updates | `devices:updates` | Installs everything available. Works without the user's password once the bootstrap token is escrowed |
 | Restart | `devices:actions` | |
-| Lock | `devices:actions` | Nexus generates a 6-digit PIN and shows it once. The Mac asks for it to unlock. Optional lock-screen message |
-| Erase | `devices:wipe` | Type the serial number to confirm. PIN shown once |
+| Lock | `devices:actions` | Mac: Nexus generates a 6-digit PIN and shows it once, and the Mac asks for it to unlock. iPhone and iPad: no PIN, and a phone number can be shown. Optional lock-screen message |
+| Erase | `devices:wipe` | Type the serial number to confirm. Mac: PIN shown once |
+| Clear passcode (iPhone, iPad) | `devices:actions` | For a forgotten passcode. Uses the unlock token the device escrowed at enrollment; the token is removed from the command once delivered |
+| Lost Mode on and off (iPhone, iPad) | `devices:actions` | Locks the device and shows your message and phone number. Needs a supervised device |
+| Locate, play a sound (iPhone, iPad) | `devices:actions` | Only in Lost Mode, as Apple allows. The location is in the device's command history, with a map link |
+
+Restart, shut down and OS updates on an iPhone or iPad need it to be supervised (Apple Configurator or Apple Business Manager).
 
 Commands queue up and the Mac is woken through APNs. An offline Mac runs them when it next checks in. If a Mac is busy ("NotNow"), the command waits and goes again at its next check-in. Every command that changes a Mac needs a reason and a recent MFA. It's audited when sent and when the Mac answers (`apple_mdm.command_sent`, `apple_mdm.command_finished`).
 
@@ -63,5 +84,7 @@ Commands queue up and the Mac is woken through APNs. An offline Mac runs them wh
 - **ADE machine info:** its signature is checked for integrity, but not yet chained to Apple's device CA. A serial number must also be assigned to you in ABM.
 - **Profile shows as "Unverified".** The enrollment profile isn't signed yet, so macOS shows it that way.
 - **Not yet supported:** signed profile uploads, declarative management, the user channel, FileVault recovery key escrow through MDM, and app installation through MDM. For apps, use App deployment through the agent.
-- **Macs only.** It's built and tested for macOS. iPhone and iPad aren't supported yet.
-- **Tested against a simulated Mac.** It signs its messages the way Macs do. Enrolling a real Mac needs your push certificate and a real device.
+- **iPhone and iPad:**
+  - no app installation (Apple VPP), no managed Apple IDs, and no User Enrollment for personal devices;
+  - no compliance checks from their passcode or OS version yet.
+- **Tested against simulated devices.** They sign their messages the way Macs and iPhones do. Enrolling real devices needs your push certificate and real hardware.

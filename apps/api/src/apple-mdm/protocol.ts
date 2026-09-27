@@ -9,7 +9,7 @@ import type { Tx } from "../platform/db.js";
 import { ApiError } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { ensureCa, issueIdentity, pkcs12, SignatureError, verifyMdmSignature } from "./pki.js";
-import { enrollmentProfile, queueCommand } from "./service.js";
+import { enrollmentProfile, platformOf, queueCommand } from "./service.js";
 import { profileResult, reconcileProfiles } from "./profiles.js";
 
 /**
@@ -108,7 +108,16 @@ export function registerAppleMdmProtocol(app: App) {
         case "Authenticate": {
           const s = await tx.selectFrom("apple_mdm_settings").select("push_topic").where("org_id", "=", orgId).executeTakeFirst();
           if (str(m.Topic) !== s?.push_topic) throw new ApiError(400, "wrong_topic", "The profile's push topic isn't this organization's");
-          const fields = { identity_fp: fp, serial: str(m.SerialNumber), model: str(m.ModelName) || str(m.Model), os_version: str(m.OSVersion), device_name: str(m.DeviceName), topic: str(m.Topic), last_seen_at: new Date() };
+          const fields = {
+            identity_fp: fp,
+            serial: str(m.SerialNumber),
+            model: str(m.ModelName) || str(m.Model),
+            os_version: str(m.OSVersion),
+            device_name: str(m.DeviceName),
+            topic: str(m.Topic),
+            platform: platformOf(str(m.ProductName), str(m.Model)),
+            last_seen_at: new Date(),
+          };
           await tx
             .insertInto("apple_mdm_devices")
             .values({ id: newId(), org_id: orgId, udid, ...fields, status: "authenticated", info: "{}", security: "{}" })
@@ -196,8 +205,9 @@ export function registerAppleMdmProtocol(app: App) {
               result: JSON.stringify(jsonSafe(result)),
               error: newStatus === "error" ? errText || status : "",
               finished_at: newStatus === "notnow" ? null : new Date(),
-              // Once delivered, the lock/erase PIN isn't kept: it was shown to the admin once.
-              ...(newStatus !== "notnow" ? { command: sql`CASE WHEN command ? 'PIN' THEN jsonb_set(command, '{PIN}', '"••••••"') ELSE command END` } : {}),
+              // Once delivered, secrets in the command aren't kept: the lock/erase PIN (shown to the admin
+              // once) and a passcode-clearing unlock token.
+              ...(newStatus !== "notnow" ? { command: sql`(CASE WHEN command ? 'PIN' THEN jsonb_set(command, '{PIN}', '"••••••"') ELSE command END) - 'UnlockToken'` } : {}),
             })
             .where("id", "=", cmd.id)
             .execute();
@@ -241,6 +251,9 @@ function withData(v: unknown): unknown {
 }
 
 async function applyResult(tx: Tx, deps: Deps, orgId: string, id: string, type: string, m: Msg) {
+  if (type === "EnableLostMode" || type === "DisableLostMode") {
+    await tx.updateTable("apple_mdm_devices").set({ lost_mode: type === "EnableLostMode" }).where("id", "=", id).execute();
+  }
   if (type === "DeviceInformation" && m.QueryResponses && typeof m.QueryResponses === "object") {
     const q = m.QueryResponses as Msg;
     await tx
@@ -250,6 +263,7 @@ async function applyResult(tx: Tx, deps: Deps, orgId: string, id: string, type: 
         ...(str(q.OSVersion) ? { os_version: str(q.OSVersion) } : {}),
         ...(str(q.ModelName) ? { model: str(q.ModelName) } : {}),
         ...(str(q.SerialNumber) ? { serial: str(q.SerialNumber) } : {}),
+        ...(str(q.ProductName) ? { platform: platformOf(str(q.ProductName), str(q.Model)) } : {}),
         info: JSON.stringify(jsonSafe(q)),
       })
       .where("id", "=", id)

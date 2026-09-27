@@ -25525,7 +25525,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Macs enrolled in Nexus MDM */
+        /** Macs, iPhones and iPads enrolled in Nexus MDM */
         get: {
             parameters: {
                 query?: never;
@@ -25680,8 +25680,8 @@ export interface paths {
         };
         put?: never;
         /**
-         * Send an MDM command to a Mac
-         * @description Queues the command and wakes the Mac through APNs. Lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.
+         * Send an MDM command to a Mac, iPhone or iPad
+         * @description Queues the command and wakes the device through APNs. On a Mac, lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). iPhones and iPads also take ClearPasscode, EnableLostMode (with a message and phone number), DeviceLocation and PlayLostModeSound (in Lost Mode) and DisableLostMode; Lost Mode, restart, shut down and OS updates need a supervised iPhone or iPad. Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.
          */
         post: {
             parameters: {
@@ -25696,10 +25696,12 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        request_type: "DeviceInformation" | "SecurityInfo" | "InstalledApplicationList" | "ProfileList" | "DeviceLock" | "RestartDevice" | "ShutDownDevice" | "ScheduleOSUpdate" | "EraseDevice";
+                        request_type: "DeviceInformation" | "SecurityInfo" | "InstalledApplicationList" | "ProfileList" | "DeviceLock" | "RestartDevice" | "ShutDownDevice" | "ScheduleOSUpdate" | "EraseDevice" | "ClearPasscode" | "EnableLostMode" | "PlayLostModeSound" | "DeviceLocation" | "DisableLostMode";
                         /** @default  */
                         reason?: string;
                         message?: string;
+                        /** @description Lock and Lost Mode: a number shown on the screen */
+                        phone?: string;
                         confirm?: string;
                     };
                 };
@@ -25765,6 +25767,100 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/apple-mdm/devices/{id}/user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Say whose iPhone or iPad this is (profiles for their groups follow)
+         * @description Macs usually get their person from the Nexus agent; phones and tablets have no agent. `user_id: null` clears it.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                         */
+                        user_id: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Assigned */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -25875,6 +25971,13 @@ export interface paths {
                         } | {
                             group_ids: string[];
                         };
+                        /**
+                         * @description Which kinds of device to install it on
+                         * @default [
+                         *       "macos"
+                         *     ]
+                         */
+                        platforms?: ("macos" | "ios" | "ipados")[];
                     };
                 };
             };
@@ -25952,7 +26055,7 @@ export interface paths {
         put?: never;
         /**
          * Build a configuration profile from a template
-         * @description Templates: screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, wifi {ssid, password, hidden}, software_update {}, login_message {message}.
+         * @description Templates: passcode {min_length, auto_lock_minutes} (Mac, iPhone, iPad), wifi {ssid, password, hidden} (Mac, iPhone, iPad), screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, software_update {}, login_message {message} (Mac only).
          */
         post: {
             parameters: {
@@ -25966,7 +26069,7 @@ export interface paths {
                     "application/json": {
                         name: string;
                         /** @enum {string} */
-                        kind: "screen_lock" | "firewall" | "wifi" | "software_update" | "login_message";
+                        kind: "passcode" | "screen_lock" | "firewall" | "wifi" | "software_update" | "login_message";
                         /** @default {} */
                         settings?: {
                             [key: string]: unknown;
@@ -35492,6 +35595,21 @@ export interface components {
              * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
              */
             device_id: string | null;
+            /** @enum {string} */
+            platform: "macos" | "ios" | "ipados" | "other";
+            /** @description Whose iPhone or iPad it is (Macs follow their agent's user) */
+            assigned_user: {
+                /**
+                 * Format: uuid
+                 * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                 */
+                id: string;
+                email: string;
+            } | null;
+            lost_mode: boolean;
+            /** @description iPhone and iPad: a passcode is set */
+            passcode: boolean | null;
+            supervised: boolean | null;
             bootstrap_token: boolean;
             filevault: boolean | null;
             enrolled_at: string | null;
@@ -35524,6 +35642,8 @@ export interface components {
                 all?: boolean;
                 group_ids?: string[];
             };
+            /** @description The kinds of device it's installed on */
+            platforms: ("macos" | "ios" | "ipados")[];
             counts: {
                 installed: number;
                 installing: number;

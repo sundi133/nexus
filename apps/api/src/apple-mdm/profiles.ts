@@ -49,23 +49,40 @@ export function readProfile(xml: string) {
 
 // ---- Templates --------------------------------------------------------------------------------
 
+const MAC = ["macos"] as const;
+const APPLE = ["macos", "ios", "ipados"] as const;
+type Platform = "macos" | "ios" | "ipados";
+
 export const TEMPLATES = {
+  passcode: {
+    title: "Passcode",
+    platforms: APPLE,
+    settings: z.object({ min_length: z.number().int().min(4).max(16).default(6), auto_lock_minutes: z.number().int().min(1).max(5).default(5) }),
+    // Honoured by Macs, iPhones and iPads: a passcode, not a simple one, and locking when idle.
+    payload: (s: { min_length: number; auto_lock_minutes: number }) => [
+      { PayloadType: "com.apple.mobiledevice.passwordpolicy", forcePIN: true, allowSimple: false, minLength: s.min_length, maxInactivity: s.auto_lock_minutes, maxGracePeriod: 0 },
+    ],
+  },
   screen_lock: {
     title: "Screen lock",
+    platforms: MAC,
     settings: z.object({ idle_minutes: z.number().int().min(1).max(60).default(10) }),
     payload: (s: { idle_minutes: number }) => [{ PayloadType: "com.apple.screensaver", idleTime: s.idle_minutes * 60, askForPassword: true, askForPasswordDelay: 0 }],
   },
   firewall: {
+    platforms: MAC,
     title: "Firewall",
     settings: z.object({ stealth: z.boolean().default(false), block_all_incoming: z.boolean().default(false) }),
     payload: (s: { stealth: boolean; block_all_incoming: boolean }) => [{ PayloadType: "com.apple.security.firewall", EnableFirewall: true, EnableStealthMode: s.stealth, BlockAllIncoming: s.block_all_incoming }],
   },
   wifi: {
     title: "Wi-Fi network",
+    platforms: APPLE,
     settings: z.object({ ssid: z.string().trim().min(1).max(32), password: z.string().min(8).max(63), hidden: z.boolean().default(false) }),
     payload: (s: { ssid: string; password: string; hidden: boolean }) => [{ PayloadType: "com.apple.wifi.managed", SSID_STR: s.ssid, HIDDEN_NETWORK: s.hidden, AutoJoin: true, EncryptionType: "WPA2", Password: s.password }],
   },
   software_update: {
+    platforms: MAC,
     title: "Automatic macOS updates",
     settings: z.object({}),
     payload: () => [
@@ -73,6 +90,7 @@ export const TEMPLATES = {
     ],
   },
   login_message: {
+    platforms: MAC,
     title: "Login window message",
     settings: z.object({ message: z.string().trim().min(1).max(300) }),
     payload: (s: { message: string }) => [{ PayloadType: "com.apple.loginwindow", LoginwindowText: s.message }],
@@ -98,10 +116,17 @@ export function buildProfile(orgId: string, name: string, payloads: Record<strin
 
 // ---- Reconciliation ---------------------------------------------------------------------------
 
+/** The groups of the device's person: a Mac's agent user, or whoever a phone is assigned to. */
 async function macGroups(tx: Tx, mdmDeviceId: string) {
-  const d = await tx.selectFrom("apple_mdm_devices").leftJoin("devices", "devices.id", "apple_mdm_devices.device_id").select(["devices.primary_user_id"]).where("apple_mdm_devices.id", "=", mdmDeviceId).executeTakeFirst();
-  if (!d?.primary_user_id) return new Set<string>();
-  return new Set((await tx.selectFrom("group_members").select("group_id").where("user_id", "=", d.primary_user_id).execute()).map((g) => g.group_id));
+  const d = await tx
+    .selectFrom("apple_mdm_devices")
+    .leftJoin("devices", "devices.id", "apple_mdm_devices.device_id")
+    .select(["devices.primary_user_id", "apple_mdm_devices.assigned_user_id"])
+    .where("apple_mdm_devices.id", "=", mdmDeviceId)
+    .executeTakeFirst();
+  const user = d?.assigned_user_id ?? d?.primary_user_id;
+  if (!user) return new Set<string>();
+  return new Set((await tx.selectFrom("group_members").select("group_id").where("user_id", "=", user).execute()).map((g) => g.group_id));
 }
 const wants = (t: Target, groups: Set<string>) => !!t.all || (t.group_ids ?? []).some((g) => groups.has(g));
 
@@ -110,16 +135,17 @@ const wants = (t: Target, groups: Set<string>) => !!t.all || (t.group_ids ?? [])
  * wanted. Returns the Macs it queued commands for (to wake after commit).
  */
 export async function reconcileProfiles(tx: Tx, deps: Pick<Deps, "sealer">, orgId: string, mdmDeviceIds?: string[]) {
-  let q = tx.selectFrom("apple_mdm_devices").select("id").where("status", "=", "enrolled");
+  let q = tx.selectFrom("apple_mdm_devices").select(["id", "platform"]).where("status", "=", "enrolled");
   if (mdmDeviceIds) q = mdmDeviceIds.length ? q.where("id", "in", mdmDeviceIds) : q.where("id", "=", "00000000-0000-0000-0000-000000000000");
-  const macs = (await q.execute()).map((m) => m.id);
-  if (!macs.length) return [];
-  const profiles = await tx.selectFrom("apple_mdm_profiles").select(["id", "identifier", "target", "updated_at", "payload"]).execute();
+  const devices = await q.execute();
+  if (!devices.length) return [];
+  const profiles = await tx.selectFrom("apple_mdm_profiles").select(["id", "identifier", "target", "updated_at", "payload", "platforms"]).execute();
   const touched = new Set<string>();
-  for (const mac of macs) {
+  for (const { id: mac, platform } of devices) {
     const groups = await macGroups(tx, mac);
     const have = new Map((await tx.selectFrom("apple_mdm_device_profiles").selectAll().where("mdm_device_id", "=", mac).execute()).map((r) => [r.identifier, r]));
-    const wanted = profiles.filter((p) => wants(p.target as Target, groups));
+    // Only profiles made for this kind of device: a Mac firewall payload means nothing to an iPhone.
+    const wanted = profiles.filter((p) => (p.platforms as string[]).includes(platform) && wants(p.target as Target, groups));
     for (const p of wanted) {
       const cur = have.get(p.identifier);
       const fresh = cur && (cur.status === "installed" || cur.status === "installing") && cur.installed_version?.getTime() === p.updated_at.getTime();
@@ -174,20 +200,21 @@ const ProfileOut = z
     payload_types: z.array(z.string()),
     source: z.enum(["upload", "template"]),
     target: z.object({ all: z.boolean().optional(), group_ids: z.array(Id).optional() }),
+    platforms: z.array(z.enum(["macos", "ios", "ipados"])).openapi({ description: "The kinds of device it's installed on" }),
     counts: z.object({ installed: z.number().int(), installing: z.number().int(), failed: z.number().int() }),
     updated_at: z.string(),
   })
   .openapi("AppleMdmProfile");
 
 async function listProfiles(tx: Tx, ids?: string[]) {
-  let q = tx.selectFrom("apple_mdm_profiles").select(["id", "name", "identifier", "payload_types", "source", "target", "updated_at"]).orderBy("name");
+  let q = tx.selectFrom("apple_mdm_profiles").select(["id", "name", "identifier", "payload_types", "source", "target", "platforms", "updated_at"]).orderBy("name");
   if (ids) q = q.where("id", "in", ids);
   const rows = await q.execute();
   const states = await tx.selectFrom("apple_mdm_device_profiles").select(["profile_id", "status"]).execute();
   return rows.map((r) => {
     const mine = states.filter((s) => s.profile_id === r.id);
     const n = (st: string) => mine.filter((s) => s.status === st).length;
-    return { ...r, target: r.target as Target, counts: { installed: n("installed"), installing: n("installing"), failed: n("failed") }, updated_at: iso(r.updated_at) };
+    return { ...r, target: r.target as Target, platforms: r.platforms as Platform[], counts: { installed: n("installed"), installing: n("installing"), failed: n("failed") }, updated_at: iso(r.updated_at) };
   });
 }
 
@@ -204,7 +231,7 @@ export function registerAppleMdmProfileRoutes(app: App) {
     },
   );
 
-  const save = async (c: any, input: { name: string; xml: string; source: "upload" | "template"; target: Target; identifier?: string; types: string[] }) => {
+  const save = async (c: any, input: { name: string; xml: string; source: "upload" | "template"; target: Target; identifier?: string; types: string[]; platforms: readonly Platform[] }) => {
     const p = requirePermission(c, "devices:enforce");
     const deps: Deps = c.get("deps");
     let macs: string[] = [];
@@ -214,7 +241,7 @@ export function registerAppleMdmProfileRoutes(app: App) {
       try {
         await tx
           .insertInto("apple_mdm_profiles")
-          .values({ id, org_id: p.orgId, name: input.name, identifier: input.identifier!, payload: deps.sealer.seal(Buffer.from(input.xml), aad(id)), payload_types: input.types, source: input.source, target: JSON.stringify(input.target), created_by: p.userId })
+          .values({ id, org_id: p.orgId, name: input.name, identifier: input.identifier!, payload: deps.sealer.seal(Buffer.from(input.xml), aad(id)), payload_types: input.types, source: input.source, target: JSON.stringify(input.target), platforms: [...input.platforms], created_by: p.userId })
           .execute();
       } catch (e) {
         if (isUniqueViolation(e)) throw conflict("duplicate_profile", `A profile with identifier ${input.identifier} already exists`);
@@ -236,13 +263,20 @@ export function registerAppleMdmProfileRoutes(app: App) {
       summary: "Upload a configuration profile (.mobileconfig)",
       description: "Installed on the targeted Macs right away (they're woken through APNs). Needs `devices:enforce` and a recent MFA.",
       security: bearer,
-      request: body(z.object({ name: z.string().trim().min(1).max(100), mobileconfig: z.string().min(50).max(1_000_000), target: TargetIn })),
+      request: body(
+        z.object({
+          name: z.string().trim().min(1).max(100),
+          mobileconfig: z.string().min(50).max(1_000_000),
+          target: TargetIn,
+          platforms: z.array(z.enum(["macos", "ios", "ipados"])).min(1).default(["macos"]).openapi({ description: "Which kinds of device to install it on" }),
+        }),
+      ),
       responses: { 201: json(ProfileOut), ...problemResponses },
     }),
     async (c) => {
       const input = c.req.valid("json");
       const { identifier, types } = readProfile(input.mobileconfig);
-      return c.json(await save(c, { name: input.name, xml: input.mobileconfig, source: "upload", target: input.target, identifier, types }), 201);
+      return c.json(await save(c, { name: input.name, xml: input.mobileconfig, source: "upload", target: input.target, identifier, types, platforms: [...new Set(input.platforms)] }), 201);
     },
   );
 
@@ -252,7 +286,8 @@ export function registerAppleMdmProfileRoutes(app: App) {
       path: "/v1/apple-mdm/profiles/template",
       tags: ["Apple MDM"],
       summary: "Build a configuration profile from a template",
-      description: "Templates: screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, wifi {ssid, password, hidden}, software_update {}, login_message {message}.",
+      description:
+        "Templates: passcode {min_length, auto_lock_minutes} (Mac, iPhone, iPad), wifi {ssid, password, hidden} (Mac, iPhone, iPad), screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, software_update {}, login_message {message} (Mac only).",
       security: bearer,
       request: body(z.object({ name: z.string().trim().min(1).max(100), kind: z.enum(Object.keys(TEMPLATES) as [TemplateKind, ...TemplateKind[]]), settings: z.record(z.string(), z.unknown()).default({}), target: TargetIn })),
       responses: { 201: json(ProfileOut), ...problemResponses },
@@ -264,7 +299,7 @@ export function registerAppleMdmProfileRoutes(app: App) {
       if (!parsed.success) throw badRequest("invalid_settings", parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
       const payloads = (t.payload as (s: unknown) => Record<string, unknown>[])(parsed.data);
       const built = buildProfile("", input.name, payloads);
-      return c.json(await save(c, { name: input.name, xml: built.xml, source: "template", target: input.target, identifier: built.identifier, types: payloads.map((x) => String(x.PayloadType)) }), 201);
+      return c.json(await save(c, { name: input.name, xml: built.xml, source: "template", target: input.target, identifier: built.identifier, types: payloads.map((x) => String(x.PayloadType)), platforms: t.platforms }), 201);
     },
   );
 

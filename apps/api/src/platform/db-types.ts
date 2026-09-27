@@ -6,6 +6,7 @@ type Json<T = Record<string, unknown>> = ColumnType<T, string | undefined, strin
 
 export type DevicePlatform = "macos" | "windows" | "linux";
 export type Compliance = "compliant" | "non_compliant" | "unknown";
+export type ApplePlatform = "macos" | "ios" | "ipados" | "other";
 export type AssetKind = "laptop" | "desktop" | "phone" | "tablet" | "monitor" | "peripheral" | "network" | "server" | "other";
 export type AssetStatus = "in_stock" | "assigned" | "in_repair" | "retired" | "lost";
 export type CheckStatus = "pass" | "fail" | "unknown" | "not_applicable";
@@ -357,6 +358,9 @@ export interface Database {
     bootstrap_token: Buffer | null;
     status: Generated<"authenticated" | "enrolled" | "checked_out">;
     device_id: string | null;
+    platform: Generated<ApplePlatform>;
+    assigned_user_id: string | null;
+    lost_mode: Generated<boolean>;
     info: Json<Record<string, unknown>>;
     security: Json<Record<string, unknown>>;
     enrolled_at: NullableTimestamp;
@@ -454,6 +458,7 @@ export interface Database {
     payload_types: Generated<string[]>;
     source: Generated<"upload" | "template">;
     target: Json<{ all?: boolean; group_ids?: string[] }>;
+    platforms: Generated<ApplePlatform[]>;
     created_by: string | null;
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
