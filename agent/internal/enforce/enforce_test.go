@@ -396,3 +396,22 @@ func TestPasswordsMustBeSignedForThisDeviceAndCurrent(t *testing.T) {
 	}
 	t.Fatal("accounts never reported")
 }
+
+func TestProtectionCoversTheOSButNotAppleUserApps(t *testing.T) {
+	for path, want := range map[string]bool{
+		"/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder":           true,
+		"/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow": true,
+		"/usr/libexec/trustd": true,
+		"/System/Applications/System Settings.app/Contents/MacOS/System Settings":                    true, // people need it to fix compliance
+		`C:\Windows\System32\svchost.exe`:                                                            true,
+		"/System/Applications/Chess.app/Contents/MacOS/Chess":                                        false,
+		"/System/Applications/Music.app/Contents/MacOS/Music":                                        false,
+		"/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal":                        false,
+		"/System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app/Contents/MacOS/Safari": false,
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":                               false,
+	} {
+		if got := protected(Proc{PID: 4242, Path: path}); got != want {
+			t.Errorf("protected(%s) = %v, want %v", path, got, want)
+		}
+	}
+}

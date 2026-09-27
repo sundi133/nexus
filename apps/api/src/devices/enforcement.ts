@@ -41,8 +41,11 @@ const PROTECTED = new Set(
     "systemd", "init", "dbus-daemon", "networkmanager", "systemd-logind", "gdm", "sddm", "xorg",
     "csrss.exe", "wininit.exe", "winlogon.exe", "lsass.exe", "services.exe", "smss.exe", "svchost.exe", "explorer.exe", "dwm.exe", "system", "registry", "msmpeng.exe",
     "nexus-agent", "nexus-agent.exe", "osqueryd", "osqueryd.exe", "osqueryi", "osqueryi.exe",
+    "system settings", "system preferences", // people need these to fix what compliance asks of them
   ].map((s) => s.toLowerCase()),
 );
+// Apple's own user apps live under /System (Music, Chess, Mail, Terminal…; Safari in a Cryptex): rules may stop those.
+const SYSTEM_APPS = ["/system/applications/", "/system/cryptexes/app/system/applications/", "/system/volumes/preboot/cryptexes/app/system/applications/"];
 const PROTECTED_PATHS = ["/system/", "/usr/libexec/", "/sbin/", "c:\\windows\\system32\\", "/library/application support/nexus/", "c:\\program files\\nexus\\", "/opt/nexus/"];
 
 const Kind = z.enum(["app", "domain"]);
@@ -75,7 +78,9 @@ export function checkRule(r: { kind: "app" | "domain"; match: string; value: str
   if (!/^(\/|[a-zA-Z]:\\)/.test(v) || v.length > 1000) return { error: "Give a full path, like /Applications/Example.app/ or C:\\Program Files\\Example\\" };
   const lower = v.toLowerCase();
   if (lower === "/" || /^[a-z]:\\$/.test(lower)) return { error: "That would match every program" };
-  if (PROTECTED_PATHS.some((p) => lower.startsWith(p) || p.startsWith(lower))) return { error: "That folder holds the operating system or Nexus and can't be blocked" };
+  const systemApp = SYSTEM_APPS.some((p) => lower.startsWith(p) && lower.length > p.length);
+  if (!systemApp && PROTECTED_PATHS.some((p) => lower.startsWith(p) || p.startsWith(lower))) return { error: "That folder holds the operating system or Nexus and can't be blocked" };
+  if (/\/system settings\.app|\/system preferences\.app/.test(lower)) return { error: "System Settings can't be blocked: people need it to fix what device policies ask" };
   return { value: v };
 }
 

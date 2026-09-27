@@ -513,12 +513,17 @@ func init() {
 	for _, n := range []string{"launchd", "kernel_task", "windowserver", "loginwindow", "securityd", "opendirectoryd", "mds", "coreservicesd", "syspolicyd", "trustd", "cfprefsd", "sshd",
 		"systemd", "init", "dbus-daemon", "networkmanager", "systemd-logind", "gdm", "sddm", "xorg",
 		"csrss.exe", "wininit.exe", "winlogon.exe", "lsass.exe", "services.exe", "smss.exe", "svchost.exe", "explorer.exe", "dwm.exe", "system", "registry", "msmpeng.exe",
-		"nexus-agent", "nexus-agent.exe", "osqueryd", "osqueryd.exe", "osqueryi", "osqueryi.exe"} {
+		"nexus-agent", "nexus-agent.exe", "osqueryd", "osqueryd.exe", "osqueryi", "osqueryi.exe",
+		"system settings", "system preferences"} { // people need these to fix what compliance asks of them
 		protectedNames[n] = true
 	}
 }
 
 var protectedPrefixes = []string{"/system/", "/usr/libexec/", "/sbin/", `c:\windows\system32\`, "/library/application support/nexus/", `c:\program files\nexus\`, "/opt/nexus/"}
+
+// Apple's own user apps live under /System (Music, Chess, Mail, Terminal…; Safari in a Cryptex):
+// rules may stop those. The rest of /System stays off limits.
+var systemAppPrefixes = []string{"/system/applications/", "/system/cryptexes/app/system/applications/", "/system/volumes/preboot/cryptexes/app/system/applications/"}
 
 func protected(p Proc) bool {
 	if p.PID <= 1 || p.PID == os.Getpid() || p.PID == os.Getppid() {
@@ -527,6 +532,11 @@ func protected(p Proc) bool {
 	lower := strings.ToLower(p.Path)
 	if protectedNames[strings.ToLower(base(p.Path))] {
 		return true
+	}
+	for _, pre := range systemAppPrefixes {
+		if strings.HasPrefix(lower, pre) {
+			return false
+		}
 	}
 	for _, pre := range protectedPrefixes {
 		if strings.HasPrefix(lower, pre) {
