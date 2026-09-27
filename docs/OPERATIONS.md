@@ -43,6 +43,7 @@ Production refuses to start on unsafe settings. It lists every problem at once, 
 | `NEXUS_DB_POOL_SIZE` | Database connections per API process (default 20). Keep processes × pool size under the database's connection limit |
 | `NEXUS_DB_CONNECT_TIMEOUT_MS` | How long to wait for a new database connection before failing the request (default 5000), so a database failover produces quick errors instead of hung requests |
 | `NEXUS_SHUTDOWN_DELAY_MS` | After SIGTERM, how long an API process keeps serving while readiness fails, so the load balancer can remove it (default 5000 in production) |
+| `NEXUS_ORG_DELETION_GRACE_DAYS` | Days between an owner scheduling the organization's deletion and it happening (default 30). See [DATA-GOVERNANCE.md](DATA-GOVERNANCE.md) |
 | `NEXUS_KEEPALIVE_TIMEOUT_MS` | Idle keep-alive timeout (default 65000). Keep it above your load balancer's idle timeout, which is 60 s on AWS ALB |
 | `NEXUS_AGENT_CONCURRENCY` | Device agent requests (enroll, check-in, process events) running at once per process (default 70% of the pool, 14). The rest of the pool stays free for people and integrations |
 | `NEXUS_AGENT_QUEUE`, `NEXUS_AGENT_QUEUE_WAIT_MS` | Agent requests that may wait for a slot (default 500) and for how long (default 3000 ms). Beyond that they get `503 busy` |

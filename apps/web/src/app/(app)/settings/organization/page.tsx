@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertChannelsCard } from "@/components/features/notification-channels";
+import { OrgDataCard } from "@/components/features/data-privacy";
 import { DomainsCard } from "@/components/features/domains-card";
 import type { Schemas } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -270,6 +271,8 @@ nexus config apply -f nexus.yaml`}
             </pre>
           </Card>
         ) : null}
+
+        <OrgDataCard />
 
         <Card className="overflow-hidden">
           <CardHeader title="Change history" description="Every change to these settings: who, when and what." />
