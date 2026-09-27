@@ -18,11 +18,17 @@ spec:
   ingress:
     - from:
         {{- if ne $c "worker" }}
-        - namespaceSelector: { matchLabels: {{- toYaml $np.ingressNamespaceLabels | nindent 12 }} }
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml $np.ingressNamespaceLabels | nindent 14 }}
         {{- end }}
-        - namespaceSelector: { matchLabels: {{- toYaml $np.prometheusNamespaceLabels | nindent 12 }} }
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml $np.prometheusNamespaceLabels | nindent 14 }}
         {{- if eq $c "api" }}
-        - podSelector: { matchLabels: {{- include "nexus.selector" (list $ "web") | nindent 12 }} }
+        - podSelector:
+            matchLabels:
+              {{- include "nexus.selector" (list $ "web") | nindent 14 }}
         {{- end }}
 {{- end }}
 {{- end }}
