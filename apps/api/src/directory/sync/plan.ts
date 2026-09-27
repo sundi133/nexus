@@ -10,18 +10,33 @@
  *    it suspended itself — never an admin's suspension or a contained account.
  *  - Deprovisioned local users are left alone.
  *  - Synced groups mirror remote membership exactly; local-only groups are untouched.
+ *  - With deprovision = "offboard" (HR sources), leavers are offboarded instead: sessions, roles,
+ *    groups, apps and devices, for good.
+ *  - Managers follow the source when it names one (HR supervisors) and that person is synced too.
  */
 
-export type RemoteUser = { external_id: string; email: string; given_name: string; family_name: string; title: string; department: string; active: boolean };
+export type RemoteUser = {
+  external_id: string;
+  email: string;
+  given_name: string;
+  family_name: string;
+  title: string;
+  department: string;
+  active: boolean;
+  /** The manager's external ID in the same source (HR supervisors). */
+  manager_external_id?: string;
+  /** Why the source says they're inactive (e.g. "Left the company in BambooHR (last day 2026-09-30)"). */
+  inactive_reason?: string;
+};
 export type RemoteGroup = { external_id: string; name: string; description: string; member_ids: string[] };
 export type Remote = { users: RemoteUser[]; groups: RemoteGroup[] };
 
-export type LocalUser = { id: string; email: string; given_name: string; family_name: string; title: string; department: string; status: "staged" | "active" | "suspended" | "deprovisioned" };
+export type LocalUser = { id: string; email: string; given_name: string; family_name: string; title: string; department: string; status: "staged" | "active" | "suspended" | "deprovisioned"; manager_id?: string | null };
 export type LocalGroup = { id: string; name: string; description: string; member_ids: string[] };
 export type Link = { kind: "user" | "group"; external_id: string; local_id: string; suspended_by_sync: boolean };
 export type Local = { users: LocalUser[]; groups: LocalGroup[]; links: Link[] };
 
-export type Settings = { provider: keyof typeof PROVIDER_NAME; deprovision: "suspend" | "none"; sync_groups: boolean; group_filter: string[] };
+export type Settings = { provider: keyof typeof PROVIDER_NAME; deprovision: "suspend" | "offboard" | "none"; sync_groups: boolean; group_filter: string[] };
 
 const FIELDS = ["email", "given_name", "family_name", "title", "department"] as const;
 type Changes = Partial<Record<(typeof FIELDS)[number], { from: string; to: string }>>;
@@ -32,6 +47,10 @@ export type Plan = {
   update_users: { local_id: string; email: string; changes: Changes }[];
   suspend_users: { local_id: string; email: string; reason: string }[];
   reactivate_users: { local_id: string; email: string }[];
+  /** Offboarded rather than suspended (deprovision = "offboard"). */
+  offboard_users: { local_id: string; email: string; reason: string }[];
+  /** Manager changes, resolved against synced people when applied (new people get theirs after they're created). */
+  managers: { external_id: string; email: string; manager_external_id: string | null; from: string | null; to: string | null }[];
   create_groups: RemoteGroup[];
   link_groups: { local_id: string; name: string; external_id: string }[];
   update_groups: { local_id: string; name: string; changes: { name?: { from: string; to: string }; description?: { from: string; to: string } } }[];
@@ -41,7 +60,7 @@ export type Plan = {
   guard: { tripped: boolean; suspensions: number; threshold: number };
 };
 
-export const PROVIDER_NAME = { google: "Google Workspace", entra: "Microsoft Entra ID", scim: "SCIM", ldap: "Active Directory / LDAP" } as const;
+export const PROVIDER_NAME = { google: "Google Workspace", entra: "Microsoft Entra ID", scim: "SCIM", ldap: "Active Directory / LDAP", bamboohr: "BambooHR", workday: "Workday" } as const;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const norm = (e: string) => e.trim().toLowerCase();
@@ -52,7 +71,7 @@ export const guardThreshold = (activeLinked: number) => Math.max(5, Math.ceil(ac
 export function plan(remote: Remote, local: Local, s: Settings): Plan {
   const src = PROVIDER_NAME[s.provider];
   const out: Plan = {
-    create_users: [], link_users: [], update_users: [], suspend_users: [], reactivate_users: [],
+    create_users: [], link_users: [], update_users: [], suspend_users: [], reactivate_users: [], offboard_users: [], managers: [],
     create_groups: [], link_groups: [], update_groups: [], membership: [], skipped: [],
     guard: { tripped: false, suspensions: 0, threshold: 0 },
   };
@@ -117,8 +136,10 @@ export function plan(remote: Remote, local: Local, s: Settings): Plan {
     }
     if (Object.keys(changes).length) out.update_users.push({ local_id: lu.id, email: lu.email, changes });
 
-    if (!r.active && lu.status !== "suspended" && s.deprovision === "suspend") {
-      out.suspend_users.push({ local_id: lu.id, email: lu.email, reason: `Suspended in ${src}` });
+    if (!r.active && s.deprovision === "offboard") {
+      out.offboard_users.push({ local_id: lu.id, email: lu.email, reason: r.inactive_reason ?? `Inactive in ${src}` });
+    } else if (!r.active && lu.status !== "suspended" && s.deprovision === "suspend") {
+      out.suspend_users.push({ local_id: lu.id, email: lu.email, reason: r.inactive_reason ?? `Suspended in ${src}` });
     } else if (r.active && lu.status === "suspended" && link?.suspended_by_sync) {
       out.reactivate_users.push({ local_id: lu.id, email: lu.email });
     }
@@ -127,11 +148,42 @@ export function plan(remote: Remote, local: Local, s: Settings): Plan {
   // Linked users that are gone from the (scoped) directory.
   for (const link of userLinks.values()) {
     const lu = localById.get(link.local_id);
-    if (!lu || seenLocal.has(lu.id) || lu.status === "suspended" || lu.status === "deprovisioned") continue;
-    if (s.deprovision !== "suspend") continue;
+    if (!lu || seenLocal.has(lu.id) || lu.status === "deprovisioned") continue;
+    if (s.deprovision === "none" || (s.deprovision === "suspend" && lu.status === "suspended")) continue;
     if (inScope.has(link.external_id)) continue; // still there, just skipped this run (e.g. a duplicate email): don't punish it
     const stillThere = remote.users.some((u) => u.external_id === link.external_id);
-    out.suspend_users.push({ local_id: lu.id, email: lu.email, reason: stillThere ? `No longer in the synced ${src} groups` : `Removed from ${src}` });
+    const reason = stillThere ? `No longer in the synced ${src} groups` : `Removed from ${src}`;
+    (s.deprovision === "offboard" ? out.offboard_users : out.suspend_users).push({ local_id: lu.id, email: lu.email, reason });
+  }
+
+  // Managers: the source's supervisor, when both people are synced (not for leavers).
+  if (remoteUsers.some((r) => r.manager_external_id !== undefined)) {
+    const emailOf = new Map(local.users.map((u) => [u.id, u.email]));
+    const remoteEmail = new Map(remoteUsers.map((r) => [r.external_id, r.email]));
+    const localOf = (ext: string) => {
+      const l = userLinks.get(ext);
+      if (l) return l.local_id;
+      const lu = localByEmail.get(remoteEmail.get(ext) ?? "");
+      return lu && !linkedLocalIds.has(lu.id) ? lu.id : undefined;
+    };
+    const leaving = new Set([...out.offboard_users, ...out.suspend_users].map((x) => x.local_id));
+    for (const r of remoteUsers) {
+      if (!r.active || r.manager_external_id === undefined) continue;
+      const me = localOf(r.external_id);
+      if (me && (leaving.has(me) || localById.get(me)?.status === "deprovisioned")) continue;
+      const wantExt = r.manager_external_id && r.manager_external_id !== r.external_id && remoteEmail.has(r.manager_external_id) ? r.manager_external_id : null;
+      const wantLocal = wantExt ? localOf(wantExt) : null;
+      const cur = me ? (localById.get(me)?.manager_id ?? null) : null;
+      if (me && wantLocal !== undefined && cur === wantLocal) continue; // already right
+      if (!me && !wantExt) continue; // new, and no manager to set
+      out.managers.push({
+        external_id: r.external_id,
+        email: r.email,
+        manager_external_id: wantExt,
+        from: cur ? (emailOf.get(cur) ?? null) : null,
+        to: wantExt ? (remoteEmail.get(wantExt) ?? null) : null,
+      });
+    }
   }
 
   // --- groups ----------------------------------------------------------------------
@@ -145,7 +197,8 @@ export function plan(remote: Remote, local: Local, s: Settings): Plan {
     for (const r of remoteUsers) {
       const link = userLinks.get(r.external_id);
       const lu = (link && localById.get(link.local_id)) || (!link ? localByEmail.get(r.email) : undefined);
-      if (lu && !out.skipped.some((x) => x.email === r.email)) localFor.set(r.external_id, lu.id);
+      if (lu && lu.status === "deprovisioned") continue; // offboarded: not put back in groups
+      if (lu && !out.offboard_users.some((x) => x.local_id === lu.id) && !out.skipped.some((x) => x.email === r.email)) localFor.set(r.external_id, lu.id);
       else if (out.create_users.includes(r)) localFor.set(r.external_id, null);
     }
 
@@ -186,7 +239,7 @@ export function plan(remote: Remote, local: Local, s: Settings): Plan {
     const u = localById.get(l.local_id);
     return u && (u.status === "active" || u.status === "staged");
   }).length;
-  out.guard = { suspensions: out.suspend_users.length, threshold: guardThreshold(activeLinked), tripped: false };
+  out.guard = { suspensions: out.suspend_users.length + out.offboard_users.length, threshold: guardThreshold(activeLinked), tripped: false };
   out.guard.tripped = out.guard.suspensions > out.guard.threshold;
   return out;
 }
@@ -198,6 +251,8 @@ export function summarize(p: Plan) {
     update_users: p.update_users.length,
     suspend_users: p.suspend_users.length,
     reactivate_users: p.reactivate_users.length,
+    offboard_users: p.offboard_users.length,
+    managers: p.managers.length,
     create_groups: p.create_groups.length,
     update_groups: p.update_groups.length + p.link_groups.length,
     membership_changes: p.membership.reduce((n, m) => n + m.add.length + m.remove.length, 0),
