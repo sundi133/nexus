@@ -2900,6 +2900,18 @@
               "process_events": {
                 "type": "boolean",
                 "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
+              },
+              "device_offline_hours": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 720,
+                "description": "A device that hasn't checked in for this long is reported offline (the Device offline alert)"
+              },
+              "disk_low_percent": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50,
+                "description": "A device whose system disk has less free space than this is reported (the Disk nearly full alert)"
               }
             }
           },
@@ -4986,6 +4998,18 @@
           "process_events": {
             "type": "boolean",
             "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
+          },
+          "device_offline_hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 720,
+            "description": "A device that hasn't checked in for this long is reported offline (the Device offline alert)"
+          },
+          "disk_low_percent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "A device whose system disk has less free space than this is reported (the Disk nearly full alert)"
           }
         },
         "required": [
@@ -4994,7 +5018,9 @@
           "restrict_to_verified_domains",
           "owners_require_passkey",
           "audit_retention_days",
-          "process_events"
+          "process_events",
+          "device_offline_hours",
+          "disk_low_percent"
         ]
       },
       "PolicyImpact": {
@@ -5946,7 +5972,8 @@
                 "saml",
                 "oidc"
               ]
-            }
+            },
+            "description": "Empty when SSO support isn't verified"
           },
           "template": {
             "type": [
@@ -5954,6 +5981,10 @@
               "null"
             ],
             "description": "A catalog template to use instead, when there is one"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Known to support SAML or OIDC single sign-on. Otherwise check the vendor's documentation (it's often on business plans only)"
           }
         },
         "required": [
@@ -5961,7 +5992,8 @@
           "name",
           "category",
           "protocols",
-          "template"
+          "template",
+          "verified"
         ]
       },
       "SigningKey": {
@@ -7087,6 +7119,31 @@
               ]
             }
           },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                },
+                "tag": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "tag",
+                "name"
+              ]
+            },
+            "description": "Hardware checked out to them: to collect"
+          },
           "agents": {
             "type": "array",
             "items": {
@@ -7137,6 +7194,7 @@
           "groups",
           "apps",
           "devices",
+          "assets",
           "agents",
           "factors",
           "scheduled"
@@ -8730,6 +8788,9 @@
           "message": {
             "type": "string"
           },
+          "saas_discovery": {
+            "type": "boolean"
+          },
           "version": {
             "type": "string"
           },
@@ -8749,6 +8810,7 @@
           "dlp",
           "uploads",
           "message",
+          "saas_discovery",
           "version",
           "updated_at",
           "server"
@@ -8893,6 +8955,10 @@
             "maxLength": 500,
             "default": "",
             "description": "Shown to people on warnings and blocks, e.g. a link to your AI policy"
+          },
+          "saas_discovery": {
+            "type": "boolean",
+            "description": "Count visits to known SaaS apps (and password sign-ins) per person per day. Nothing else about browsing is reported. Left as it is when omitted"
           }
         }
       },
@@ -10107,6 +10173,52 @@
             "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f",
             "description": "The same Mac's Nexus agent device, matched by serial"
           },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "macos",
+              "ios",
+              "ipados",
+              "other"
+            ]
+          },
+          "assigned_user": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email"
+            ],
+            "description": "Whose iPhone or iPad it is (Macs follow their agent's user)"
+          },
+          "lost_mode": {
+            "type": "boolean"
+          },
+          "passcode": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "iPhone and iPad: a passcode is set"
+          },
+          "supervised": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "bootstrap_token": {
             "type": "boolean"
           },
@@ -10140,6 +10252,11 @@
           "os_version",
           "status",
           "device_id",
+          "platform",
+          "assigned_user",
+          "lost_mode",
+          "passcode",
+          "supervised",
           "bootstrap_token",
           "filevault",
           "enrolled_at",
@@ -10236,6 +10353,18 @@
               }
             }
           },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "macos",
+                "ios",
+                "ipados"
+              ]
+            },
+            "description": "The kinds of device it's installed on"
+          },
           "counts": {
             "type": "object",
             "properties": {
@@ -10266,6 +10395,7 @@
           "payload_types",
           "source",
           "target",
+          "platforms",
           "counts",
           "updated_at"
         ]
@@ -10639,6 +10769,641 @@
           "accepted_at",
           "ended_at",
           "expires_at"
+        ]
+      },
+      "SaasApp": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "hosts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "approved",
+              "unapproved"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "warn",
+              "block"
+            ],
+            "description": "For unapproved apps: what browsers do (allow and count, warn, or block)"
+          },
+          "owner": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "people": {
+            "type": "integer"
+          },
+          "visits": {
+            "type": "integer"
+          },
+          "password_logins": {
+            "type": "integer",
+            "description": "Sign-ins with a password rather than SSO"
+          },
+          "password_people": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "integer"
+          },
+          "last_seen": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sso": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "The Nexus application for it, if it's set up for single sign-on"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "hosts",
+          "status",
+          "action",
+          "owner",
+          "notes",
+          "people",
+          "visits",
+          "password_logins",
+          "password_people",
+          "blocked",
+          "last_seen",
+          "sso"
+        ]
+      },
+      "SaasLicense": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "app_key": {
+            "type": "string"
+          },
+          "app_name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "seats": {
+            "type": "integer"
+          },
+          "unit_cost": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billing": {
+            "type": "string",
+            "enum": [
+              "monthly",
+              "annual"
+            ]
+          },
+          "annual_cost": {
+            "type": "number"
+          },
+          "renews_on": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "renews_soon": {
+            "type": "boolean"
+          },
+          "seat_source": {
+            "type": "string",
+            "enum": [
+              "sso",
+              "list"
+            ]
+          },
+          "owner": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "holders": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "integer"
+          },
+          "inactive": {
+            "type": "integer"
+          },
+          "departed": {
+            "type": "integer"
+          },
+          "unassigned": {
+            "type": "integer",
+            "description": "Seats paid for that nobody holds"
+          },
+          "reclaimable": {
+            "type": "integer",
+            "description": "Unassigned seats, plus seats held by people who left or haven't used the app"
+          },
+          "reclaimable_annual": {
+            "type": "number"
+          },
+          "activity_from": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "browser",
+                "sso"
+              ]
+            },
+            "description": "Where use is seen. Empty: use can't be judged, so no seat counts as inactive"
+          },
+          "sso_app": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "app_key",
+          "app_name",
+          "category",
+          "plan",
+          "seats",
+          "unit_cost",
+          "currency",
+          "billing",
+          "annual_cost",
+          "renews_on",
+          "renews_soon",
+          "seat_source",
+          "owner",
+          "notes",
+          "holders",
+          "active",
+          "inactive",
+          "departed",
+          "unassigned",
+          "reclaimable",
+          "reclaimable_annual",
+          "activity_from",
+          "sso_app"
+        ]
+      },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "laptop",
+              "desktop",
+              "phone",
+              "tablet",
+              "monitor",
+              "peripheral",
+              "network",
+              "server",
+              "other"
+            ]
+          },
+          "make": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_stock",
+              "assigned",
+              "in_repair",
+              "retired",
+              "lost"
+            ]
+          },
+          "assigned_to": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "left": {
+                "type": "boolean",
+                "description": "They've been suspended or offboarded: collect it"
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "name",
+              "left"
+            ]
+          },
+          "location": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "purchase_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purchase_cost": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "warranty_until": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warranty": {
+            "type": "string",
+            "enum": [
+              "none",
+              "active",
+              "expiring",
+              "expired"
+            ]
+          },
+          "device": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "hostname": {
+                "type": "string"
+              },
+              "last_seen_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "hostname",
+              "last_seen_at"
+            ],
+            "description": "The enrolled device with the same serial number"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tag",
+          "name",
+          "kind",
+          "make",
+          "model",
+          "serial",
+          "status",
+          "assigned_to",
+          "location",
+          "vendor",
+          "purchase_date",
+          "purchase_cost",
+          "currency",
+          "warranty_until",
+          "warranty",
+          "device",
+          "notes",
+          "updated_at"
+        ]
+      },
+      "DeviceSignIn": {
+        "type": "object",
+        "properties": {
+          "factor_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+              },
+              "hostname": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "hostname"
+            ]
+          }
+        },
+        "required": [
+          "factor_id",
+          "name",
+          "device"
+        ]
+      },
+      "AndroidPolicySettings": {
+        "type": "object",
+        "properties": {
+          "password_min_length": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16,
+            "description": "0: no passcode required"
+          },
+          "lock_after_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "block_unknown_sources": {
+            "type": "boolean",
+            "description": "No apps from outside Google Play"
+          },
+          "disable_camera": {
+            "type": "boolean"
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$"
+                },
+                "install": {
+                  "type": "string",
+                  "enum": [
+                    "force",
+                    "available",
+                    "blocked"
+                  ]
+                }
+              },
+              "required": [
+                "package",
+                "install"
+              ]
+            },
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "password_min_length",
+          "lock_after_minutes",
+          "block_unknown_sources",
+          "disable_camera",
+          "apps"
+        ]
+      },
+      "AndroidDevice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "brand": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "android_version": {
+            "type": "string"
+          },
+          "security_patch": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "company",
+              "work_profile",
+              "unknown"
+            ],
+            "description": "company: fully managed (DEVICE_OWNER). work_profile: a personal phone with a work profile"
+          },
+          "state": {
+            "type": "string"
+          },
+          "policy_compliant": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "non_compliance": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "setting": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "setting",
+                "reason"
+              ]
+            }
+          },
+          "assigned_user": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email"
+            ]
+          },
+          "enrolled_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_status_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "serial",
+          "brand",
+          "model",
+          "android_version",
+          "security_patch",
+          "kind",
+          "state",
+          "policy_compliant",
+          "non_compliance",
+          "assigned_user",
+          "enrolled_at",
+          "last_status_at"
         ]
       },
       "DevicePage": {
@@ -27158,6 +27923,18 @@
                   "process_events": {
                     "type": "boolean",
                     "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
+                  },
+                  "device_offline_hours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720,
+                    "description": "A device that hasn't checked in for this long is reported offline (the Device offline alert)"
+                  },
+                  "disk_low_percent": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "description": "A device whose system disk has less free space than this is reported (the Disk nearly full alert)"
                   }
                 }
               }
@@ -43413,7 +44190,7 @@
         "tags": [
           "Apple MDM"
         ],
-        "summary": "Macs enrolled in Nexus MDM",
+        "summary": "Macs, iPhones and iPads enrolled in Nexus MDM",
         "security": [
           {
             "bearer": []
@@ -43595,8 +44372,8 @@
         "tags": [
           "Apple MDM"
         ],
-        "summary": "Send an MDM command to a Mac",
-        "description": "Queues the command and wakes the Mac through APNs. Lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.",
+        "summary": "Send an MDM command to a Mac, iPhone or iPad",
+        "description": "Queues the command and wakes the device through APNs. On a Mac, lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). iPhones and iPads also take ClearPasscode, EnableLostMode (with a message and phone number), DeviceLocation and PlayLostModeSound (in Lost Mode) and DisableLostMode; Lost Mode, restart, shut down and OS updates need a supervised iPhone or iPad. Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.",
         "security": [
           {
             "bearer": []
@@ -43632,7 +44409,12 @@
                       "RestartDevice",
                       "ShutDownDevice",
                       "ScheduleOSUpdate",
-                      "EraseDevice"
+                      "EraseDevice",
+                      "ClearPasscode",
+                      "EnableLostMode",
+                      "PlayLostModeSound",
+                      "DeviceLocation",
+                      "DisableLostMode"
                     ]
                   },
                   "reason": {
@@ -43643,6 +44425,11 @@
                   "message": {
                     "type": "string",
                     "maxLength": 200
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "description": "Lock and Lost Mode: a number shown on the screen"
                   },
                   "confirm": {
                     "type": "string",
@@ -43688,6 +44475,110 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/devices/{id}/user": {
+      "put": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Say whose iPhone or iPad this is (profiles for their groups follow)",
+        "description": "Macs usually get their person from the Nexus agent; phones and tablets have no agent. `user_id: null` clears it.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Assigned"
           },
           "400": {
             "description": "Invalid request",
@@ -43894,6 +44785,22 @@
                       "all": true
                     },
                     "description": "Every enrolled Mac, or the Macs of people in these groups"
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "macos",
+                        "ios",
+                        "ipados"
+                      ]
+                    },
+                    "minItems": 1,
+                    "default": [
+                      "macos"
+                    ],
+                    "description": "Which kinds of device to install it on"
                   }
                 },
                 "required": [
@@ -43974,7 +44881,7 @@
           "Apple MDM"
         ],
         "summary": "Build a configuration profile from a template",
-        "description": "Templates: screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, wifi {ssid, password, hidden}, software_update {}, login_message {message}.",
+        "description": "Templates: passcode {min_length, auto_lock_minutes} (Mac, iPhone, iPad), wifi {ssid, password, hidden} (Mac, iPhone, iPad), screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, software_update {}, login_message {message} (Mac only).",
         "security": [
           {
             "bearer": []
@@ -43995,6 +44902,7 @@
                   "kind": {
                     "type": "string",
                     "enum": [
+                      "passcode",
                       "screen_lock",
                       "firewall",
                       "wifi",
@@ -47160,6 +48068,4549 @@
         "responses": {
           "204": {
             "description": "Recorded"
+          }
+        }
+      }
+    },
+    "/v1/saas/apps": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "SaaS apps people use, and what the organization decided about them",
+        "description": "Apps seen in managed browsers in the last `days` (while discovery is on), plus every app with a decision.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 180,
+              "default": 30
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "unreviewed",
+                "approved",
+                "unapproved"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SaasApp"
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "discovery": {
+                          "type": "boolean"
+                        },
+                        "apps": {
+                          "type": "integer"
+                        },
+                        "people": {
+                          "type": "integer"
+                        },
+                        "unreviewed": {
+                          "type": "integer"
+                        },
+                        "unapproved_in_use": {
+                          "type": "integer"
+                        },
+                        "password_apps": {
+                          "type": "integer",
+                          "description": "Apps set up for SSO that people still sign in to with a password"
+                        }
+                      },
+                      "required": [
+                        "discovery",
+                        "apps",
+                        "people",
+                        "unreviewed",
+                        "unapproved_in_use",
+                        "password_apps"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "summary"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/apps/{key}": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "One SaaS app: who uses it and how they sign in",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,40}$"
+            },
+            "required": true,
+            "name": "key",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 180,
+              "default": 30
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "app": {
+                      "$ref": "#/components/schemas/SaasApp"
+                    },
+                    "people": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "user_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "visits": {
+                            "type": "integer"
+                          },
+                          "password_logins": {
+                            "type": "integer"
+                          },
+                          "blocked": {
+                            "type": "integer"
+                          },
+                          "last_seen": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "email",
+                          "user_id",
+                          "name",
+                          "visits",
+                          "password_logins",
+                          "blocked",
+                          "last_seen"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "app",
+                    "people"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Approve an app, or mark it unapproved and choose what browsers do",
+        "description": "Warning or blocking needs a recent MFA. Browsers pick up the change on their next sync (about a minute).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,40}$"
+            },
+            "required": true,
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "unreviewed",
+                      "approved",
+                      "unapproved"
+                    ]
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "allow",
+                      "warn",
+                      "block"
+                    ],
+                    "default": "allow"
+                  },
+                  "owner_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaasApp"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/catalog": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Search the SaaS apps Nexus recognises",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": ""
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "required": false,
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "hosts": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "name",
+                          "category",
+                          "hosts"
+                        ]
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "total",
+                    "categories"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/licenses": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "SaaS licenses: what you pay for, and which seats are used",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 7,
+              "maximum": 180,
+              "default": 30,
+              "description": "A seat counts as used if its holder used the app within this many days"
+            },
+            "required": false,
+            "description": "A seat counts as used if its holder used the app within this many days",
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SaasLicense"
+                      }
+                    },
+                    "totals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "currency": {
+                            "type": "string"
+                          },
+                          "annual_cost": {
+                            "type": "number"
+                          },
+                          "reclaimable_annual": {
+                            "type": "number"
+                          },
+                          "seats": {
+                            "type": "integer"
+                          },
+                          "reclaimable": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "currency",
+                          "annual_cost",
+                          "reclaimable_annual",
+                          "seats",
+                          "reclaimable"
+                        ]
+                      }
+                    },
+                    "renewing_soon": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "totals",
+                    "renewing_soon"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Add a license",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "app_key": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]{1,40}$"
+                  },
+                  "plan": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "seats": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "unit_cost": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 0,
+                    "description": "Price per seat per billing period, e.g. 12.5"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "default": "USD"
+                  },
+                  "billing": {
+                    "type": "string",
+                    "enum": [
+                      "monthly",
+                      "annual"
+                    ],
+                    "default": "annual"
+                  },
+                  "renews_on": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "seat_source": {
+                    "type": "string",
+                    "enum": [
+                      "sso",
+                      "list"
+                    ],
+                    "default": "sso",
+                    "description": "sso: people assigned to the app in Nexus hold the seats. list: the seat holders you give"
+                  },
+                  "owner_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "app_key",
+                  "seats"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaasLicense"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/licenses/{id}": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "A license and its seat holders",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 7,
+              "maximum": 180,
+              "default": 30,
+              "description": "A seat counts as used if its holder used the app within this many days"
+            },
+            "required": false,
+            "description": "A seat counts as used if its holder used the app within this many days",
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "license": {
+                      "$ref": "#/components/schemas/SaasLicense"
+                    },
+                    "holders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "user_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "active",
+                              "inactive",
+                              "departed",
+                              "unknown"
+                            ]
+                          },
+                          "last_used": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "via": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "browser",
+                              "sso",
+                              null
+                            ]
+                          }
+                        },
+                        "required": [
+                          "email",
+                          "user_id",
+                          "name",
+                          "status",
+                          "last_used",
+                          "via"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "license",
+                    "holders"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Change a license",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "app_key": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]{1,40}$"
+                  },
+                  "plan": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "seats": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  },
+                  "unit_cost": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 0,
+                    "description": "Price per seat per billing period, e.g. 12.5"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "default": "USD"
+                  },
+                  "billing": {
+                    "type": "string",
+                    "enum": [
+                      "monthly",
+                      "annual"
+                    ],
+                    "default": "annual"
+                  },
+                  "renews_on": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "seat_source": {
+                    "type": "string",
+                    "enum": [
+                      "sso",
+                      "list"
+                    ],
+                    "default": "sso",
+                    "description": "sso: people assigned to the app in Nexus hold the seats. list: the seat holders you give"
+                  },
+                  "owner_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "app_key",
+                  "seats"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaasLicense"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Remove a license",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/licenses/{id}/holders": {
+      "put": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Set who holds the seats (for licenses whose seats come from a list)",
+        "description": "Replaces the list. Emails are matched to people in Nexus; others are kept as they are (contractors, shared accounts).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "emails": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 20000
+                  }
+                },
+                "required": [
+                  "emails"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "holders": {
+                      "type": "integer"
+                    },
+                    "added": {
+                      "type": "integer"
+                    },
+                    "removed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "holders",
+                    "added",
+                    "removed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Hardware the organization owns",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "in_stock",
+                "assigned",
+                "in_repair",
+                "retired",
+                "lost"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "laptop",
+                "desktop",
+                "phone",
+                "tablet",
+                "monitor",
+                "peripheral",
+                "network",
+                "server",
+                "other"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": false,
+            "name": "assigned_to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Asset"
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "assigned": {
+                          "type": "integer"
+                        },
+                        "in_stock": {
+                          "type": "integer"
+                        },
+                        "to_collect": {
+                          "type": "integer",
+                          "description": "Assigned to people who've left"
+                        },
+                        "warranty_expiring": {
+                          "type": "integer"
+                        },
+                        "unenrolled_devices": {
+                          "type": "integer",
+                          "description": "Enrolled devices with no asset record"
+                        },
+                        "value": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "currency": {
+                                "type": "string"
+                              },
+                              "total": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "currency",
+                              "total"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "assigned",
+                        "in_stock",
+                        "to_collect",
+                        "warranty_expiring",
+                        "unenrolled_devices",
+                        "value"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "summary"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Add an asset",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "laptop",
+                      "desktop",
+                      "phone",
+                      "tablet",
+                      "monitor",
+                      "peripheral",
+                      "network",
+                      "server",
+                      "other"
+                    ],
+                    "default": "other"
+                  },
+                  "make": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "model": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "serial": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "vendor": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "purchase_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "purchase_cost": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100000000,
+                    "default": null
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "default": "USD"
+                  },
+                  "warranty_until": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "tag"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{id}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "An asset and its history",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asset": {
+                      "$ref": "#/components/schemas/Asset"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "at": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "user": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "note": {
+                            "type": "string"
+                          },
+                          "by": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "at",
+                          "kind",
+                          "user",
+                          "status",
+                          "note",
+                          "by"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "asset",
+                    "history"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Change an asset's details",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "laptop",
+                      "desktop",
+                      "phone",
+                      "tablet",
+                      "monitor",
+                      "peripheral",
+                      "network",
+                      "server",
+                      "other"
+                    ],
+                    "default": "other"
+                  },
+                  "make": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "model": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "serial": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "vendor": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "purchase_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "purchase_cost": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100000000,
+                    "default": null
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "default": "USD"
+                  },
+                  "warranty_until": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "tag"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Delete an asset record (to keep its history, retire it instead)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{id}/checkout": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Give an asset to someone",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{id}/checkin": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Take an asset back (to stock, repair, retirement, or report it lost)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "in_stock",
+                      "in_repair",
+                      "retired",
+                      "lost"
+                    ],
+                    "default": "in_stock"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/import": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Import assets (from a spreadsheet): new tags are added, existing tags updated",
+        "description": "Rows may name the holder by `assigned_to_email`; an asset given a holder is marked assigned.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "tag": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "default": ""
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "laptop",
+                            "desktop",
+                            "phone",
+                            "tablet",
+                            "monitor",
+                            "peripheral",
+                            "network",
+                            "server",
+                            "other"
+                          ],
+                          "default": "other"
+                        },
+                        "make": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "default": ""
+                        },
+                        "model": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "default": ""
+                        },
+                        "serial": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "default": ""
+                        },
+                        "location": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "default": ""
+                        },
+                        "vendor": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "default": ""
+                        },
+                        "purchase_date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date",
+                          "default": null
+                        },
+                        "purchase_cost": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "minimum": 0,
+                          "maximum": 100000000,
+                          "default": null
+                        },
+                        "currency": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{3}$",
+                          "default": "USD"
+                        },
+                        "warranty_until": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date",
+                          "default": null
+                        },
+                        "notes": {
+                          "type": "string",
+                          "maxLength": 2000,
+                          "default": ""
+                        },
+                        "assigned_to_email": {
+                          "type": "string",
+                          "maxLength": 320,
+                          "default": ""
+                        }
+                      },
+                      "required": [
+                        "tag"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 5000
+                  }
+                },
+                "required": [
+                  "rows"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "created": {
+                      "type": "integer"
+                    },
+                    "updated": {
+                      "type": "integer"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "row": {
+                            "type": "integer"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "row",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "created",
+                    "updated",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/from-devices": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Add an asset for every enrolled device that doesn't have one (matched by serial)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "created": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "created"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/device/start": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Start signing in with this managed device",
+        "description": "Send `nonce` to the local agent at `agent_url` (`POST /v1/attest`), then call `/v1/auth/device/options` with its attestation.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticket": {
+                      "type": "string"
+                    },
+                    "nonce": {
+                      "type": "string"
+                    },
+                    "agent_url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ticket",
+                    "nonce",
+                    "agent_url"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/device/options": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Check the device's attestation and get the passkey request for its user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ticket": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "attestation": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "ticket",
+                  "attestation"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticket": {
+                      "type": "string"
+                    },
+                    "options": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "email"
+                      ]
+                    },
+                    "device": {
+                      "type": "object",
+                      "properties": {
+                        "hostname": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "hostname"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ticket",
+                    "options",
+                    "user",
+                    "device"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/device": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Finish signing in with this device",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ticket": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "response": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "client": {
+                    "type": "string",
+                    "enum": [
+                      "web"
+                    ],
+                    "default": "web"
+                  }
+                },
+                "required": [
+                  "ticket",
+                  "response"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "session": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "active"
+                          ]
+                        },
+                        "expires_at": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "state",
+                        "expires_at"
+                      ]
+                    },
+                    "mfa": {
+                      "type": "object",
+                      "properties": {
+                        "required": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "enrollment_required": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "factors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "required",
+                        "enrollment_required",
+                        "factors"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "session",
+                    "mfa"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/device-sign-in": {
+      "get": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Devices you can sign in with",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DeviceSignIn"
+                      }
+                    },
+                    "this_device": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                        },
+                        "hostname": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "hostname"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "this_device"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Let a passkey sign you in on this device",
+        "description": "The session must have verified the device (device trust) in the last 15 minutes, and the device must be assigned to you. Use a passkey made on this device (Touch ID, Windows Hello).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "factor_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  }
+                },
+                "required": [
+                  "factor_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceSignIn"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/device-sign-in/{factor_id}": {
+      "delete": {
+        "tags": [
+          "Me"
+        ],
+        "summary": "Stop a passkey signing you in with a device (it stays a passkey)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "factor_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android": {
+      "get": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Whether Android Enterprise is connected, and its policy",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service_account": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The service account's email, once added"
+                    },
+                    "project_id": {
+                      "type": "string"
+                    },
+                    "enterprise": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "display_name"
+                      ]
+                    },
+                    "policy": {
+                      "$ref": "#/components/schemas/AndroidPolicySettings"
+                    },
+                    "policy_applied_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "devices": {
+                      "type": "integer"
+                    },
+                    "last_sync_at": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "last_error": {
+                      "type": "string"
+                    },
+                    "callback_url": {
+                      "type": "string",
+                      "description": "Where Google sends admins back after creating the enterprise"
+                    }
+                  },
+                  "required": [
+                    "service_account",
+                    "project_id",
+                    "enterprise",
+                    "policy",
+                    "policy_applied_at",
+                    "devices",
+                    "last_sync_at",
+                    "last_error",
+                    "callback_url"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/service-account": {
+      "put": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Add the Google Cloud service account Nexus manages Android with",
+        "description": "A JSON key for a service account with the Android Management User role, in a project with the Android Management API enabled. Stored sealed. Owners and admins (`org:manage`) only, with a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project_id": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 100
+                  },
+                  "key_json": {
+                    "type": "string",
+                    "minLength": 100,
+                    "maxLength": 20000
+                  }
+                },
+                "required": [
+                  "project_id",
+                  "key_json"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service_account": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "service_account"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/signup": {
+      "post": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Start creating the organization's Android enterprise (returns Google's sign-up page)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/enterprise": {
+      "post": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Finish creating the Android enterprise, with the token Google sent back",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enterprise_token": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "enterprise_token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "display_name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "display_name"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/policy": {
+      "put": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Set the Android policy (passcode, screen lock, apps, camera)",
+        "description": "Applied to every enrolled device through Google. Needs `devices:enforce` and a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AndroidPolicySettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AndroidPolicySettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/enrollment-tokens": {
+      "post": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Make an enrollment token: a QR code for company phones, a link for work profiles",
+        "description": "Company phones: factory reset, tap the welcome screen six times, and scan the QR code. Personal phones: open the link to add a work profile. Naming a person makes the device theirs when it enrolls.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "company",
+                      "work_profile"
+                    ]
+                  },
+                  "user_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "default": null,
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  },
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 90,
+                    "default": 7
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    },
+                    "qr_code": {
+                      "type": "string"
+                    },
+                    "enroll_url": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "qr_code",
+                    "enroll_url",
+                    "expires_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/sync": {
+      "post": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Fetch the devices Google reports now",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "devices": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "devices"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/devices": {
+      "get": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Enrolled Android devices",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AndroidDevice"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/devices/{id}/commands": {
+      "post": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Lock, reboot, or turn Lost Mode on or off",
+        "description": "Reboot and Lost Mode are for company phones (fully managed). Needs `devices:actions` and a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "enum": [
+                      "lock",
+                      "reboot",
+                      "start_lost_mode",
+                      "stop_lost_mode"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "command",
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/devices/{id}": {
+      "delete": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Remove a device: erases a company phone, or removes the work profile from a personal one",
+        "description": "Needs `devices:wipe`, a recent MFA, and the serial number typed to confirm.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 200
+                  },
+                  "confirm": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "reason",
+                  "confirm"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/android/devices/{id}/user": {
+      "put": {
+        "tags": [
+          "Android"
+        ],
+        "summary": "Say whose phone this is",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Assigned"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }

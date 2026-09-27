@@ -6,24 +6,50 @@ import { pushKeyAad } from "./pki.js";
 import { pushMdm } from "./push.js";
 
 /** What admins can send, and the command dictionary Apple expects for each. */
+const MAC = ["macos"] as const;
+const MOBILE = ["ios", "ipados"] as const;
+const ALL = ["macos", "ios", "ipados"] as const;
+
+/**
+ * Commands admins can send, with who may send them and which devices take them. Mobile-only ones
+ * (Lost Mode, clearing a passcode) and Mac-only ones (a lock PIN) follow Apple's MDM reference;
+ * restarting, shutting down and updating an iPhone or iPad need it to be supervised.
+ */
 export const COMMANDS = {
   DeviceInformation: {
     perm: "devices:read",
+    platforms: ALL,
     build: () => ({ Queries: ["DeviceName", "OSVersion", "BuildVersion", "ModelName", "Model", "ProductName", "SerialNumber", "DeviceCapacity", "AvailableDeviceCapacity", "IsSupervised", "IsActivationLockEnabled"] }),
   },
-  SecurityInfo: { perm: "devices:read", build: () => ({}) },
-  InstalledApplicationList: { perm: "devices:read", build: () => ({}) },
-  ProfileList: { perm: "devices:read", build: () => ({}) },
-  DeviceLock: { perm: "devices:actions", build: (o: { pin: string; message?: string }) => ({ PIN: o.pin, ...(o.message ? { Message: o.message } : {}) }) },
-  RestartDevice: { perm: "devices:actions", build: () => ({}) },
-  ShutDownDevice: { perm: "devices:actions", build: () => ({}) },
-  // Without Updates, macOS installs everything available with the default action.
-  ScheduleOSUpdate: { perm: "devices:updates", build: () => ({}) },
-  EraseDevice: { perm: "devices:wipe", build: (o: { pin: string }) => ({ PIN: o.pin }) },
+  SecurityInfo: { perm: "devices:read", platforms: ALL, build: () => ({}) },
+  InstalledApplicationList: { perm: "devices:read", platforms: ALL, build: () => ({}) },
+  ProfileList: { perm: "devices:read", platforms: ALL, build: () => ({}) },
+  DeviceLock: { perm: "devices:actions", platforms: ALL, build: (o: { pin: string; message?: string; phone?: string }) => ({ ...(o.pin ? { PIN: o.pin } : {}), ...(o.message ? { Message: o.message } : {}), ...(o.phone ? { PhoneNumber: o.phone } : {}) }) },
+  RestartDevice: { perm: "devices:actions", platforms: ALL, build: () => ({}) },
+  ShutDownDevice: { perm: "devices:actions", platforms: ALL, build: () => ({}) },
+  // Without Updates, the device installs everything available with the default action.
+  ScheduleOSUpdate: { perm: "devices:updates", platforms: ALL, build: () => ({}) },
+  EraseDevice: { perm: "devices:wipe", platforms: ALL, build: (o: { pin: string }) => (o.pin ? { PIN: o.pin } : {}) },
+  // iPhone and iPad: a forgotten passcode, and lost devices (Lost Mode needs supervision).
+  ClearPasscode: { perm: "devices:actions", platforms: MOBILE, build: (o: { unlockToken?: string }) => ({ UnlockToken: { $data: o.unlockToken ?? "" } }) },
+  EnableLostMode: { perm: "devices:actions", platforms: MOBILE, build: (o: { message?: string; phone?: string }) => ({ Message: o.message || "This device is lost. Please call the number shown.", ...(o.phone ? { PhoneNumber: o.phone } : {}) }) },
+  PlayLostModeSound: { perm: "devices:actions", platforms: MOBILE, build: () => ({}) },
+  DeviceLocation: { perm: "devices:actions", platforms: MOBILE, build: () => ({}) },
+  DisableLostMode: { perm: "devices:actions", platforms: MOBILE, build: () => ({}) },
 } as const;
 export type RequestType = keyof typeof COMMANDS;
 export const REQUEST_TYPES = Object.keys(COMMANDS) as RequestType[];
-export const needsPin = (t: RequestType) => t === "DeviceLock" || t === "EraseDevice";
+/** Macs take a 6-digit PIN with lock and erase (asked for at the Mac); iPhones and iPads don't. */
+export const needsPin = (t: RequestType, platform = "macos") => platform === "macos" && (t === "DeviceLock" || t === "EraseDevice");
+
+/** iPhone, iPad or Mac, from what the device reports (ProductName like "iPhone15,2", "iPad13,1", "Mac14,7"). */
+export function platformOf(productName: string, model = ""): "macos" | "ios" | "ipados" | "other" {
+  const p = `${productName} ${model}`;
+  if (/\biP(hone|od)/.test(p)) return "ios";
+  if (/\biPad/.test(p)) return "ipados";
+  if (/\b(Mac|iMac|MacBook)/.test(p)) return "macos";
+  return productName || model ? "other" : "macos";
+}
 export const newPin = () => String(randomInt(0, 1_000_000)).padStart(6, "0");
 
 export async function queueCommand(tx: Tx, orgId: string, mdmDeviceId: string, type: RequestType | "InstallProfile" | "RemoveProfile", fields: Record<string, unknown>, who: { userId: string | null; reason: string }) {

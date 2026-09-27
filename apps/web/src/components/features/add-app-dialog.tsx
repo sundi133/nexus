@@ -53,7 +53,13 @@ function Picker({ onPick }: { onPick: (s: Stage) => void }) {
   const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
   const list = (catalog.data?.data ?? []).filter((e) => match(`${e.name} ${e.category}`));
   // Apps without a template: shown once someone searches, set up as generic SAML/OIDC with their name.
-  const more = q.trim() ? (dir.data?.data ?? []).filter((d) => !d.template && match(`${d.name} ${d.category}`)).slice(0, 30) : [];
+  // Verified SSO support first; the rest (from the SaaS catalog) may need a business plan.
+  const more = q.trim()
+    ? (dir.data?.data ?? [])
+        .filter((d) => !d.template && match(`${d.name} ${d.category}`))
+        .sort((a, b) => Number(b.verified) - Number(a.verified))
+        .slice(0, 30)
+    : [];
   return (
     <div className="space-y-3">
       <div className="relative">
@@ -87,14 +93,14 @@ function Picker({ onPick }: { onPick: (s: Stage) => void }) {
               <li key={d.key}>
                 <button
                   type="button"
-                  onClick={() => onPick({ kind: "custom", protocol: d.protocols[0]!, name: d.name })}
+                  onClick={() => onPick({ kind: "custom", protocol: d.protocols[0] ?? "saml", name: d.name })}
                   className="flex w-full items-center gap-2.5 rounded-lg border border-border p-2.5 text-left hover:border-primary hover:bg-bg-subtle"
                 >
                   <AppIcon name={d.name} size={26} />
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-medium">{d.name}</span>
-                    <span className="block text-[11px] text-fg-muted">
-                      {d.category} · {d.protocols.map((p) => p.toUpperCase()).join(" / ")}
+                    <span className="block text-[11px] text-fg-muted" title={d.verified ? undefined : `Check that ${d.name} offers SAML or OIDC single sign-on on your plan`}>
+                      {d.category} · {d.verified ? d.protocols.map((p) => p.toUpperCase()).join(" / ") : "check SSO support"}
                     </span>
                   </span>
                 </button>

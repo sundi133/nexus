@@ -1,6 +1,6 @@
 "use client";
 
-import { Fingerprint, LogIn } from "lucide-react";
+import { Fingerprint, Laptop, LogIn } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/ui/misc";
 import { bffAuth, goTo, nextStepUrl, type SignInResult } from "@/lib/api";
-import { passkeyErrorMessage, signInWithPasskey, usePasskeysSupported } from "@/lib/passkeys";
+import { passkeyErrorMessage, signInWithDevice, signInWithPasskey, usePasskeysSupported } from "@/lib/passkeys";
 import { MfaVerify } from "@/components/features/mfa-verify";
 
 function LoginForm() {
@@ -19,7 +19,7 @@ function LoginForm() {
   const [step, setStep] = useState<"password" | "mfa">(params.get("step") === "mfa" ? "mfa" : "password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState<null | "password" | "passkey">(null);
+  const [busy, setBusy] = useState<null | "password" | "passkey" | "device">(null);
   const [error, setError] = useState<unknown>(() => (params.get("sso_error") ? new Error(params.get("sso_error")!) : null));
   const passkeys = usePasskeysSupported();
   // Home-realm discovery: does this email's organization sign in with its own IdP?
@@ -89,6 +89,19 @@ function LoginForm() {
     }
   }
 
+  async function device() {
+    setBusy("device");
+    setError(null);
+    try {
+      go(await signInWithDevice());
+    } catch (err) {
+      if (err instanceof ApiProblem && err.problem.code === "use_sso") return void startSso();
+      setError(new Error(passkeyErrorMessage(err)));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (step === "mfa") return <MfaVerify next={next} onRestart={() => setStep("password")} />;
 
   return (
@@ -112,6 +125,9 @@ function LoginForm() {
         <>
           <Button type="button" variant={sso ? "secondary" : "primary"} size="lg" className="w-full" loading={busy === "passkey"} onClick={passkey}>
             <Fingerprint /> Sign in with a passkey
+          </Button>
+          <Button type="button" variant="secondary" size="lg" className="w-full" loading={busy === "device"} onClick={device}>
+            <Laptop /> Sign in with this computer
           </Button>
           <div className="flex items-center gap-3 text-xs text-fg-subtle">
             <span className="h-px flex-1 bg-border" /> or use your password <span className="h-px flex-1 bg-border" />

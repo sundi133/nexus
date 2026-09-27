@@ -36,7 +36,7 @@ const Options = z.record(z.string(), z.unknown()).openapi({ description: "Pass t
 const Ceremony = z.object({ challenge_id: Id, options: Options }).openapi("WebAuthnCeremony");
 const CredentialResponse = z.record(z.string(), z.unknown()).openapi({ description: "The JSON returned by @simplewebauthn/browser" });
 
-async function storeChallenge(tx: Tx, orgId: string, userId: string, purpose: "webauthn_register" | "webauthn_authenticate", challenge: string) {
+export async function storeChallenge(tx: Tx, orgId: string, userId: string, purpose: "webauthn_register" | "webauthn_authenticate", challenge: string) {
   const id = newId();
   await tx
     .insertInto("auth_challenges")
@@ -81,7 +81,7 @@ async function authOptions(tx: Tx, deps: Deps, orgId: string, userId: string) {
 }
 
 /** Verifies an assertion against the user's registered passkeys; returns the factor ID used. */
-async function verifyAssertion(tx: Tx, deps: Deps, userId: string, challengeId: string, response: AuthenticationResponseJSON) {
+export async function verifyAssertion(tx: Tx, deps: Deps, userId: string, challengeId: string, response: AuthenticationResponseJSON) {
   const expectedChallenge = await takeChallenge(tx, challengeId, userId, "webauthn_authenticate");
   const cred = (await passkeysOf(tx, userId)).find((c) => c.credential_id === response.id);
   if (!cred || !cred.public_key) return null;

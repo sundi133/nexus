@@ -193,6 +193,31 @@ export default function OrganizationSettingsPage() {
                 </Select>
                 <span className="text-xs text-fg-muted">Older events are removed only after your SIEM and archive have them.</span>
               </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label htmlFor="offline" className="text-[13px] font-medium">
+                  Alert when a device hasn&apos;t checked in for
+                </label>
+                <Select id="offline" disabled={!editable} value={draft.device_offline_hours} onChange={(e) => setDraft({ ...draft, device_offline_hours: Number(e.target.value) })}>
+                  {[...new Set([4, 12, 24, 48, 72, 168, 336, 720, draft.device_offline_hours])].sort((x, y) => x - y).map((h) => (
+                    <option key={h} value={h}>
+                      {h < 24 ? `${h} hours` : `${Math.round((h / 24) * 10) / 10} day${h > 24 ? "s" : ""}`}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label htmlFor="disk" className="text-[13px] font-medium">
+                  Alert when a device&apos;s disk has less free than
+                </label>
+                <Select id="disk" disabled={!editable} value={draft.disk_low_percent} onChange={(e) => setDraft({ ...draft, disk_low_percent: Number(e.target.value) })}>
+                  {[...new Set([5, 10, 15, 20, 25, draft.disk_low_percent])].sort((x, y) => x - y).map((p) => (
+                    <option key={p} value={p}>
+                      {p}%
+                    </option>
+                  ))}
+                </Select>
+                <span className="text-xs text-fg-muted">The Device offline and Disk nearly full alert rules use these.</span>
+              </div>
               <label className="flex items-start gap-2 text-[13px]">
                 <input
                   type="checkbox"

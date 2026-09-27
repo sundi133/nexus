@@ -24,6 +24,7 @@ Most AI use at work happens in a browser tab: ChatGPT, Claude, Gemini, Copilot, 
 - **Trust model:** the extension token identifies your organization, not a person, so events are self-reported by managed browsers. Revoke the token to stop a leaked one.
 - **Audit:** blocked sensitive data, blocked uploads and "went ahead after a warning" are in the audit log (`browser.dlp_blocked`, `browser.dlp_continued`, `browser.upload_blocked`, …), so they reach your SIEM and alert rules.
 - **Retention:** events are kept 90 days.
+- **Work apps:** with SaaS discovery on, the extension also counts visits to known work apps and password sign-ins on them. See [SAAS.md](SAAS.md).
 
 ## Detectors
 

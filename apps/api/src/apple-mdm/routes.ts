@@ -10,6 +10,7 @@ import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, isoOrNull, json, problemResponses } from "../schemas.js";
 import type { Permission } from "../rbac.js";
 import { certFingerprint, ensureCa, pushCsr, pushKeyAad, readPushCert } from "./pki.js";
+import { reconcileProfiles } from "./profiles.js";
 import { COMMANDS, needsPin, newPin, queueCommand, REQUEST_TYPES, type RequestType, wake } from "./service.js";
 
 /**
@@ -39,6 +40,11 @@ const Device = z
     os_version: z.string(),
     status: z.enum(["authenticated", "enrolled", "checked_out"]),
     device_id: Id.nullable().openapi({ description: "The same Mac's Nexus agent device, matched by serial" }),
+    platform: z.enum(["macos", "ios", "ipados", "other"]),
+    assigned_user: z.object({ id: Id, email: z.string() }).nullable().openapi({ description: "Whose iPhone or iPad it is (Macs follow their agent's user)" }),
+    lost_mode: z.boolean(),
+    passcode: z.boolean().nullable().openapi({ description: "iPhone and iPad: a passcode is set" }),
+    supervised: z.boolean().nullable(),
     bootstrap_token: z.boolean(),
     filevault: z.boolean().nullable(),
     enrolled_at: z.string().nullable(),
@@ -192,14 +198,15 @@ export function registerAppleMdmRoutes(app: App) {
   );
 
   app.openapi(
-    createRoute({ method: "get", path: "/v1/apple-mdm/devices", tags: ["Apple MDM"], summary: "Macs enrolled in Nexus MDM", security: bearer, responses: { 200: json(z.object({ data: z.array(Device) })), ...problemResponses } }),
+    createRoute({ method: "get", path: "/v1/apple-mdm/devices", tags: ["Apple MDM"], summary: "Macs, iPhones and iPads enrolled in Nexus MDM", security: bearer, responses: { 200: json(z.object({ data: z.array(Device) })), ...problemResponses } }),
     async (c) => {
       const p = requirePermission(c, "devices:read");
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
-        const rows = await tx.selectFrom("apple_mdm_devices").selectAll().orderBy("device_name").execute();
+        const rows = await tx.selectFrom("apple_mdm_devices").leftJoin("users", "users.id", "apple_mdm_devices.assigned_user_id").selectAll("apple_mdm_devices").select("users.email as assigned_email").orderBy("device_name").execute();
         const pending = await tx.selectFrom("apple_mdm_commands").select(["mdm_device_id"]).select((eb) => eb.fn.countAll<number>().as("n")).where("status", "in", ["queued", "sent", "notnow"]).groupBy("mdm_device_id").execute();
         return rows.map((d) => {
-          const sec = d.security as { FDE_Enabled?: boolean };
+          const sec = d.security as { FDE_Enabled?: boolean; PasscodePresent?: boolean };
+          const info = d.info as { IsSupervised?: boolean };
           return {
             id: d.id,
             device_name: d.device_name,
@@ -208,6 +215,11 @@ export function registerAppleMdmRoutes(app: App) {
             os_version: d.os_version,
             status: d.status,
             device_id: d.device_id,
+            platform: d.platform,
+            assigned_user: d.assigned_user_id && d.assigned_email ? { id: d.assigned_user_id, email: d.assigned_email } : null,
+            lost_mode: d.lost_mode,
+            passcode: typeof sec.PasscodePresent === "boolean" ? sec.PasscodePresent : null,
+            supervised: typeof info.IsSupervised === "boolean" ? info.IsSupervised : null,
             bootstrap_token: !!d.bootstrap_token,
             filevault: typeof sec.FDE_Enabled === "boolean" ? sec.FDE_Enabled : null,
             enrolled_at: isoOrNull(d.enrolled_at),
@@ -252,13 +264,21 @@ export function registerAppleMdmRoutes(app: App) {
       method: "post",
       path: "/v1/apple-mdm/devices/{id}/commands",
       tags: ["Apple MDM"],
-      summary: "Send an MDM command to a Mac",
+      summary: "Send an MDM command to a Mac, iPhone or iPad",
       description:
-        "Queues the command and wakes the Mac through APNs. Lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.",
+        "Queues the command and wakes the device through APNs. On a Mac, lock and erase return a 6-digit PIN, shown once (a locked Mac asks for it). iPhones and iPads also take ClearPasscode, EnableLostMode (with a message and phone number), DeviceLocation and PlayLostModeSound (in Lost Mode) and DisableLostMode; Lost Mode, restart, shut down and OS updates need a supervised iPhone or iPad. Lock and restart need `devices:actions`, erase needs `devices:wipe` and the serial number typed to confirm, OS updates need `devices:updates`. Anything that changes the Mac needs a recent MFA.",
       security: bearer,
       request: {
         params: z.object({ id: Id }),
-        ...body(z.object({ request_type: z.enum(REQUEST_TYPES as [RequestType, ...RequestType[]]), reason: z.string().trim().max(500).default(""), message: z.string().trim().max(200).optional(), confirm: z.string().max(100).optional() })),
+        ...body(
+          z.object({
+            request_type: z.enum(REQUEST_TYPES as [RequestType, ...RequestType[]]),
+            reason: z.string().trim().max(500).default(""),
+            message: z.string().trim().max(200).optional(),
+            phone: z.string().trim().max(40).optional().openapi({ description: "Lock and Lost Mode: a number shown on the screen" }),
+            confirm: z.string().max(100).optional(),
+          }),
+        ),
       },
       responses: { 201: json(z.object({ id: z.string(), pin: z.string().nullable(), push_error: z.string().nullable() })), ...problemResponses },
     }),
@@ -271,12 +291,26 @@ export function registerAppleMdmRoutes(app: App) {
       if (!readOnly && input.reason.length < 3) throw badRequest("reason_required", "Say why (it goes in the audit log)");
       const out = await deps.db.tenant(p.orgId, async (tx) => {
         if (!readOnly) requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0);
-        const d = await tx.selectFrom("apple_mdm_devices").select(["id", "status", "serial", "device_name"]).where("id", "=", id).executeTakeFirst();
-        if (!d) throw notFound("Mac");
-        if (d.status !== "enrolled") throw badRequest("not_enrolled", "This Mac isn't enrolled any more");
-        if (input.request_type === "EraseDevice" && input.confirm?.trim() !== d.serial) throw badRequest("confirm_mismatch", `Type the Mac's serial number (${d.serial}) to confirm the erase`);
-        const pin = needsPin(input.request_type) ? newPin() : null;
-        const fields = (COMMANDS[input.request_type].build as (o: { pin: string; message?: string }) => Record<string, unknown>)({ pin: pin ?? "", message: input.message });
+        const d = await tx.selectFrom("apple_mdm_devices").select(["id", "status", "serial", "device_name", "platform", "unlock_token", "lost_mode"]).where("id", "=", id).executeTakeFirst();
+        if (!d) throw notFound("Device");
+        if (d.status !== "enrolled") throw badRequest("not_enrolled", "This device isn't enrolled any more");
+        const kind = d.platform === "macos" ? "Mac" : d.platform === "ipados" ? "iPad" : "iPhone";
+        if (!(COMMANDS[input.request_type].platforms as readonly string[]).includes(d.platform)) throw badRequest("unsupported", `${input.request_type} doesn't apply to ${kind === "Mac" ? "a Mac" : `an ${kind}`}`);
+        if (input.request_type === "EraseDevice" && input.confirm?.trim() !== d.serial) throw badRequest("confirm_mismatch", `Type the ${kind}'s serial number (${d.serial}) to confirm the erase`);
+        if ((input.request_type === "DeviceLocation" || input.request_type === "PlayLostModeSound") && !d.lost_mode) throw badRequest("not_lost", `Put the ${kind} in Lost Mode first: Apple only reports its location, or plays the sound, in Lost Mode`);
+        // Clearing a passcode needs the unlock token the device escrowed at enrollment.
+        let unlockToken: string | undefined;
+        if (input.request_type === "ClearPasscode") {
+          if (!d.unlock_token) throw badRequest("no_unlock_token", `This ${kind} didn't escrow an unlock token, so its passcode can't be cleared remotely`);
+          unlockToken = deps.sealer.open(d.unlock_token, `apple_mdm_unlock:${d.id}`).toString("base64");
+        }
+        const pin = needsPin(input.request_type, d.platform) ? newPin() : null;
+        const fields = (COMMANDS[input.request_type].build as (o: { pin: string; message?: string; phone?: string; unlockToken?: string }) => Record<string, unknown>)({
+          pin: pin ?? "",
+          message: input.message,
+          phone: input.phone,
+          unlockToken,
+        });
         const cid = await queueCommand(tx, p.orgId, d.id, input.request_type, fields, { userId: p.userId, reason: input.reason });
         if (!readOnly) {
           await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, { type: "apple_mdm.command_sent", target: { type: "apple_mdm_device", id: d.id, display: d.device_name || d.serial }, details: { command_id: cid, request_type: input.request_type, reason: input.reason } });
@@ -285,6 +319,36 @@ export function registerAppleMdmRoutes(app: App) {
       });
       const push_error = await wake(deps, p.orgId, id);
       return c.json({ ...out, push_error }, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/v1/apple-mdm/devices/{id}/user",
+      tags: ["Apple MDM"],
+      summary: "Say whose iPhone or iPad this is (profiles for their groups follow)",
+      description: "Macs usually get their person from the Nexus agent; phones and tablets have no agent. `user_id: null` clears it.",
+      security: bearer,
+      request: { params: z.object({ id: Id }), ...body(z.object({ user_id: Id.nullable() })) },
+      responses: { 204: { description: "Assigned" }, ...problemResponses },
+    }),
+    async (c) => {
+      const p = requirePermission(c, "devices:write");
+      const { id } = c.req.valid("param");
+      const { user_id } = c.req.valid("json");
+      const deps = c.get("deps");
+      const touched = await deps.db.tenant(p.orgId, async (tx) => {
+        const d = await tx.selectFrom("apple_mdm_devices").select(["id", "device_name", "serial"]).where("id", "=", id).executeTakeFirst();
+        if (!d) throw notFound("Device");
+        const u = user_id ? await tx.selectFrom("users").select("email").where("id", "=", user_id).executeTakeFirst() : null;
+        if (user_id && !u) throw badRequest("unknown_user", "No such person");
+        await tx.updateTable("apple_mdm_devices").set({ assigned_user_id: user_id }).where("id", "=", id).execute();
+        await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, { type: "apple_mdm.device_assigned", target: { type: "apple_mdm_device", id, display: d.device_name || d.serial }, details: { to: u?.email ?? null } });
+        return reconcileProfiles(tx, deps, p.orgId, [id]); // their groups' profiles
+      });
+      for (const m of touched) await wake(deps, p.orgId, m);
+      return c.body(null, 204);
     },
   );
 }

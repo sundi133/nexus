@@ -147,6 +147,8 @@ func main() {
 			break
 		}
 		fmt.Printf("Enrolled in %s\nDevice ID: %s\nServer:    %s\nAgent:     %s\n", e.Organization, e.DeviceID, e.Server, version)
+	case "assist-helper": // Windows Remote Assist: started by the agent in the signed-in person's session
+		os.Exit(assist.HelperMain(os.Args[2:]))
 	case "version":
 		fmt.Println(version)
 	case "selftest":
@@ -260,19 +262,19 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 	}
 	runner := &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate), "script": command.ScriptAction(store.Dir)}, Log: log}
 	// Remote Assist: asks the person at the Mac, then tunnels Screen Sharing to the Nexus relay.
-	mac := assist.Mac{Run: assist.ExecRun}
-	helper := &assist.Runner{D: assist.Deps{
-		GOOS: runtime.GOOS, ConsoleUser: mac.ConsoleUser, Ask: mac.Ask, Showing: mac.Showing, Notify: mac.Notify, Sharing: mac, DialVNC: assist.DialVNC,
-		Open: func(ctx context.Context, id string) (assist.Tunnel, error) {
-			t, err := c.RemoteAssistTunnel(ctx, id)
-			if err != nil {
-				return nil, err
-			}
-			return t, nil
-		},
-		Report: c.RemoteAssistState,
-		Log:    log,
-	}}
+	// (On Windows the screen is served by a helper this program starts in the person's session.)
+	exe, _ := os.Executable()
+	assistDeps := assist.ForThisOS(exe)
+	assistDeps.Open = func(ctx context.Context, id string) (assist.Tunnel, error) {
+		t, err := c.RemoteAssistTunnel(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return t, nil
+	}
+	assistDeps.Report = c.RemoteAssistState
+	assistDeps.Log = log
+	helper := &assist.Runner{D: assistDeps}
 	runner.ArgExec["remote_assist"] = helper.Action
 	ownHost := ""
 	if u, perr := url.Parse(e.Server); perr == nil {

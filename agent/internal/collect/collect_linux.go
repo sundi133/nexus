@@ -64,5 +64,6 @@ func collect(ctx context.Context) Snapshot {
 		f, _ := strconv.ParseFloat(up[0], 64)
 		s.Inventory.UptimeSeconds = int64(f)
 	}
+	s.Inventory.Disks = systemDisk()
 	return s
 }

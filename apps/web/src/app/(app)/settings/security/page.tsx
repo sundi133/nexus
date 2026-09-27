@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangePasswordCard, RecoveryCodesCard } from "@/components/features/account-recovery";
+import { DeviceSignInCard } from "@/components/features/device-sign-in-card";
 import { NotificationPrefsCard } from "@/components/features/notification-channels";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fingerprint, KeyRound, Plus, Smartphone, Trash2 } from "lucide-react";
@@ -94,6 +95,7 @@ export default function SecurityPage() {
           )}
         </Card>
 
+        <DeviceSignInCard />
         <RecoveryCodesCard hasFactor={verified.length > 0} />
         <ChangePasswordCard />
         <NotificationPrefsCard />

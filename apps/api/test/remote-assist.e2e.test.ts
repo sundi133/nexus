@@ -67,7 +67,7 @@ beforeAll(async () => {
   await h.call("POST", "/v1/users", { token: admin, body: { email: e, given_name: "Ada", password: PASSWORD, roles: ["admin"] } });
   other = (await h.call("POST", "/v1/auth/login", { body: { email: e, password: PASSWORD } })).body.token;
   const t = (await h.call("POST", "/v1/devices/enrollment-tokens", { token: admin, body: { name: "all" } })).body.token;
-  for (const [name, platform] of [["mac", "macos"], ["linux", "linux"]] as const) {
+  for (const [name, platform] of [["mac", "macos"], ["linux", "linux"], ["win", "windows"]] as const) {
     const d = await new SoftDevice().init();
     const r = await agentCall("/v1/agent/enroll", { token: t, device: { hostname: name, platform, os_version: "1", agent_version: "0.3.0" } }, d, true);
     d.id = r.body.device_id;
@@ -86,7 +86,10 @@ describe("Remote Assist", () => {
   let sid = "";
 
   it("asks the Mac, and nothing is viewable until the person there allows it", async () => {
-    expect((await h.call("POST", `/v1/devices/${devices.linux!.id}/remote-assist`, { token: admin, body: { reason: "Printer help" } })).body.code).toBe("unsupported_platform");
+    expect((await h.call("POST", `/v1/devices/${devices.linux!.id}/remote-assist`, { token: admin, body: { reason: "Printer help" } })).body.code).toBe("unsupported_platform"); // Linux isn't supported yet
+    const win = await h.call("POST", `/v1/devices/${devices.win!.id}/remote-assist`, { token: admin, body: { reason: "Outlook won't open" } });
+    expect(win.body).toMatchObject({ status: "asking", hostname: "win" });
+    await h.call("POST", `/v1/remote-assist/sessions/${win.body.id}/end`, { token: admin });
     const r = await h.call("POST", `/v1/devices/${devices.mac!.id}/remote-assist`, { token: admin, body: { reason: "VPN won't connect", minutes: 30 } });
     expect(r.status).toBe(201);
     expect(r.body).toMatchObject({ status: "asking", hostname: "mac", mine: true, reason: "VPN won't connect" });

@@ -87,8 +87,8 @@ func (r *Runner) Action(_ context.Context, raw json.RawMessage) (string, json.Ra
 	if err := json.Unmarshal(raw, &a); err != nil || !idRe.MatchString(a.SessionID) {
 		return "", nil, errors.New("malformed Remote Assist request")
 	}
-	if r.D.GOOS != "darwin" {
-		return "", nil, errors.New("Remote Assist works on Macs for now")
+	if r.D.GOOS != "darwin" && r.D.GOOS != "windows" {
+		return "", nil, errors.New("Remote Assist works on Macs and Windows PCs for now")
 	}
 	if a.Minutes <= 0 || a.Minutes > 120 {
 		a.Minutes = 60

@@ -6,6 +6,9 @@ type Json<T = Record<string, unknown>> = ColumnType<T, string | undefined, strin
 
 export type DevicePlatform = "macos" | "windows" | "linux";
 export type Compliance = "compliant" | "non_compliant" | "unknown";
+export type ApplePlatform = "macos" | "ios" | "ipados" | "other";
+export type AssetKind = "laptop" | "desktop" | "phone" | "tablet" | "monitor" | "peripheral" | "network" | "server" | "other";
+export type AssetStatus = "in_stock" | "assigned" | "in_repair" | "retired" | "lost";
 export type CheckStatus = "pass" | "fail" | "unknown" | "not_applicable";
 
 export type SessionState = "pending_mfa" | "enroll_mfa" | "active";
@@ -98,6 +101,7 @@ export interface Database {
     created_at: Generated<Date>;
     last_totp_step: number | null;
     credential_id: string | null;
+    bound_device_id: string | null;
     sign_count: Generated<number>;
     transports: Generated<string[]>;
   };
@@ -242,6 +246,8 @@ export interface Database {
     security_updates_since: NullableTimestamp;
     third_party_pending: Generated<number>;
     third_party_since: NullableTimestamp;
+    offline_since: NullableTimestamp;
+    disk_low_since: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
     last_ip: Generated<string>;
@@ -352,6 +358,9 @@ export interface Database {
     bootstrap_token: Buffer | null;
     status: Generated<"authenticated" | "enrolled" | "checked_out">;
     device_id: string | null;
+    platform: Generated<ApplePlatform>;
+    assigned_user_id: string | null;
+    lost_mode: Generated<boolean>;
     info: Json<Record<string, unknown>>;
     security: Json<Record<string, unknown>>;
     enrolled_at: NullableTimestamp;
@@ -449,6 +458,7 @@ export interface Database {
     payload_types: Generated<string[]>;
     source: Generated<"upload" | "template">;
     target: Json<{ all?: boolean; group_ids?: string[] }>;
+    platforms: Generated<ApplePlatform[]>;
     created_by: string | null;
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
@@ -617,6 +627,115 @@ export interface Database {
     dlp: Json;
     uploads: "allow" | "warn" | "block";
     message: string;
+    saas_discovery: Generated<boolean>;
+    updated_at: Generated<Date>;
+    updated_by: string | null;
+  };
+  saas_usage: {
+    org_id: string;
+    app_key: string;
+    user_email: string;
+    user_id: string | null;
+    day: string;
+    visits: Generated<number>;
+    password_logins: Generated<number>;
+    blocked: Generated<number>;
+    last_at: Date;
+  };
+  android_settings: {
+    org_id: string;
+    project_id: Generated<string>;
+    service_account: Buffer | null;
+    client_email: Generated<string>;
+    signup_url_name: Generated<string>;
+    enterprise_name: Generated<string>;
+    enterprise_display: Generated<string>;
+    policy: Json<Record<string, unknown>>;
+    policy_applied_at: Date | null;
+    last_sync_at: Date | null;
+    last_error: Generated<string>;
+    updated_at: Generated<Date>;
+  };
+  android_devices: {
+    id: string;
+    org_id: string;
+    name: string;
+    serial: Generated<string>;
+    brand: Generated<string>;
+    model: Generated<string>;
+    android_version: Generated<string>;
+    security_patch: Generated<string>;
+    management_mode: Generated<string>;
+    ownership: Generated<string>;
+    state: Generated<string>;
+    policy_compliant: boolean | null;
+    non_compliance: Json<unknown[]>;
+    assigned_user_id: string | null;
+    enrolled_at: Date | null;
+    last_status_at: Date | null;
+    updated_at: Generated<Date>;
+  };
+  assets: {
+    id: string;
+    org_id: string;
+    tag: string;
+    name: Generated<string>;
+    kind: Generated<AssetKind>;
+    make: Generated<string>;
+    model: Generated<string>;
+    serial: Generated<string>;
+    status: Generated<AssetStatus>;
+    assigned_to: string | null;
+    location: Generated<string>;
+    vendor: Generated<string>;
+    purchase_date: string | null;
+    purchase_cost_cents: number | null;
+    currency: Generated<string>;
+    warranty_until: string | null;
+    notes: Generated<string>;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  asset_events: {
+    id: string;
+    org_id: string;
+    asset_id: string;
+    at: Generated<Date>;
+    kind: "created" | "checked_out" | "checked_in" | "updated";
+    user_id: string | null;
+    status: Generated<string>;
+    note: Generated<string>;
+    actor_id: string | null;
+  };
+  saas_licenses: {
+    id: string;
+    org_id: string;
+    app_key: string;
+    plan: Generated<string>;
+    seats: number;
+    unit_cost_cents: Generated<number>;
+    currency: Generated<string>;
+    billing: Generated<"monthly" | "annual">;
+    renews_on: string | null;
+    seat_source: Generated<"sso" | "list">;
+    owner_id: string | null;
+    notes: Generated<string>;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  saas_license_holders: {
+    license_id: string;
+    org_id: string;
+    email: string;
+    added_at: Generated<Date>;
+  };
+  saas_apps: {
+    org_id: string;
+    app_key: string;
+    status: "approved" | "unapproved";
+    action: Generated<"allow" | "warn" | "block">;
+    owner_id: string | null;
+    notes: Generated<string>;
     updated_at: Generated<Date>;
     updated_by: string | null;
   };

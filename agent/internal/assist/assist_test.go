@@ -200,9 +200,9 @@ func TestEndedAtTheMacAndAlreadyOn(t *testing.T) {
 func TestRefusals(t *testing.T) {
 	rep := &reports{}
 	d := deps(t, Allowed, rep, &fakeSharing{})
-	d.GOOS = "windows"
+	d.GOOS = "linux"
 	if _, _, err := (&Runner{D: d}).Action(context.Background(), json.RawMessage(`{"session_id":"`+sid+`"}`)); err == nil {
-		t.Fatal("Windows isn't supported yet")
+		t.Fatal("Linux isn't supported yet")
 	}
 	d.GOOS = "darwin"
 	if _, _, err := (&Runner{D: d}).Action(context.Background(), json.RawMessage(`{"session_id":"../x"}`)); err == nil {

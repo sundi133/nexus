@@ -44,7 +44,8 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
   if (device.isPending) return <Skeleton className="h-40" />;
   if (!device.data) return <ErrorBanner error={device.error} />;
   const d = device.data;
-  const inv = d.inventory as { cpu?: string; memory_bytes?: number; uptime_seconds?: number; console_user?: string; local_users?: { name: string; admin: boolean }[] };
+  const inv = d.inventory as { cpu?: string; memory_bytes?: number; uptime_seconds?: number; console_user?: string; local_users?: { name: string; admin: boolean }[]; disks?: { mount: string; size_bytes: number; free_bytes?: number }[] };
+  const disk = inv.disks?.find((x) => x.free_bytes !== undefined && x.size_bytes > 0);
   const failing = d.checks.filter((c) => c.status === "fail").length;
   const aiIssues = d.ai?.mcp_servers.filter((s) => !s.disabled && (s.governance === "bypass" || s.governance === "remote" || s.inline_secrets)).length ?? 0;
 
@@ -131,6 +132,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
                 items={[
                   ["CPU", inv.cpu || "—"],
                   ["Memory", gb(inv.memory_bytes)],
+                  ["Disk", disk ? `${gb(disk.free_bytes)} free of ${gb(disk.size_bytes)} (${Math.round((disk.free_bytes! / disk.size_bytes) * 100)}%)` : "—"],
                   ["Uptime", duration(inv.uptime_seconds)],
                   ["Signed-in user", inv.console_user || "—"],
                   ["Local admins", inv.local_users?.filter((u) => u.admin).map((u) => u.name).join(", ") || "—"],

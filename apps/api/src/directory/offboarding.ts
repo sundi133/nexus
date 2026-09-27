@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { assetsHeldBy } from "../assets/routes.js";
 import { removeFromVaults } from "../vault/routes.js";
 import type { Context } from "hono";
 import type { App, Env, Principal, RequestMeta } from "../context.js";
@@ -29,6 +30,7 @@ const Preview = z
     groups: z.array(z.object({ id: Id, name: z.string() })),
     apps: z.array(z.object({ id: Id, name: z.string(), provisioned: z.boolean(), action: z.enum(["deactivate", "delete", "sign_in_only"]) })),
     devices: z.array(z.object({ id: Id, hostname: z.string() })),
+    assets: z.array(z.object({ id: Id, tag: z.string(), name: z.string() })).openapi({ description: "Hardware checked out to them: to collect" }),
     agents: z.array(z.object({ id: Id, name: z.string() })).openapi({ description: "Active AI agents they own: suspended until given a new owner" }),
     factors: z.number().int(),
     scheduled: z.object({ at: z.string(), reason: z.string() }).nullable(),
@@ -75,6 +77,7 @@ async function preview(tx: Tx, userId: string): Promise<z.infer<typeof Preview>>
       action: a.enabled && a.state ? (a.on_unassign === "delete" ? ("delete" as const) : ("deactivate" as const)) : ("sign_in_only" as const),
     })),
     devices,
+    assets: await assetsHeldBy(tx, userId),
     agents,
     factors: Number(factors.n),
     scheduled: job ? { at: iso(job.run_at), reason: String((job.payload as unknown as { reason?: string }).reason ?? "") } : null,
@@ -111,6 +114,7 @@ export async function offboard(tx: Tx, orgId: string, userId: string, who: { pri
     sign_in_only_apps: before.apps.filter((a) => !a.provisioned).map((a) => a.name),
     factors_removed: Number(factors.numDeletedRows),
     devices_unassigned: before.devices.map((d) => d.hostname),
+    ...(before.assets.length ? { assets_to_collect: before.assets.map((a) => a.tag) } : {}),
     password_vaults_removed: vaults.removed,
     ...(vaults.promoted.length ? { password_vault_owners_promoted: vaults.promoted } : {}),
   };
@@ -120,14 +124,16 @@ export async function offboard(tx: Tx, orgId: string, userId: string, who: { pri
     target: { type: "user", id: userId, display: before.user.email },
     details: { reason, effects, ...who.details },
   });
-  if (before.devices.length) {
+  if (before.devices.length || before.assets.length) {
+    // Enrolled devices, and hardware checked out to them (an enrolled device can be both).
+    const things = [...new Set([...before.devices.map((d) => d.hostname), ...before.assets.map((a) => (a.name ? `${a.name} (${a.tag})` : a.tag))])];
     await notifyRoles(tx, orgId, ["owner", "admin", "helpdesk"], {
       category: "directory.offboarding",
       severity: "info",
-      title: `Collect ${before.devices.length === 1 ? before.devices[0]!.hostname : `${before.devices.length} devices`} from ${before.user.display_name}`,
-      body: `${before.user.display_name} was offboarded. Their device${before.devices.length === 1 ? " is" : "s are"} now unassigned: ${before.devices.map((d) => d.hostname).join(", ")}.`,
+      title: `Collect ${things.length === 1 ? things[0]! : `${things.length} items`} from ${before.user.display_name}`,
+      body: `${before.user.display_name} was offboarded. To collect: ${things.join(", ")}.`,
       entity: { type: "user", id: userId },
-      link: `/devices`,
+      link: before.assets.length ? `/assets?assigned_to=${userId}` : `/devices`,
     });
   }
   return { already: false as const, before, effects };

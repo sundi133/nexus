@@ -54,8 +54,8 @@ export default function RemoteAssistPage({ params }: { params: Promise<{ id: str
       <ErrorBanner error={device.error ?? sessions.error ?? end.error} />
       {device.isPending || sessions.isPending ? (
         <Skeleton className="h-40" />
-      ) : device.data && device.data.platform !== "macos" ? (
-        <EmptyState icon={<MonitorPlay />} title="Macs only for now" description="Remote Assist works on Macs running the Nexus agent. Windows and Linux are on the roadmap." />
+      ) : device.data && device.data.platform === "linux" ? (
+        <EmptyState icon={<MonitorPlay />} title="Macs and Windows PCs for now" description="Remote Assist works on Macs and Windows PCs running the Nexus agent. Linux is on the roadmap." />
       ) : !current ? (
         <RequestForm deviceId={id} online={!!device.data?.online} onAsked={refresh} withStepUp={withStepUp} />
       ) : current.status === "asking" ? (
