@@ -3,6 +3,7 @@ import { registerSoftwareDeployRoutes } from "./devices/software-deploy.js";
 import { registerLocalAccountRoutes } from "./devices/local-accounts.js";
 import { registerAppleMdmProtocol } from "./apple-mdm/protocol.js";
 import { registerAppleMdmRoutes } from "./apple-mdm/routes.js";
+import { registerAppleMdmProfileRoutes } from "./apple-mdm/profiles.js";
 import { registerScriptRoutes } from "./devices/scripts.js";
 import { registerDirectoryServiceRoutes } from "./protocols/routes.js";
 import { registerMcpPeopleRoutes } from "./mcp/people-routes.js";
@@ -296,6 +297,7 @@ export function createApp(deps: Deps) {
   registerLocalAccountRoutes(app);
   registerAppleMdmProtocol(app);
   registerAppleMdmRoutes(app);
+  registerAppleMdmProfileRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);

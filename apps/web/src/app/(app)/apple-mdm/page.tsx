@@ -6,6 +6,7 @@ import { Apple, CheckCircle2, Link2, Plus, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
+import { MdmProfiles } from "@/components/features/mdm-profiles";
 import { CopyField } from "@/components/ui/copy";
 import { useStepUp } from "@/components/step-up";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ export default function AppleMdmPage() {
         <div className="space-y-5">
           <PushSetup ready={s.ready} csrPending={s.csr_pending} push={s.push} canManage={can("org:manage")} />
           {s.ready ? <EnrollLinks canManage={can("devices:write")} /> : null}
+          {s.ready ? <MdmProfiles /> : null}
           <Card className="overflow-hidden">
             <CardHeader title="Enrolled Macs" description={`${s.devices.enrolled} enrolled`} />
             {devices.data?.data.length ? (

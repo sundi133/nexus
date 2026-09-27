@@ -358,6 +358,30 @@ export interface Database {
     last_seen_at: NullableTimestamp;
     created_at: Generated<Date>;
   };
+  apple_mdm_profiles: {
+    id: string;
+    org_id: string;
+    name: string;
+    identifier: string;
+    payload: Buffer;
+    payload_types: Generated<string[]>;
+    source: Generated<"upload" | "template">;
+    target: Json<{ all?: boolean; group_ids?: string[] }>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  apple_mdm_device_profiles: {
+    org_id: string;
+    mdm_device_id: string;
+    identifier: string;
+    profile_id: string | null;
+    status: "installing" | "installed" | "failed" | "removing";
+    detail: Generated<string>;
+    command_id: string | null;
+    installed_version: NullableTimestamp;
+    updated_at: Generated<Date>;
+  };
   apple_mdm_commands: {
     id: string;
     org_id: string;
