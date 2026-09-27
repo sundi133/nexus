@@ -407,6 +407,7 @@
           "devices:wipe",
           "devices:query",
           "devices:enforce",
+          "devices:recovery_keys",
           "directory:sync",
           "api_keys:manage",
           "integrations:manage",
@@ -3606,6 +3607,7 @@
                       "devices:wipe",
                       "devices:query",
                       "devices:enforce",
+                      "devices:recovery_keys",
                       "directory:sync",
                       "api_keys:manage",
                       "integrations:manage",
@@ -3666,6 +3668,7 @@
                     "devices:wipe",
                     "devices:query",
                     "devices:enforce",
+                    "devices:recovery_keys",
                     "directory:sync",
                     "api_keys:manage",
                     "integrations:manage",
@@ -3741,6 +3744,7 @@
                 "devices:wipe",
                 "devices:query",
                 "devices:enforce",
+                "devices:recovery_keys",
                 "directory:sync",
                 "api_keys:manage",
                 "integrations:manage",
@@ -7907,6 +7911,38 @@
           }
         ]
       },
+      "RecoveryKey": {
+        "type": "object",
+        "properties": {
+          "volume": {
+            "type": "string"
+          },
+          "key_id": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "description": "The 48-digit BitLocker recovery password"
+          },
+          "escrowed_at": {
+            "type": "string"
+          },
+          "retired_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Set when the device stopped reporting this key (rotated or removed)"
+          }
+        },
+        "required": [
+          "volume",
+          "key_id",
+          "password",
+          "escrowed_at",
+          "retired_at"
+        ]
+      },
       "EnforcementRule": {
         "type": "object",
         "properties": {
@@ -8767,6 +8803,49 @@
               "inventory": {
                 "type": "object",
                 "additionalProperties": {}
+              },
+              "settings": {
+                "type": "object",
+                "properties": {
+                  "reported_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "results": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "status",
+                        "detail"
+                      ]
+                    }
+                  },
+                  "recovery_keys": {
+                    "type": "integer",
+                    "description": "Escrowed BitLocker recovery keys still in use (reveal with GET /v1/devices/{id}/recovery-keys)"
+                  }
+                },
+                "required": [
+                  "reported_at",
+                  "results",
+                  "recovery_keys"
+                ],
+                "description": "Device settings the agent enforces (device policies set to fix, not just report) and what it did"
               }
             },
             "required": [
@@ -8778,7 +8857,8 @@
               "checks",
               "mdm",
               "ai",
-              "inventory"
+              "inventory",
+              "settings"
             ]
           }
         ]
@@ -19558,6 +19638,7 @@
                         "devices:wipe",
                         "devices:query",
                         "devices:enforce",
+                        "devices:recovery_keys",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -19713,6 +19794,7 @@
                         "devices:wipe",
                         "devices:query",
                         "devices:enforce",
+                        "devices:recovery_keys",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -33299,6 +33381,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LiveQueryDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/recovery-keys": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Reveal a device's escrowed BitLocker recovery keys",
+        "description": "Needs `devices:recovery_keys` (owners, admins and help desk) and a recent MFA; never an API key. Every reveal is in the audit log.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RecoveryKey"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
                 }
               }
             }

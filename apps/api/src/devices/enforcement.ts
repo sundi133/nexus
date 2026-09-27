@@ -10,6 +10,7 @@ import { badRequest, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, isoOrNull, json, problemResponses } from "../schemas.js";
 import { commandKey, sign } from "./commands.js";
+import { getPolicies } from "./service.js";
 
 /**
  * Device enforcement (DEV-ENF): block apps and domains on devices.
@@ -91,14 +92,32 @@ async function rulesFor(tx: Tx, device: { id: string; platform: DevicePlatform; 
     .map((r) => ({ id: r.id, name: r.name, kind: r.kind, match: r.match, value: r.value, mode: r.kind === "domain" ? "block" : r.mode }));
 }
 
-export const policyVersion = (rules: PolicyRule[]) => createHash("sha256").update(JSON.stringify(rules)).digest("hex").slice(0, 16);
+/** Device settings the agent enforces, from the device policies an admin asked Nexus to fix. */
+export type DeviceSettings = { firewall?: true; screen_lock_minutes?: number; disk_encryption?: true; escrow_recovery_keys?: true };
+
+export async function settingsFor(tx: Tx): Promise<DeviceSettings> {
+  const s: DeviceSettings = {};
+  for (const p of await getPolicies(tx)) {
+    if (!p.enabled) continue;
+    const params = p.params as { remediate?: boolean; max_delay_minutes?: number; escrow_recovery_keys?: boolean };
+    if (p.key === "firewall" && params.remediate) s.firewall = true;
+    if (p.key === "screen_lock" && params.remediate && (params.max_delay_minutes ?? 0) > 0) s.screen_lock_minutes = params.max_delay_minutes!;
+    if (p.key === "disk_encryption" && params.remediate) s.disk_encryption = true;
+    if (p.key === "disk_encryption" && params.escrow_recovery_keys !== false) s.escrow_recovery_keys = true;
+  }
+  return s;
+}
+
+export const policyVersion = (rules: PolicyRule[], settings: DeviceSettings = {}) =>
+  createHash("sha256").update(JSON.stringify(rules)).update(Object.keys(settings).length ? JSON.stringify(settings) : "").digest("hex").slice(0, 16);
 
 /** The device's current policy, signed, for the check-in response. */
 export async function signedPolicy(tx: Tx, deps: Deps, device: { id: string; org_id: string; platform: DevicePlatform; primary_user_id: string | null }) {
   const rules = await rulesFor(tx, device);
+  const settings = await settingsFor(tx);
   const key = await commandKey(tx, deps, device.org_id);
   // ts orders policies: the agent refuses one older than what it already applied (a replayed response).
-  return sign(key.privatePem, { sub: device.id, ts: Date.now(), ver: policyVersion(rules), rules }, POLICY_TYP);
+  return sign(key.privatePem, { sub: device.id, ts: Date.now(), ver: policyVersion(rules, settings), rules, settings }, POLICY_TYP);
 }
 
 // ---- What agents report -------------------------------------------------------------------------
@@ -120,10 +139,34 @@ export const EnforcementReport = z.object({
     )
     .max(100)
     .default([]),
+  settings: z
+    .array(
+      z.object({
+        key: z.enum(["firewall", "screen_lock", "disk_encryption"]),
+        status: z.enum(["compliant", "applied", "pending_restart", "failed", "unsupported"]),
+        detail: z.string().max(500).default(""),
+      }),
+    )
+    .max(10)
+    .default([]),
+  recovery_keys: z
+    .array(
+      z.object({
+        volume: z.string().max(64),
+        id: z.string().max(64),
+        password: z.string().regex(/^\d{6}(-\d{6}){7}$/, "a 48-digit BitLocker recovery password"),
+      }),
+    )
+    .max(20)
+    .default([]),
 });
 
-export async function recordEnforcement(tx: Tx, device: { id: string; org_id: string; hostname: string }, rep: z.infer<typeof EnforcementReport>, meta: RequestMeta) {
+export const recoveryKeyAad = (id: string) => `recovery_key:${id}`;
+
+export async function recordEnforcement(tx: Tx, deps: Deps, device: { id: string; org_id: string; hostname: string }, rep: z.infer<typeof EnforcementReport>, meta: RequestMeta) {
   await tx.updateTable("devices").set({ enforcement_version: rep.version, enforcement_status: rep.status }).where("id", "=", device.id).execute();
+  await recordSettings(tx, device, rep.settings, meta);
+  if (rep.recovery_keys.length) await escrowKeys(tx, deps, device, rep.recovery_keys, meta);
   if (!rep.events.length) return;
   const known = new Map((await tx.selectFrom("enforcement_rules").select(["id", "name"]).execute()).map((r) => [r.id, r.name]));
   for (const e of rep.events) {
@@ -139,6 +182,58 @@ export async function recordEnforcement(tx: Tx, device: { id: string; org_id: st
       actor: { type: "system", id: null, display: "Nexus agent" },
       target: { type: "device", id: device.id, display: device.hostname },
       details: { rule_id: ruleId, rule: name, subject: e.subject, user: e.user, count: e.count, detail: e.detail },
+    });
+  }
+}
+
+type SettingResult = z.infer<typeof EnforcementReport>["settings"][number];
+
+/** Stores what the agent did about each setting, and audits changes it made or couldn't make. */
+async function recordSettings(tx: Tx, device: { id: string; org_id: string; hostname: string }, results: SettingResult[], meta: RequestMeta) {
+  if (!results.length) return;
+  const cur = await tx.selectFrom("devices").select("settings_report").where("id", "=", device.id).executeTakeFirst();
+  const before = new Map(((cur?.settings_report as SettingResult[] | undefined) ?? []).map((r) => [r.key, r]));
+  await tx.updateTable("devices").set({ settings_report: JSON.stringify(results), settings_reported_at: new Date() }).where("id", "=", device.id).execute();
+  for (const r of results) {
+    const prev = before.get(r.key);
+    if (prev?.status === r.status && prev.detail === r.detail) continue; // unchanged since the last report: already audited
+    if (r.status !== "applied" && r.status !== "pending_restart" && r.status !== "failed") continue;
+    await audit(tx, device.org_id, { meta }, {
+      type: r.status === "failed" ? "device.setting_failed" : "device.setting_applied",
+      outcome: r.status === "failed" ? "failure" : "success",
+      actor: { type: "system", id: null, display: "Nexus agent" },
+      target: { type: "device", id: device.id, display: device.hostname },
+      details: { setting: r.key, status: r.status, detail: r.detail },
+    });
+  }
+}
+
+/** Seals and stores BitLocker recovery keys; keys the device no longer reports are kept, marked retired. */
+async function escrowKeys(tx: Tx, deps: Deps, device: { id: string; org_id: string; hostname: string }, keys: z.infer<typeof EnforcementReport>["recovery_keys"], meta: RequestMeta) {
+  const existing = await tx.selectFrom("device_recovery_keys").select(["id", "volume", "key_id", "retired_at"]).where("device_id", "=", device.id).execute();
+  const now = new Date();
+  let added = 0;
+  for (const k of keys) {
+    const cur = existing.find((e) => e.volume === k.volume && e.key_id === k.id);
+    if (cur) {
+      // The same protector: re-seal in case its password changed, and un-retire it.
+      await tx.updateTable("device_recovery_keys").set({ sealed: deps.sealer.seal(Buffer.from(k.password), recoveryKeyAad(cur.id)), retired_at: null }).where("id", "=", cur.id).execute();
+      continue;
+    }
+    const id = newId();
+    await tx.insertInto("device_recovery_keys").values({ id, org_id: device.org_id, device_id: device.id, volume: k.volume, key_id: k.id, sealed: deps.sealer.seal(Buffer.from(k.password), recoveryKeyAad(id)), retired_at: null }).execute();
+    added++;
+  }
+  const reported = new Set(keys.map((k) => `${k.volume}|${k.id}`));
+  const volumes = new Set(keys.map((k) => k.volume));
+  const retired = existing.filter((e) => volumes.has(e.volume) && !e.retired_at && !reported.has(`${e.volume}|${e.key_id}`)).map((e) => e.id);
+  if (retired.length) await tx.updateTable("device_recovery_keys").set({ retired_at: now }).where("id", "in", retired).execute();
+  if (added || retired.length) {
+    await audit(tx, device.org_id, { meta }, {
+      type: "device.recovery_key_escrowed",
+      actor: { type: "system", id: null, display: "Nexus agent" },
+      target: { type: "device", id: device.id, display: device.hostname },
+      details: { volumes: [...volumes], added, retired: retired.length },
     });
   }
 }
@@ -222,7 +317,46 @@ async function listRules(tx: Tx, ids?: string[]) {
   }));
 }
 
+const RecoveryKeyOut = z
+  .object({
+    volume: z.string(),
+    key_id: z.string(),
+    password: z.string().openapi({ description: "The 48-digit BitLocker recovery password" }),
+    escrowed_at: z.string(),
+    retired_at: z.string().nullable().openapi({ description: "Set when the device stopped reporting this key (rotated or removed)" }),
+  })
+  .openapi("RecoveryKey");
+
 export function registerEnforcementRoutes(app: App) {
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/v1/devices/{id}/recovery-keys",
+      tags: ["Devices"],
+      summary: "Reveal a device's escrowed BitLocker recovery keys",
+      description: "Needs `devices:recovery_keys` (owners, admins and help desk) and a recent MFA; never an API key. Every reveal is in the audit log.",
+      security: bearer,
+      request: { params: z.object({ id: Id }) },
+      responses: { 200: json(z.object({ data: z.array(RecoveryKeyOut) })), ...problemResponses },
+    }),
+    async (c) => {
+      const p = requirePermission(c, "devices:recovery_keys", { scoped: true });
+      const { id } = c.req.valid("param");
+      const deps = c.get("deps");
+      const out = await deps.db.tenant(p.orgId, async (tx) => {
+        requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0);
+        await assertDeviceInScope(tx, p, "devices:recovery_keys", id);
+        const d = await tx.selectFrom("devices").select(["id", "hostname"]).where("id", "=", id).executeTakeFirst();
+        if (!d) throw notFound("Device");
+        const rows = await tx.selectFrom("device_recovery_keys").selectAll().where("device_id", "=", id).orderBy("retired_at", (ob) => ob.desc().nullsFirst()).orderBy("escrowed_at", "desc").execute();
+        await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, { type: "device.recovery_key_viewed", target: { type: "device", id, display: d.hostname }, details: { keys: rows.length } });
+        return rows.map((r) => ({ volume: r.volume, key_id: r.key_id, password: deps.sealer.open(r.sealed, recoveryKeyAad(r.id)).toString(), escrowed_at: iso(r.escrowed_at), retired_at: isoOrNull(r.retired_at) }));
+      });
+      c.header("Cache-Control", "no-store");
+      return c.json({ data: out }, 200);
+    },
+  );
+
   app.openapi(
     createRoute({ method: "get", path: "/v1/enforcement/rules", tags: ["Devices"], summary: "App and domain block rules", security: bearer, responses: { 200: json(z.object({ data: z.array(RuleOut) })), ...problemResponses } }),
     async (c) => {
@@ -384,7 +518,7 @@ export function registerEnforcementRoutes(app: App) {
         const d = await tx.selectFrom("devices").select(["id", "platform", "primary_user_id", "enforcement_version", "enforcement_status", "last_seen_at"]).where("id", "=", id).executeTakeFirst();
         if (!d) throw notFound("Device");
         const rules = await rulesFor(tx, d);
-        const expected = policyVersion(rules);
+        const expected = policyVersion(rules, await settingsFor(tx));
         return { rules, expected_version: expected, applied_version: d.enforcement_version, in_sync: d.enforcement_version === expected, status: d.enforcement_status, last_seen_at: isoOrNull(d.last_seen_at) };
       });
       return c.json(out, 200);

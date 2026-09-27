@@ -7826,7 +7826,7 @@ export interface paths {
                         name: string;
                         /** @default  */
                         description?: string;
-                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                     };
                 };
             };
@@ -7995,7 +7995,7 @@ export interface paths {
                         name?: string;
                         /** @default  */
                         description?: string;
-                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                     };
                 };
             };
@@ -19466,6 +19466,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/devices/{id}/recovery-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reveal a device's escrowed BitLocker recovery keys
+         * @description Needs `devices:recovery_keys` (owners, admins and help desk) and a recent MFA; never an API key. Every reveal is in the audit log.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["RecoveryKey"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/enforcement/rules": {
         parameters: {
             query?: never;
@@ -22619,7 +22707,7 @@ export interface components {
             created_at: string;
         };
         /** @enum {string} */
-        Permission: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+        Permission: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
         Factor: {
             /**
              * Format: uuid
@@ -23619,13 +23707,13 @@ export interface components {
             builtin: {
                 /** @enum {string} */
                 key: "owner" | "admin" | "helpdesk" | "security_analyst" | "readonly";
-                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                 scopable: boolean;
             }[];
             custom: components["schemas"]["CustomRole"][];
             permissions: {
                 /** @enum {string} */
-                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
                 /** @description Can be limited to groups in a scoped grant */
                 scopable: boolean;
                 in_custom_roles: boolean;
@@ -23639,7 +23727,7 @@ export interface components {
             id: string;
             name: string;
             description: string;
-            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
             holders: number;
             /**
              * Format: date-time
@@ -24811,6 +24899,15 @@ export interface components {
                 [key: string]: string;
             }[];
         };
+        RecoveryKey: {
+            volume: string;
+            key_id: string;
+            /** @description The 48-digit BitLocker recovery password */
+            password: string;
+            escrowed_at: string;
+            /** @description Set when the device stopped reporting this key (rotated or removed) */
+            retired_at: string | null;
+        };
         EnforcementRule: {
             /**
              * Format: uuid
@@ -25058,6 +25155,17 @@ export interface components {
             ai: components["schemas"]["DeviceAI"];
             inventory: {
                 [key: string]: unknown;
+            };
+            /** @description Device settings the agent enforces (device policies set to fix, not just report) and what it did */
+            settings: {
+                reported_at: string | null;
+                results: {
+                    key: string;
+                    status: string;
+                    detail: string;
+                }[];
+                /** @description Escrowed BitLocker recovery keys still in use (reveal with GET /v1/devices/{id}/recovery-keys) */
+                recovery_keys: number;
             };
         };
         DeviceCheck: {

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { reseal } from "../src/platform/reseal.js";
+import { reseal, SEALED } from "../src/platform/reseal.js";
 import { Sealer } from "../src/platform/seal.js";
 import { bootApp, PASSWORD, totpCode, uniqueEmail } from "./harness.js";
 
@@ -60,5 +60,17 @@ describe("seal key rotation", () => {
     const stranger = new Sealer([{ id: 3, key: randomBytes(32) }]);
     const r = await reseal(process.env.NEXUS_DATABASE_OWNER_URL!, stranger, { dryRun: true, orgId });
     expect(r.find((x) => x.table === "auth_factors")!.failed).toHaveLength(1);
+  });
+});
+
+describe("every sealed column is rotated", () => {
+  it("registers each secret-bearing bytea column with reseal (hashes and public keys aside)", async () => {
+    const cols = (
+      await owner.query(`SELECT table_name || '.' || column_name AS c FROM information_schema.columns
+        WHERE table_schema = 'public' AND data_type = 'bytea' AND column_name !~ '(_hash|^public_key)$' ORDER BY 1`)
+    ).rows.map((r) => r.c as string);
+    const registered = new Set(SEALED.map((t) => `${t.table}.${t.column}`));
+    // A column missing here would stay sealed with the old key after a rotation, and break once it's removed.
+    expect(cols.filter((c) => !registered.has(c))).toEqual([]);
   });
 });
