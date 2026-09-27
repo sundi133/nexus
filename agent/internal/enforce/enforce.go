@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/votal-ai/nexus/agent/internal/accounts"
 	"github.com/votal-ai/nexus/agent/internal/command"
 	"github.com/votal-ai/nexus/agent/internal/settings"
 	"github.com/votal-ai/nexus/agent/internal/software"
@@ -41,12 +42,13 @@ type Rule struct {
 }
 
 type Policy struct {
-	Device   string           `json:"sub"`
-	TS       int64            `json:"ts"`
-	Ver      string           `json:"ver"`
-	Rules    []Rule           `json:"rules"`
-	Settings settings.Desired `json:"settings"` // device settings to enforce (firewall, screen lock, BitLocker)
-	Software []software.Item  `json:"software"` // apps to install or remove
+	Device   string             `json:"sub"`
+	TS       int64              `json:"ts"`
+	Ver      string             `json:"ver"`
+	Rules    []Rule             `json:"rules"`
+	Settings settings.Desired   `json:"settings"` // device settings to enforce (firewall, screen lock, BitLocker)
+	Software []software.Item    `json:"software"` // apps to install or remove
+	Accounts []accounts.Account `json:"accounts"` // people's local accounts
 }
 
 // Event is reported on the next check-in; repeats are counted, not repeated.
@@ -67,6 +69,7 @@ type Report struct {
 	Settings     []settings.Result      `json:"settings"`
 	RecoveryKeys []settings.RecoveryKey `json:"recovery_keys,omitempty"` // only when they changed
 	Software     []software.Result      `json:"software"`                // null until the first pass
+	Accounts     []accounts.Status      `json:"accounts"`                // null until the first pass
 }
 
 // Proc is a running process.
@@ -93,6 +96,10 @@ type Enforcer struct {
 	ApplySettings func(settings.Desired) settings.Outcome
 	// ApplySoftware installs and removes the policy's apps (software.Manager.Apply).
 	ApplySoftware func([]software.Item) []software.Result
+	// ApplyAccounts makes people's local accounts match the policy (accounts.Manager.Apply);
+	// OfferPassword hands it a password the server sent (accounts.Manager.Offer).
+	ApplyAccounts func([]accounts.Account) []accounts.Status
+	OfferPassword func(userID string, version int, ct string) (bool, error)
 
 	mu        sync.Mutex
 	monitored map[string]bool // rule|pid already reported in monitor mode
@@ -110,6 +117,11 @@ type Enforcer struct {
 	softwareRunning bool
 	softwareAt      time.Time
 	softwareRes     []software.Result
+
+	accountsRunning bool
+	accountsAt      time.Time
+	accountsRes     []accounts.Status
+	accountsAgain   bool // a password arrived during a pass: run another
 }
 
 // SettingsEvery is how often settings are re-asserted, so ones someone turned off come back.
@@ -144,6 +156,7 @@ func (e *Enforcer) Load() {
 	e.applyDomains()
 	e.settingsSoon()
 	e.softwareSoon()
+	e.accountsSoon()
 }
 
 // Apply verifies a signed policy from a check-in and, when it's new, applies it.
@@ -189,9 +202,11 @@ func (e *Enforcer) Apply(jws string) error {
 	e.mu.Lock()
 	e.settingsAt = time.Time{} // a new policy: apply its settings and apps now
 	e.softwareAt = time.Time{}
+	e.accountsAt = time.Time{}
 	e.mu.Unlock()
 	e.settingsSoon()
 	e.softwareSoon()
+	e.accountsSoon()
 	return nil
 }
 
@@ -252,6 +267,89 @@ func (e *Enforcer) softwareSoon() {
 			out = []software.Result{}
 		}
 		e.softwareRes = out
+	}()
+}
+
+const secretTyp = "nexus-secret+jwt"
+
+// OfferPasswords takes the password envelopes from a check-in: each signed by the organization
+// for this device, then opened with the device's own key. New ones are applied right away.
+func (e *Enforcer) OfferPasswords(jwss []string) {
+	if e.OfferPassword == nil || len(jwss) == 0 {
+		return
+	}
+	key, err := e.Key()
+	if err != nil {
+		return
+	}
+	fresh := false
+	for _, j := range jwss {
+		payload, err := command.VerifySigned(j, key, secretTyp, "password")
+		if err != nil {
+			e.Log.Warn("refused a password", "err", err)
+			continue
+		}
+		var p struct {
+			Sub string `json:"sub"`
+			UID string `json:"uid"`
+			Ver int    `json:"ver"`
+			CT  string `json:"ct"`
+			Exp int64  `json:"exp"`
+		}
+		if json.Unmarshal(payload, &p) != nil || p.Sub != e.DeviceID || p.Exp < e.now().Unix() {
+			e.Log.Warn("refused a password", "err", "not for this device, or expired")
+			continue
+		}
+		ok, err := e.OfferPassword(p.UID, p.Ver, p.CT)
+		if err != nil {
+			e.Log.Warn("refused a password", "err", err)
+		}
+		fresh = fresh || ok
+	}
+	if fresh {
+		e.mu.Lock()
+		if e.accountsRunning {
+			e.accountsAgain = true
+		}
+		e.accountsAt = time.Time{}
+		e.mu.Unlock()
+		e.accountsSoon()
+	}
+}
+
+// accountsSoon reconciles local accounts in the background when due (new policy or password,
+// startup, or hourly, so an account someone re-enabled by hand is disabled again).
+func (e *Enforcer) accountsSoon() {
+	e.mu.Lock()
+	if e.ApplyAccounts == nil || e.policy == nil || e.accountsRunning || (!e.accountsAt.IsZero() && e.now().Sub(e.accountsAt) < SettingsEvery) {
+		e.mu.Unlock()
+		return
+	}
+	want := append([]accounts.Account(nil), e.policy.Accounts...)
+	e.accountsRunning, e.accountsAgain = true, false
+	e.mu.Unlock()
+	go func() {
+		out := e.ApplyAccounts(want)
+		for _, s := range out {
+			if s.Status == "failed" {
+				e.Log.Warn("local account", "user", s.Username, "detail", s.Detail)
+			}
+		}
+		e.mu.Lock()
+		e.accountsRunning = false
+		e.accountsAt = e.now()
+		if out == nil {
+			out = []accounts.Status{}
+		}
+		e.accountsRes = out
+		again := e.accountsAgain
+		if again {
+			e.accountsAt = time.Time{}
+		}
+		e.mu.Unlock()
+		if again {
+			e.accountsSoon()
+		}
 	}()
 }
 
@@ -592,6 +690,7 @@ func (e *Enforcer) Report() Report {
 	r := e.report()
 	e.settingsSoon() // re-assert settings hourly
 	e.softwareSoon() // …and apps
+	e.accountsSoon() // …and local accounts
 	return r
 }
 
@@ -601,6 +700,9 @@ func (e *Enforcer) report() Report {
 	r := Report{Status: e.status, Events: []Event{}, Settings: append([]settings.Result{}, e.settingsRes...), RecoveryKeys: e.pendingKeys}
 	if e.softwareRes != nil {
 		r.Software = append([]software.Result{}, e.softwareRes...)
+	}
+	if e.accountsRes != nil {
+		r.Accounts = append([]accounts.Status{}, e.accountsRes...)
 	}
 	if e.policy != nil {
 		r.Version = e.policy.Ver

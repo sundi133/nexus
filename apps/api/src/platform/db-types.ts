@@ -35,6 +35,8 @@ export interface Database {
     department: Generated<string>;
     status: Generated<UserStatus>;
     password_hash: string | null;
+    local_password_version: Generated<number>;
+    local_password_fp: string | null;
     attributes: Json;
     break_glass: Generated<boolean>;
     last_login_at: NullableTimestamp;
@@ -231,6 +233,7 @@ export interface Database {
     settings_reported_at: Generated<Date | null>;
     events_status: Generated<string>;
     osquery_collected_at: NullableTimestamp;
+    enc_public_key: string | null;
     updates_checked_at: NullableTimestamp;
     updates_error: string | null;
     updates_pending: Generated<number>;
@@ -301,6 +304,30 @@ export interface Database {
     created_by: string | null;
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
+  };
+  device_accounts: {
+    id: string;
+    org_id: string;
+    device_id: string;
+    user_id: string;
+    username: string;
+    admin: Generated<boolean>;
+    take_over: Generated<boolean>;
+    status: Generated<"pending" | "waiting_password" | "active" | "disabled" | "failed">;
+    password_version: Generated<number>;
+    detail: Generated<string>;
+    reported_at: NullableTimestamp;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
+  password_deliveries: {
+    org_id: string;
+    device_id: string;
+    user_id: string;
+    version: number;
+    ciphertext: string;
+    created_at: Generated<Date>;
+    expires_at: Date;
   };
   software_packages: {
     id: string;

@@ -1,3 +1,4 @@
+import { capturePassword } from "../devices/local-accounts.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { sql } from "kysely";
@@ -259,6 +260,7 @@ export function registerRecoveryRoutes(app: App) {
         const r = await tx.updateTable("password_resets").set({ used_at: new Date() }).where("id", "=", found.reset_id).where("used_at", "is", null).returning("id").executeTakeFirst();
         if (!r) throw new ApiError(404, "reset_invalid", "This reset link was already used.");
         await tx.updateTable("users").set({ password_hash: passwordHash, updated_at: new Date() }).where("id", "=", found.user_id).execute();
+        await capturePassword(tx, deps, found.user_id, password);
         const sessions = await revokeUserSessions(tx, found.user_id);
         await audit(tx, found.org_id, { meta, display: found.email }, {
           type: "user.password_reset",
@@ -303,6 +305,8 @@ export function registerRecoveryRoutes(app: App) {
       const passwordHash = await hashPassword(new_password);
       await deps.db.tenant(p.orgId, async (tx) => {
         await tx.updateTable("users").set({ password_hash: passwordHash, updated_at: new Date() }).where("id", "=", p.userId).execute();
+        // The old password lets macOS change (not reset) it, so the login keychain and FileVault follow.
+        await capturePassword(tx, deps, p.userId, new_password, current_password);
         const others = await tx.updateTable("sessions").set({ revoked_at: new Date() }).where("user_id", "=", p.userId).where("id", "<>", p.sessionId).where("revoked_at", "is", null).executeTakeFirst();
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, { type: "user.password_changed", target: { type: "user", id: p.userId, display: p.email }, details: { other_sessions_revoked: Number(others.numUpdatedRows) } });
       });
