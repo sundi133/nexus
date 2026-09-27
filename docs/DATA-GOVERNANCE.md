@@ -20,6 +20,7 @@ Everything is in the deployment's Postgres database, in the region you run it. T
 | In transit | TLS to the console, the API and the database |
 | At rest | The database's storage encryption. On a managed database, use a customer-managed KMS key (for example AWS KMS on RDS, CMEK on Cloud SQL, or Azure Key Vault) to control and revoke it |
 | Secrets in the database | Sealed with AES-256-GCM before they're stored: directory and MDM credentials, webhook and SIEM secrets, signing keys, TOTP seeds. The seal keys come from your secret manager (`NEXUS_SEAL_KEYS`, rotated with `reseal`; see [OPERATIONS.md](OPERATIONS.md#key-rotation-seal-keys)). Passwords, API keys and tokens are stored only as hashes |
+| Password manager | End-to-end encrypted in the browser. Nexus stores only ciphertext and can't decrypt it ([PASSWORDS.md](PASSWORDS.md)) |
 | Access | Roles and permissions, step-up MFA for sensitive actions, everything audited in a tamper-evident log ([SECURITY.md](SECURITY.md)) |
 
 ## Retention

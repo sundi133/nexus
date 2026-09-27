@@ -37,6 +37,7 @@
     "reflect-metadata": "0.2.2",
     "undici": "^7.19.2",
     "uuidv7": "^1.2.1",
+    "ws": "^8.18.0",
     "xml-crypto": "^6.3.1",
     "xpath": "^0.0.34",
     "zod": "^4.6.5"
@@ -50,6 +51,7 @@
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/plist": "^3.0.5",
+    "@types/ws": "^8.18.1",
     "ldapts": "^9.2.0",
     "openid-client": "^6.8.8",
     "tsx": "^4.23.15",

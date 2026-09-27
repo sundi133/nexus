@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/votal-ai/nexus/agent/internal/accounts"
+	"github.com/votal-ai/nexus/agent/internal/assist"
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
@@ -258,6 +259,21 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		}
 	}
 	runner := &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate), "script": command.ScriptAction(store.Dir)}, Log: log}
+	// Remote Assist: asks the person at the Mac, then tunnels Screen Sharing to the Nexus relay.
+	mac := assist.Mac{Run: assist.ExecRun}
+	helper := &assist.Runner{D: assist.Deps{
+		GOOS: runtime.GOOS, ConsoleUser: mac.ConsoleUser, Ask: mac.Ask, Showing: mac.Showing, Notify: mac.Notify, Sharing: mac, DialVNC: assist.DialVNC,
+		Open: func(ctx context.Context, id string) (assist.Tunnel, error) {
+			t, err := c.RemoteAssistTunnel(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			return t, nil
+		},
+		Report: c.RemoteAssistState,
+		Log:    log,
+	}}
+	runner.ArgExec["remote_assist"] = helper.Action
 	ownHost := ""
 	if u, perr := url.Parse(e.Server); perr == nil {
 		ownHost = u.Hostname()
@@ -333,7 +349,13 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			return string(out), err
 		},
 		Has: func(n string) bool { _, err := exec.LookPath(n); return err == nil }}
-	runner.ArgExec["updates"] = command.UpdatesAction(command.Actions()["restart"], updateChecker.Recheck)
+	// Third-party apps: winget on Windows, the signed-vendor catalog on macOS, checked daily.
+	updateChecker.ThirdPartyEvery = 24 * time.Hour
+	updateChecker.Winget = func() string { return software.FindWinget(exec.LookPath) }
+	updateChecker.Mac = updates.Mac{Run: updateChecker.Run, Dir: store.Dir, Download: updates.DownloadLatest}
+	runner.ArgExec["updates"] = command.UpdatesAction(command.Actions()["restart"], updateChecker.Recheck, func(ctx context.Context, ids []string) (string, error) {
+		return updates.InstallThirdParty(ctx, runtime.GOOS, updateChecker.Run, software.FindWinget(exec.LookPath), updateChecker.Mac, ids)
+	})
 	collectWithUpdates := func(ctx context.Context) collect.Snapshot {
 		s := collect.Collect(ctx)
 		if r := updateChecker.Report(); r != nil {

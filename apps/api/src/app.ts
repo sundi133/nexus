@@ -3,6 +3,10 @@ import { registerSoftwareDeployRoutes } from "./devices/software-deploy.js";
 import { registerLocalAccountRoutes } from "./devices/local-accounts.js";
 import { registerAppleMdmProtocol } from "./apple-mdm/protocol.js";
 import { registerAppleMdmRoutes } from "./apple-mdm/routes.js";
+import { registerAppleMdmProfileRoutes } from "./apple-mdm/profiles.js";
+import { registerAdeRoutes, scheduleAdeSyncs } from "./apple-mdm/ade.js";
+import { registerRemoteAssistRoutes } from "./remote-assist/routes.js";
+import { registerVaultRoutes } from "./vault/routes.js";
 import { registerScriptRoutes } from "./devices/scripts.js";
 import { registerDirectoryServiceRoutes } from "./protocols/routes.js";
 import { registerMcpPeopleRoutes } from "./mcp/people-routes.js";
@@ -61,6 +65,7 @@ import { registerAppRoutes } from "./sso/apps.js";
 import { registerOidcRoutes } from "./sso/oidc.js";
 import { registerSamlRoutes } from "./sso/saml.js";
 import { registerCatalogRoutes } from "./sso/catalog.js";
+import { registerAppDirectoryRoutes } from "./sso/directory.js";
 import { registerKeyRoutes } from "./sso/key-routes.js";
 import { registerAgentRoutes, registerReleaseDownloads } from "./devices/agent-api.js";
 import { registerAgentUpdateRoutes } from "./devices/update-routes.js";
@@ -263,6 +268,7 @@ export function createApp(deps: Deps) {
   registerOidcRoutes(app);
   registerSamlRoutes(app);
   registerCatalogRoutes(app);
+  registerAppDirectoryRoutes(app);
   registerKeyRoutes(app);
   registerAgentRoutes(app);
   registerReleaseDownloads(app);
@@ -294,6 +300,10 @@ export function createApp(deps: Deps) {
   registerLocalAccountRoutes(app);
   registerAppleMdmProtocol(app);
   registerAppleMdmRoutes(app);
+  registerAppleMdmProfileRoutes(app);
+  registerAdeRoutes(app);
+  registerVaultRoutes(app);
+  registerRemoteAssistRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -328,4 +338,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleOrgDeletions(jobs, deps);
   scheduleRetention(jobs, deps);
   schedulePatching(jobs, deps);
+  scheduleAdeSyncs(jobs, deps);
 }

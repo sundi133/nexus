@@ -240,6 +240,8 @@ export interface Database {
     security_updates_pending: Generated<number>;
     updates_pending_since: NullableTimestamp;
     security_updates_since: NullableTimestamp;
+    third_party_pending: Generated<number>;
+    third_party_since: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
     last_ip: Generated<string>;
@@ -356,6 +358,112 @@ export interface Database {
     last_seen_at: NullableTimestamp;
     created_at: Generated<Date>;
   };
+  vault_accounts: {
+    user_id: string;
+    org_id: string;
+    public_key: string;
+    private_key_enc: Json<{ iv: string; ct: string }>;
+    kdf: Json<{ alg: string; iterations: number; salt: string }>;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  vaults: {
+    id: string;
+    org_id: string;
+    kind: "personal" | "shared";
+    name_enc: Json<{ iv: string; ct: string }>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
+  vault_members: {
+    vault_id: string;
+    user_id: string;
+    org_id: string;
+    wrapped_key: string;
+    role: "owner" | "editor" | "viewer";
+    added_by: string | null;
+    created_at: Generated<Date>;
+  };
+  remote_assist_sessions: {
+    id: string;
+    org_id: string;
+    device_id: string;
+    requested_by: string | null;
+    reason: string;
+    status: Generated<"asking" | "active" | "declined" | "ended" | "expired" | "failed">;
+    detail: Generated<string>;
+    command_id: string | null;
+    ticket_hash: string | null;
+    ticket_expires_at: Date | null;
+    created_at: Generated<Date>;
+    accepted_at: Date | null;
+    ended_at: Date | null;
+    expires_at: Date;
+  };
+  vault_items: {
+    id: string;
+    org_id: string;
+    vault_id: string;
+    data: Json<{ iv: string; ct: string }>;
+    created_by: string | null;
+    updated_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  apple_ade_settings: {
+    org_id: string;
+    key: Buffer;
+    cert: string;
+    token: Buffer | null;
+    token_expires_at: NullableTimestamp;
+    server_name: Generated<string>;
+    abm_org_name: Generated<string>;
+    enroll_secret: string;
+    profile_uuid: string | null;
+    profile: Json<Record<string, unknown>>;
+    auto_assign: Generated<boolean>;
+    cursor: string | null;
+    last_sync_at: NullableTimestamp;
+    last_error: Generated<string>;
+    updated_at: Generated<Date>;
+  };
+  apple_ade_devices: {
+    org_id: string;
+    serial: string;
+    model: Generated<string>;
+    description: Generated<string>;
+    color: Generated<string>;
+    os: Generated<string>;
+    profile_status: Generated<string>;
+    profile_uuid: Generated<string>;
+    assigned_at: NullableTimestamp;
+    deleted: Generated<boolean>;
+    updated_at: Generated<Date>;
+  };
+  apple_mdm_profiles: {
+    id: string;
+    org_id: string;
+    name: string;
+    identifier: string;
+    payload: Buffer;
+    payload_types: Generated<string[]>;
+    source: Generated<"upload" | "template">;
+    target: Json<{ all?: boolean; group_ids?: string[] }>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  apple_mdm_device_profiles: {
+    org_id: string;
+    mdm_device_id: string;
+    identifier: string;
+    profile_id: string | null;
+    status: "installing" | "installed" | "failed" | "removing";
+    detail: Generated<string>;
+    command_id: string | null;
+    installed_version: NullableTimestamp;
+    updated_at: Generated<Date>;
+  };
   apple_mdm_commands: {
     id: string;
     org_id: string;
@@ -443,6 +551,7 @@ export interface Database {
     restart: Generated<"never" | "if_needed">;
     window_start: Generated<number>;
     window_end: Generated<number>;
+    third_party: Generated<boolean>;
     timezone: Generated<string>;
     updated_by: string | null;
     updated_at: Generated<Date>;
@@ -564,7 +673,7 @@ export interface Database {
     id: string;
     org_id: string;
     device_id: string;
-    action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates";
+    action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script" | "updates" | "remote_assist";
     channel: "agent" | "mdm";
     status: Generated<"queued" | "sent" | "done" | "failed" | "expired" | "canceled">;
     reason: Generated<string>;

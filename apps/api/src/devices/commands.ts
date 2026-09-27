@@ -120,7 +120,7 @@ export async function recordCommandResults(tx: Tx, device: { id: string; org_id:
 const CommandOut = z
   .object({
     id: Id,
-    action: z.enum(["refresh", "lock", "restart", "wipe", "osquery", "script", "updates"]),
+    action: z.enum(["refresh", "lock", "restart", "wipe", "osquery", "script", "updates", "remote_assist"]),
     channel: z.enum(["agent", "mdm"]),
     status: z.enum(["queued", "sent", "done", "failed", "expired", "canceled"]),
     reason: z.string(),

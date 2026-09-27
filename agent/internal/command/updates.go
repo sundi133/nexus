@@ -15,11 +15,13 @@ import (
 // UpdatesAction installs OS updates from a signed command: {"scope": "security"|"all",
 // "restart": "never"|"if_needed"}. A restart, when allowed and needed, goes through the same
 // restart action admins use (with its warning to the signed-in person).
-func UpdatesAction(restart Executor, recheck func()) ArgExecutor {
+func UpdatesAction(restart Executor, recheck func(), thirdParty func(ctx context.Context, ids []string) (string, error)) ArgExecutor {
 	return func(ctx context.Context, raw json.RawMessage) (string, json.RawMessage, error) {
 		var a struct {
-			Scope   string `json:"scope"`
-			Restart string `json:"restart"`
+			Scope      string   `json:"scope"` // security | all | none (apps only)
+			Restart    string   `json:"restart"`
+			ThirdParty bool     `json:"third_party"`
+			Apps       []string `json:"apps"`
 		}
 		_ = json.Unmarshal(raw, &a)
 		run := func(ctx context.Context, name string, args ...string) (string, error) {
@@ -31,12 +33,21 @@ func UpdatesAction(restart Executor, recheck func()) ArgExecutor {
 		// keep the device silent for longer than an hour.
 		ictx, cancel := context.WithTimeout(ctx, installTimeout)
 		defer cancel()
-		msg, err := updates.Install(ictx, runtime.GOOS, run, has, a.Scope != "all")
+		var msg string
+		var err error
+		if a.Scope != "none" {
+			msg, err = updates.Install(ictx, runtime.GOOS, run, has, a.Scope != "all")
+		}
+		if err == nil && a.ThirdParty && thirdParty != nil {
+			var tp string
+			tp, err = thirdParty(ictx, a.Apps)
+			msg = strings.TrimPrefix(strings.Join([]string{msg, tp}, "; "), "; ")
+		}
 		if recheck != nil {
 			recheck()
 		}
 		if err != nil {
-			return "", nil, err
+			return msg, nil, err
 		}
 		restarted := false
 		if a.Restart == "if_needed" && needsRestart(msg) && restart != nil {

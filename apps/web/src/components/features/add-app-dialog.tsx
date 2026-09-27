@@ -16,7 +16,7 @@ import { SamlIdpValues } from "./saml-values";
 
 type Entry = Schemas["CatalogEntry"];
 type Result = { app: Schemas["Application"]; client_secret: string | null; setup_steps?: string[] };
-type Stage = { kind: "pick" } | { kind: "catalog"; entry: Entry } | { kind: "custom"; protocol: "saml" | "oidc" } | { kind: "done"; result: Result };
+type Stage = { kind: "pick" } | { kind: "catalog"; entry: Entry } | { kind: "custom"; protocol: "saml" | "oidc"; name?: string } | { kind: "done"; result: Result };
 
 /** Add an app: pick from the catalog (guided) or configure a custom SAML/OIDC app. */
 export function AddAppDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -30,7 +30,7 @@ export function AddAppDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const title = {
     pick: "Add an application",
     catalog: stage.kind === "catalog" ? `Add ${stage.entry.name}` : "",
-    custom: stage.kind === "custom" ? (stage.protocol === "saml" ? "Custom SAML app" : "Custom OpenID Connect app") : "",
+    custom: stage.kind === "custom" ? (stage.name ? `${stage.name} (${stage.protocol === "saml" ? "SAML" : "OpenID Connect"})` : stage.protocol === "saml" ? "Custom SAML app" : "Custom OpenID Connect app") : "",
     done: stage.kind === "done" ? `${stage.result.app.name} is ready` : "",
   }[stage.kind];
 
@@ -39,7 +39,7 @@ export function AddAppDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       <DialogContent title={title} className={stage.kind === "pick" ? "max-w-2xl" : "max-w-lg"}>
         {stage.kind === "pick" ? <Picker onPick={setStage} /> : null}
         {stage.kind === "catalog" ? <CatalogForm entry={stage.entry} onBack={() => setStage({ kind: "pick" })} onDone={(result) => setStage({ kind: "done", result })} /> : null}
-        {stage.kind === "custom" ? <CustomForm protocol={stage.protocol} onBack={() => setStage({ kind: "pick" })} onDone={(result) => setStage({ kind: "done", result })} /> : null}
+        {stage.kind === "custom" ? <CustomForm protocol={stage.protocol} initialName={stage.name} onBack={() => setStage({ kind: "pick" })} onDone={(result) => setStage({ kind: "done", result })} /> : null}
         {stage.kind === "done" ? <Done result={stage.result} onClose={close} /> : null}
       </DialogContent>
     </Dialog>
@@ -49,7 +49,11 @@ export function AddAppDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 function Picker({ onPick }: { onPick: (s: Stage) => void }) {
   const [q, setQ] = useState("");
   const catalog = useQuery({ queryKey: ["app-catalog"], queryFn: () => unwrap(api.GET("/v1/app-catalog")), staleTime: Infinity });
-  const list = (catalog.data?.data ?? []).filter((e) => `${e.name} ${e.category}`.toLowerCase().includes(q.toLowerCase()));
+  const dir = useQuery({ queryKey: ["app-directory"], queryFn: () => unwrap(api.GET("/v1/app-directory")), staleTime: Infinity });
+  const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
+  const list = (catalog.data?.data ?? []).filter((e) => match(`${e.name} ${e.category}`));
+  // Apps without a template: shown once someone searches, set up as generic SAML/OIDC with their name.
+  const more = q.trim() ? (dir.data?.data ?? []).filter((d) => !d.template && match(`${d.name} ${d.category}`)).slice(0, 30) : [];
   return (
     <div className="space-y-3">
       <div className="relative">
@@ -75,6 +79,32 @@ function Picker({ onPick }: { onPick: (s: Stage) => void }) {
           </li>
         ))}
       </ul>
+      {more.length ? (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-fg-subtle">More apps · set up with SAML or OIDC</p>
+          <ul className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+            {more.map((d) => (
+              <li key={d.key}>
+                <button
+                  type="button"
+                  onClick={() => onPick({ kind: "custom", protocol: d.protocols[0]!, name: d.name })}
+                  className="flex w-full items-center gap-2.5 rounded-lg border border-border p-2.5 text-left hover:border-primary hover:bg-bg-subtle"
+                >
+                  <AppIcon name={d.name} size={26} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px] font-medium">{d.name}</span>
+                    <span className="block text-[11px] text-fg-muted">
+                      {d.category} · {d.protocols.map((p) => p.toUpperCase()).join(" / ")}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : !q.trim() && dir.data ? (
+        <p className="text-xs text-fg-muted">Search to find {dir.data.data.length} apps, or connect any SAML 2.0 / OpenID Connect app below.</p>
+      ) : null}
       <div className="grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
         {(["saml", "oidc"] as const).map((p) => (
           <button
@@ -148,9 +178,9 @@ function CatalogForm({ entry, onBack, onDone }: { entry: Entry; onBack: () => vo
   );
 }
 
-function CustomForm({ protocol, onBack, onDone }: { protocol: "saml" | "oidc"; onBack: () => void; onDone: (r: Result) => void }) {
+function CustomForm({ protocol, initialName, onBack, onDone }: { protocol: "saml" | "oidc"; initialName?: string; onBack: () => void; onDone: (r: Result) => void }) {
   const qc = useQueryClient();
-  const [form, setForm] = useState({ name: "", redirects: "", launch_url: "", client_type: "confidential" as "confidential" | "public", saml_mode: "metadata" as "metadata" | "manual", metadata_xml: "", entity_id: "", acs_url: "" });
+  const [form, setForm] = useState({ name: initialName ?? "", redirects: "", launch_url: "", client_type: "confidential" as "confidential" | "public", saml_mode: "metadata" as "metadata" | "manual", metadata_xml: "", entity_id: "", acs_url: "" });
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
   const create = useMutation({
     mutationFn: () =>

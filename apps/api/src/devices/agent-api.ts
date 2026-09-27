@@ -6,7 +6,7 @@ import { calculateJwkThumbprint, EmbeddedJWK, importJWK, jwtVerify, type JWK } f
 import { sql } from "kysely";
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
-import type { App, Env, RequestMeta } from "../context.js";
+import type { App, Deps, Env, RequestMeta } from "../context.js";
 import type { Tx } from "../platform/db.js";
 import { audit } from "../audit/record.js";
 import { hashToken } from "../auth/tokens.js";
@@ -126,7 +126,7 @@ function deviceError(status: 401 | 403, code: string, message: string) {
 }
 
 /** Verifies the proof JWT against a key; returns claims. Throws 401 on any mismatch. */
-async function verifyProof(c: Context<Env>, token: string, key: Parameters<typeof jwtVerify>[1], body: string) {
+async function verifyProof(req: { method: string; path: string }, token: string, key: Parameters<typeof jwtVerify>[1], body: string) {
   const { payload } = await jwtVerify(token, key as never, {
     audience: AUD,
     typ: TYP,
@@ -137,7 +137,7 @@ async function verifyProof(c: Context<Env>, token: string, key: Parameters<typeo
   }).catch((err: Error) => {
     throw deviceError(401, "invalid_device_proof", `Device signature rejected: ${err.message}`);
   });
-  if (payload.htm !== c.req.method || payload.htu !== c.req.path) throw deviceError(401, "invalid_device_proof", "Signature is for a different request");
+  if (payload.htm !== req.method || payload.htu !== req.path) throw deviceError(401, "invalid_device_proof", "Signature is for a different request");
   if (payload.bsh !== bsh(body)) throw deviceError(401, "invalid_device_proof", "Body doesn't match the signature");
   if ((payload.exp ?? 0) - (payload.iat ?? 0) > MAX_AGE_S) throw deviceError(401, "invalid_device_proof", "Signature lifetime too long");
   return payload;
@@ -145,18 +145,22 @@ async function verifyProof(c: Context<Env>, token: string, key: Parameters<typeo
 
 /** The device a signed agent request comes from (its proof checked against the device's key). */
 async function authenticateDevice(c: Context<Env>, raw: string) {
-  const proof = authHeader(c);
+  return deviceFromProof(c.get("deps"), { method: c.req.method, path: c.req.path }, authHeader(c), raw);
+}
+
+/** The same check outside a Hono route (the Remote Assist tunnel's websocket upgrade). */
+export async function deviceFromProof(deps: Deps, req: { method: string; path: string }, proof: string, raw: string) {
   const kid = (JSON.parse(Buffer.from(proof.split(".")[0] ?? "", "base64url").toString() || "{}") as { kid?: string }).kid ?? "";
   if (!/^[0-9a-f-]{36}$/.test(kid)) throw deviceError(401, "invalid_device_proof", "Missing device ID");
-  const dev = await c.get("deps").db.unscoped(async (tx) => (await sql<{ org_id: string; public_jwk: JWK }>`SELECT * FROM nexus_device_auth(${kid}::uuid)`.execute(tx)).rows[0]);
+  const dev = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; public_jwk: JWK }>`SELECT * FROM nexus_device_auth(${kid}::uuid)`.execute(tx)).rows[0]);
   // Removed devices must stop: the agent treats this code as "unenrolled".
   if (!dev) throw deviceError(401, "device_not_enrolled", "This device is not enrolled (it may have been removed)");
-  const payload = await verifyProof(c, proof, await importJWK(dev.public_jwk, "ES256"), raw);
+  const payload = await verifyProof(req, proof, await importJWK(dev.public_jwk, "ES256"), raw);
   return { dev, kid, payload };
 }
 
 /** Replay protection: a proof can be used once (expired nonces are pruned by a job, not per request). */
-async function consumeProof(tx: Tx, orgId: string, kid: string, payload: { jti?: unknown; exp?: number }) {
+export async function consumeProof(tx: Tx, orgId: string, kid: string, payload: { jti?: unknown; exp?: number }) {
   const fresh = await tx
     .insertInto("agent_nonces")
     .values({ jti: String(payload.jti), org_id: orgId, device_id: kid, expires_at: new Date((payload.exp ?? 0) * 1000) })
@@ -205,7 +209,7 @@ export function registerAgentRoutes(app: App) {
     const raw = await c.req.text();
     const proof = authHeader(c);
     // Proof of possession: the request is signed by the key being registered.
-    await verifyProof(c, proof, EmbeddedJWK, raw);
+    await verifyProof({ method: c.req.method, path: c.req.path }, proof, EmbeddedJWK, raw);
     const header = JSON.parse(Buffer.from(proof.split(".")[0]!, "base64url").toString()) as { jwk?: unknown };
     const jwk = P256Jwk.safeParse(header.jwk);
     if (!jwk.success) throw deviceError(401, "invalid_device_proof", "Device key must be an EC P-256 public key");

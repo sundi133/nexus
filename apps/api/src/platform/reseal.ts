@@ -28,6 +28,9 @@ export const SEALED: Target[] = [
   { table: "apple_mdm_settings", pk: "org_id", column: "push_key_pending", aad: (r) => `apple_mdm_push:${r.org_id}` },
   { table: "apple_mdm_devices", pk: "id", column: "unlock_token", aad: (r) => `apple_mdm_unlock:${r.id}` },
   { table: "apple_mdm_devices", pk: "id", column: "bootstrap_token", aad: (r) => `apple_mdm_bootstrap:${r.id}` },
+  { table: "apple_mdm_profiles", pk: "id", column: "payload", aad: (r) => `apple_mdm_profile:${r.id}` },
+  { table: "apple_ade_settings", pk: "org_id", column: "key", aad: (r) => `apple_ade_key:${r.org_id}` },
+  { table: "apple_ade_settings", pk: "org_id", column: "token", aad: (r) => `apple_ade_token:${r.org_id}` },
 ];
 
 export type ResealReport = { table: string; checked: number; resealed: number; failed: string[] }[];

@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { removeFromVaults } from "../vault/routes.js";
 import type { Context } from "hono";
 import type { App, Env, Principal, RequestMeta } from "../context.js";
 import { audit } from "../audit/record.js";
@@ -92,6 +93,7 @@ export async function offboard(tx: Tx, orgId: string, userId: string, who: { pri
   await tx.deleteFrom("app_assignments").where("principal_type", "=", "user").where("principal_id", "=", userId).execute();
   const factors = await tx.deleteFrom("auth_factors").where("user_id", "=", userId).executeTakeFirst();
   await tx.deleteFrom("push_registrations").where("user_id", "=", userId).execute();
+  const vaults = await removeFromVaults(tx, userId); // they can't open any vault any more
   await tx.updateTable("invitations").set({ revoked_at: new Date() }).where("user_id", "=", userId).where("accepted_at", "is", null).where("revoked_at", "is", null).execute();
   await tx.updateTable("devices").set({ primary_user_id: null, updated_at: new Date() }).where("primary_user_id", "=", userId).execute();
   await tx.deleteFrom("jobs").where("kind", "=", "user.offboard").where("dedupe_key", "=", dedupe(userId)).where("status", "=", "queued").execute();
@@ -109,6 +111,8 @@ export async function offboard(tx: Tx, orgId: string, userId: string, who: { pri
     sign_in_only_apps: before.apps.filter((a) => !a.provisioned).map((a) => a.name),
     factors_removed: Number(factors.numDeletedRows),
     devices_unassigned: before.devices.map((d) => d.hostname),
+    password_vaults_removed: vaults.removed,
+    ...(vaults.promoted.length ? { password_vault_owners_promoted: vaults.promoted } : {}),
   };
   await audit(tx, orgId, who, {
     type: "user.offboarded",

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@nexus/api-client": "workspace:*",
+    "@novnc/novnc": "^1.7.0",
     "@simplewebauthn/browser": "^14.0.0",
     "@tanstack/react-query": "^5",
     "class-variance-authority": "^0.7",

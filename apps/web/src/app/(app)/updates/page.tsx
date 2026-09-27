@@ -44,7 +44,7 @@ export default function UpdatesPage() {
         description="Pending operating-system updates on each device (Software Update, Windows Update, apt or dnf), checked by the agent every few hours. Install them now, or let the patch policy install them once they've waited past its deadline, inside a maintenance window."
         actions={
           can("devices:updates") ? (
-            <Button variant="primary" onClick={() => setInstalling("all")} disabled={!s?.with_security && !fleet.data?.data.some((d) => d.pending)}>
+            <Button variant="primary" onClick={() => setInstalling("all")} disabled={!s?.with_security && !fleet.data?.data.some((d) => d.pending || d.apps_pending)}>
               <Download className="size-4" /> Install updates
             </Button>
           ) : null
@@ -56,9 +56,10 @@ export default function UpdatesPage() {
         <ErrorBanner error={fleet.error} />
       ) : (
         <div className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <Tile label="Up to date" value={s.up_to_date} of={s.reporting} />
             <Tile label="Security updates pending" value={s.with_security} tone={s.with_security ? "warning" : undefined} />
+            <Tile label="Apps out of date" value={s.apps_outdated} tone={s.apps_outdated ? "warning" : undefined} hint="Chrome, Zoom, Slack…" />
             <Tile label="Past the deadline" value={s.overdue} tone={s.overdue ? "danger" : undefined} hint={p.enabled ? `${pluralize(p.deadline_days, "day")} for ${p.scope === "security" ? "security updates" : "all updates"}` : "no patch policy"} />
             <Tile label="Not reporting" value={s.devices - s.reporting + s.failing_checks} hint={s.failing_checks ? `${s.failing_checks} failing to check` : "need agent 0.2 or later"} />
           </div>
@@ -68,7 +69,7 @@ export default function UpdatesPage() {
               title="Patch policy"
               description={
                 p.enabled
-                  ? `Installs ${p.scope === "security" ? "security updates" : "all updates"} pending more than ${pluralize(p.deadline_days, "day")}, on online devices between ${hour(p.window_start)} and ${hour(p.window_end)} (${p.timezone})${p.window_start === p.window_end ? ", any time" : ""}. ${p.restart === "if_needed" ? "Restarts when the update needs it, after warning the signed-in person." : "Never restarts: people restart when they're ready."}`
+                  ? `Installs ${p.scope === "security" ? "security updates" : "all updates"}${p.third_party ? " and app updates" : ""} pending more than ${pluralize(p.deadline_days, "day")}, on online devices between ${hour(p.window_start)} and ${hour(p.window_end)} (${p.timezone})${p.window_start === p.window_end ? ", any time" : ""}. ${p.restart === "if_needed" ? "Restarts when the update needs it, after warning the signed-in person." : "Never restarts: people restart when they're ready."}`
                   : "Off: updates are installed only when someone clicks Install updates."
               }
               actions={
@@ -89,6 +90,7 @@ export default function UpdatesPage() {
                     <TH>Device</TH>
                     <TH className="text-right">Security</TH>
                     <TH className="text-right">All</TH>
+                    <TH className="text-right">Apps</TH>
                     <TH>Pending since</TH>
                     <TH>Last checked</TH>
                     <TH>Last install</TH>
@@ -107,6 +109,7 @@ export default function UpdatesPage() {
                       </TD>
                       <TD className="text-right tabular-nums">{d.checked_at ? d.security_pending : "–"}</TD>
                       <TD className="text-right tabular-nums">{d.checked_at ? d.pending : "–"}</TD>
+                      <TD className="text-right tabular-nums">{d.checked_at ? d.apps_pending : "–"}</TD>
                       <TD>
                         {(p.scope === "security" ? d.security_since : d.pending_since) ? (
                           <span className="flex items-center gap-1.5">
@@ -169,6 +172,9 @@ function PolicyEditor({ policy, onClose }: { policy: Policy; onClose: () => void
           <label className="flex items-center gap-2 text-[13px]">
             <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} /> Install updates automatically
           </label>
+          <label className="flex items-center gap-2 text-[13px]">
+            <input type="checkbox" checked={draft.third_party} onChange={(e) => setDraft({ ...draft, third_party: e.target.checked })} /> Also keep apps up to date (Chrome, Zoom, Slack… on Windows and macOS)
+          </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="What" htmlFor="scope">
               <Select id="scope" value={draft.scope} onChange={(e) => setDraft({ ...draft, scope: e.target.value as Policy["scope"] })}>
@@ -228,11 +234,12 @@ function InstallDialog({ rows, onClose }: { rows: Row[] | null; onClose: () => v
   const [groupId, setGroupId] = useState("");
   const [scope, setScope] = useState<"security" | "all">("security");
   const [restart, setRestart] = useState<"never" | "if_needed">("never");
+  const [apps, setApps] = useState(true);
   const [reason, setReason] = useState("");
   const install = useMutation({
     mutationFn: () =>
       withStepUp(() =>
-        unwrap(api.POST("/v1/device-updates/install", { body: { scope, restart, reason, target: rows ? { device_ids: rows.map((r) => r.device_id) } : groupId ? { group_id: groupId } : { all: true } } })),
+        unwrap(api.POST("/v1/device-updates/install", { body: { scope, restart, apps, reason, target: rows ? { device_ids: rows.map((r) => r.device_id) } : groupId ? { group_id: groupId } : { all: true } } })),
       ),
     onSuccess: (r) => {
       const skipped = [r.skipped_up_to_date ? `${r.skipped_up_to_date} up to date` : "", r.skipped_in_progress ? `${r.skipped_in_progress} already installing` : "", r.skipped_not_reporting ? `${r.skipped_not_reporting} not reporting` : ""].filter(Boolean).join(", ");
@@ -272,6 +279,9 @@ function InstallDialog({ rows, onClose }: { rows: Row[] | null; onClose: () => v
               </Select>
             </Field>
           </div>
+          <label className="flex items-center gap-2 text-[13px]">
+            <input type="checkbox" checked={apps} onChange={(e) => setApps(e.target.checked)} /> Also update apps (Chrome, Zoom, Slack…). Open apps are skipped.
+          </label>
           <Field label="Reason" htmlFor="ireason" hint="Saved to the audit log.">
             <Input id="ireason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Patch the OpenSSH advisory" />
           </Field>
@@ -301,10 +311,17 @@ function DeviceUpdates({ row, canInstall, onInstall, onClose }: { row: Row; canI
               {q.data.available.map((u) => (
                 <li key={`${u.name}-${u.version}`} className="flex items-center justify-between gap-2 px-3 py-1.5">
                   <span className="min-w-0 truncate">
-                    {u.name} {u.version ? <code className="font-mono text-xs text-fg-muted">{u.version}</code> : null}
+                    {u.name}{" "}
+                    {u.version ? (
+                      <code className="font-mono text-xs text-fg-muted">
+                        {u.current ? `${u.current} → ` : ""}
+                        {u.version}
+                      </code>
+                    ) : null}
                   </span>
                   <span className="flex shrink-0 gap-1">
                     {u.upgrade ? <StatusPill>major upgrade, not installed by patching</StatusPill> : null}
+                    {u.third_party ? <StatusPill>app</StatusPill> : null}
                     {u.security ? <StatusPill tone="warning">security</StatusPill> : null}
                     {u.restart ? <StatusPill>restart</StatusPill> : null}
                   </span>

@@ -26,7 +26,7 @@ export const REQUEST_TYPES = Object.keys(COMMANDS) as RequestType[];
 export const needsPin = (t: RequestType) => t === "DeviceLock" || t === "EraseDevice";
 export const newPin = () => String(randomInt(0, 1_000_000)).padStart(6, "0");
 
-export async function queueCommand(tx: Tx, orgId: string, mdmDeviceId: string, type: RequestType, fields: Record<string, unknown>, who: { userId: string | null; reason: string }) {
+export async function queueCommand(tx: Tx, orgId: string, mdmDeviceId: string, type: RequestType | "InstallProfile" | "RemoveProfile", fields: Record<string, unknown>, who: { userId: string | null; reason: string }) {
   const id = randomUUID().toUpperCase();
   await tx
     .insertInto("apple_mdm_commands")

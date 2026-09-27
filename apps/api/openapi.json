@@ -951,7 +951,8 @@
               "wipe",
               "osquery",
               "script",
-              "updates"
+              "updates",
+              "remote_assist"
             ]
           },
           "channel": {
@@ -5925,6 +5926,44 @@
           }
         ]
       },
+      "AppDirectoryEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "protocols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "saml",
+                "oidc"
+              ]
+            }
+          },
+          "template": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A catalog template to use instead, when there is one"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "protocols",
+          "template"
+        ]
+      },
       "SigningKey": {
         "type": "object",
         "properties": {
@@ -9552,6 +9591,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 64
+          },
+          "third_party": {
+            "type": "boolean",
+            "default": false,
+            "description": "Also keep third-party apps (Chrome, Zoom…) up to date, on the same deadline and window"
           }
         },
         "required": [
@@ -9617,6 +9661,16 @@
               "null"
             ]
           },
+          "apps_pending": {
+            "type": "integer",
+            "description": "Third-party apps with a newer version"
+          },
+          "apps_since": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "overdue": {
             "type": "boolean",
             "description": "Past the patch policy's deadline (false while the policy is off)"
@@ -9674,6 +9728,8 @@
           "security_pending",
           "pending_since",
           "security_since",
+          "apps_pending",
+          "apps_since",
           "overdue",
           "last_install"
         ]
@@ -10135,6 +10191,454 @@
           "requested_by",
           "created_at",
           "finished_at"
+        ]
+      },
+      "AppleMdmProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "payload_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "upload",
+              "template"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "all": {
+                "type": "boolean"
+              },
+              "group_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                }
+              }
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "installed": {
+                "type": "integer"
+              },
+              "installing": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "installed",
+              "installing",
+              "failed"
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "identifier",
+          "payload_types",
+          "source",
+          "target",
+          "counts",
+          "updated_at"
+        ]
+      },
+      "AppleAdeStatus": {
+        "type": "object",
+        "properties": {
+          "key_ready": {
+            "type": "boolean"
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "server_name": {
+            "type": "string"
+          },
+          "abm_org_name": {
+            "type": "string"
+          },
+          "token_expires_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "devices": {
+            "type": "integer"
+          },
+          "last_sync_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "profile": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "profile_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100,
+                "default": "Votal Nexus"
+              },
+              "department": {
+                "type": "string",
+                "maxLength": 100,
+                "default": ""
+              },
+              "support_phone_number": {
+                "type": "string",
+                "maxLength": 40,
+                "default": ""
+              },
+              "support_email_address": {
+                "type": "string",
+                "maxLength": 200,
+                "default": ""
+              },
+              "is_mdm_removable": {
+                "type": "boolean",
+                "default": false,
+                "description": "Let people remove device management in System Settings"
+              },
+              "skip_setup_items": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "Location",
+                    "Restore",
+                    "AppleID",
+                    "TOS",
+                    "Siri",
+                    "Diagnostics",
+                    "Privacy",
+                    "ScreenTime",
+                    "Appearance",
+                    "FileVault",
+                    "iCloudDiagnostics",
+                    "iCloudStorage",
+                    "TouchId",
+                    "Payment",
+                    "Accessibility",
+                    "TrueToneDisplay",
+                    "UnlockWithWatch",
+                    "Wallpaper"
+                  ]
+                },
+                "default": [
+                  "Siri",
+                  "Diagnostics",
+                  "ScreenTime",
+                  "AppleID",
+                  "Payment"
+                ]
+              },
+              "auto_assign": {
+                "type": "boolean",
+                "default": true,
+                "description": "Assign this profile to every Mac Apple Business Manager assigns to Nexus"
+              }
+            }
+          },
+          "enroll_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key_ready",
+          "connected",
+          "server_name",
+          "abm_org_name",
+          "token_expires_at",
+          "devices",
+          "last_sync_at",
+          "last_error",
+          "profile",
+          "enroll_url"
+        ]
+      },
+      "VaultAccount": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "public_key": {
+            "type": "string",
+            "maxLength": 20000,
+            "pattern": "^[A-Za-z0-9+/=]+$"
+          },
+          "private_key_enc": {
+            "type": "object",
+            "properties": {
+              "iv": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9+/=]{16}$"
+              },
+              "ct": {
+                "type": "string",
+                "maxLength": 90000,
+                "pattern": "^[A-Za-z0-9+/=]+$"
+              }
+            },
+            "required": [
+              "iv",
+              "ct"
+            ]
+          },
+          "kdf": {
+            "type": "object",
+            "properties": {
+              "alg": {
+                "type": "string",
+                "enum": [
+                  "PBKDF2-SHA256"
+                ]
+              },
+              "iterations": {
+                "type": "integer",
+                "minimum": 100000,
+                "maximum": 10000000
+              },
+              "salt": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9+/=]{20,64}$"
+              }
+            },
+            "required": [
+              "alg",
+              "iterations",
+              "salt"
+            ]
+          }
+        },
+        "required": [
+          "public_key",
+          "private_key_enc",
+          "kdf"
+        ]
+      },
+      "Vault": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "shared"
+            ]
+          },
+          "name_enc": {
+            "type": "object",
+            "properties": {
+              "iv": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9+/=]{16}$"
+              },
+              "ct": {
+                "type": "string",
+                "maxLength": 90000,
+                "pattern": "^[A-Za-z0-9+/=]+$"
+              }
+            },
+            "required": [
+              "iv",
+              "ct"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "editor",
+              "viewer"
+            ]
+          },
+          "wrapped_key": {
+            "type": "string",
+            "maxLength": 20000,
+            "pattern": "^[A-Za-z0-9+/=]+$"
+          },
+          "members": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name_enc",
+          "role",
+          "wrapped_key",
+          "members",
+          "items"
+        ]
+      },
+      "VaultItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "iv": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9+/=]{16}$"
+              },
+              "ct": {
+                "type": "string",
+                "maxLength": 90000,
+                "pattern": "^[A-Za-z0-9+/=]+$"
+              }
+            },
+            "required": [
+              "iv",
+              "ct"
+            ]
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "updated_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "data",
+          "updated_at",
+          "updated_by"
+        ]
+      },
+      "RemoteAssistSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "device_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "asking",
+              "active",
+              "declined",
+              "ended",
+              "expired",
+              "failed"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The requester's email"
+          },
+          "mine": {
+            "type": "boolean",
+            "description": "You asked for it, so you're the one who can view it"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ended_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "While asking: the approval deadline. While active: when it ends on its own"
+          }
+        },
+        "required": [
+          "id",
+          "device_id",
+          "hostname",
+          "status",
+          "detail",
+          "reason",
+          "requested_by",
+          "mine",
+          "created_at",
+          "accepted_at",
+          "ended_at",
+          "expires_at"
         ]
       },
       "DevicePage": {
@@ -28587,6 +29091,92 @@
         }
       }
     },
+    "/v1/app-directory": {
+      "get": {
+        "tags": [
+          "Applications"
+        ],
+        "summary": "Every app you can connect with a template or a generic SAML/OIDC setup",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AppDirectoryEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/org/signing-keys": {
       "get": {
         "tags": [
@@ -40575,6 +41165,9 @@
                         "with_security": {
                           "type": "integer"
                         },
+                        "apps_outdated": {
+                          "type": "integer"
+                        },
                         "overdue": {
                           "type": "integer"
                         },
@@ -40587,6 +41180,7 @@
                         "reporting",
                         "up_to_date",
                         "with_security",
+                        "apps_outdated",
                         "overdue",
                         "failing_checks"
                       ]
@@ -40728,6 +41322,20 @@
                           "upgrade": {
                             "type": "boolean",
                             "description": "A major OS upgrade (e.g. the next macOS): shown, but never installed by patching"
+                          },
+                          "third_party": {
+                            "type": "boolean",
+                            "description": "An app, not the OS (Chrome, Zoom…)"
+                          },
+                          "app_id": {
+                            "type": "string",
+                            "maxLength": 200,
+                            "description": "winget ID, or the macOS catalog ID"
+                          },
+                          "current": {
+                            "type": "string",
+                            "maxLength": 200,
+                            "description": "The version installed now"
                           }
                         },
                         "required": [
@@ -40847,7 +41455,7 @@
         "tags": [
           "Devices"
         ],
-        "summary": "Install pending OS updates now",
+        "summary": "Install pending OS updates (and optionally app updates) now",
         "description": "Queues a signed install on the chosen devices that have updates pending (security only, or all). Each runs it on its next check-in (offline devices within a day) and restarts afterwards only if `restart` is `if_needed` and the OS asks for it. Needs `devices:updates` and a recent MFA.",
         "security": [
           {
@@ -40901,6 +41509,11 @@
                       "if_needed"
                     ],
                     "default": "never"
+                  },
+                  "apps": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Also update third-party apps (Chrome, Zoom…)"
                   },
                   "reason": {
                     "type": "string",
@@ -43125,6 +43738,3428 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/profiles": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Configuration profiles and where they're installed",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AppleMdmProfile"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Upload a configuration profile (.mobileconfig)",
+        "description": "Installed on the targeted Macs right away (they're woken through APNs). Needs `devices:enforce` and a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "mobileconfig": {
+                    "type": "string",
+                    "minLength": 50,
+                    "maxLength": 1000000
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "all": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        },
+                        "required": [
+                          "all"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "group_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                            },
+                            "minItems": 1,
+                            "maxItems": 50
+                          }
+                        },
+                        "required": [
+                          "group_ids"
+                        ]
+                      }
+                    ],
+                    "default": {
+                      "all": true
+                    },
+                    "description": "Every enrolled Mac, or the Macs of people in these groups"
+                  }
+                },
+                "required": [
+                  "name",
+                  "mobileconfig"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleMdmProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/profiles/template": {
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Build a configuration profile from a template",
+        "description": "Templates: screen_lock {idle_minutes}, firewall {stealth, block_all_incoming}, wifi {ssid, password, hidden}, software_update {}, login_message {message}.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "screen_lock",
+                      "firewall",
+                      "wifi",
+                      "software_update",
+                      "login_message"
+                    ]
+                  },
+                  "settings": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "default": {}
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "all": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        },
+                        "required": [
+                          "all"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "group_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                            },
+                            "minItems": 1,
+                            "maxItems": 50
+                          }
+                        },
+                        "required": [
+                          "group_ids"
+                        ]
+                      }
+                    ],
+                    "default": {
+                      "all": true
+                    },
+                    "description": "Every enrolled Mac, or the Macs of people in these groups"
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleMdmProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/profiles/{id}": {
+      "patch": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Change who gets a profile, or replace its contents",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "all": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        },
+                        "required": [
+                          "all"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "group_ids": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                            },
+                            "minItems": 1,
+                            "maxItems": 50
+                          }
+                        },
+                        "required": [
+                          "group_ids"
+                        ]
+                      }
+                    ],
+                    "default": {
+                      "all": true
+                    },
+                    "description": "Every enrolled Mac, or the Macs of people in these groups"
+                  },
+                  "mobileconfig": {
+                    "type": "string",
+                    "minLength": 50,
+                    "maxLength": 1000000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleMdmProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Delete a profile (it's removed from the Macs that have it)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/devices/{id}/profiles": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "A Mac's configuration profiles",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "identifier": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "identifier",
+                          "name",
+                          "status",
+                          "detail",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Apple Business Manager connection",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleAdeStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/public-key": {
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Make the key for Apple Business Manager and get its public certificate",
+        "description": "Upload the returned certificate (.pem) in Apple Business Manager when you add or edit this MDM server; ABM encrypts the server token to it. Making a new key disconnects the current token.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "certificate": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "certificate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/token": {
+      "put": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Connect with the server token from Apple Business Manager",
+        "description": "The .p7m file's contents. Nexus opens it with its key, checks it with Apple, defines its enrollment profile and syncs the Macs assigned to this server.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 50,
+                    "maxLength": 200000
+                  },
+                  "profile": {
+                    "type": "object",
+                    "properties": {
+                      "profile_name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100,
+                        "default": "Votal Nexus"
+                      },
+                      "department": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "default": ""
+                      },
+                      "support_phone_number": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "default": ""
+                      },
+                      "support_email_address": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "default": ""
+                      },
+                      "is_mdm_removable": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Let people remove device management in System Settings"
+                      },
+                      "skip_setup_items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "Location",
+                            "Restore",
+                            "AppleID",
+                            "TOS",
+                            "Siri",
+                            "Diagnostics",
+                            "Privacy",
+                            "ScreenTime",
+                            "Appearance",
+                            "FileVault",
+                            "iCloudDiagnostics",
+                            "iCloudStorage",
+                            "TouchId",
+                            "Payment",
+                            "Accessibility",
+                            "TrueToneDisplay",
+                            "UnlockWithWatch",
+                            "Wallpaper"
+                          ]
+                        },
+                        "default": [
+                          "Siri",
+                          "Diagnostics",
+                          "ScreenTime",
+                          "AppleID",
+                          "Payment"
+                        ]
+                      },
+                      "auto_assign": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Assign this profile to every Mac Apple Business Manager assigns to Nexus"
+                      }
+                    },
+                    "default": {}
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleAdeStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/profile": {
+      "put": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Change the Setup Assistant enrollment profile",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "profile_name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "default": "Votal Nexus"
+                  },
+                  "department": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "support_phone_number": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "default": ""
+                  },
+                  "support_email_address": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "is_mdm_removable": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Let people remove device management in System Settings"
+                  },
+                  "skip_setup_items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "Location",
+                        "Restore",
+                        "AppleID",
+                        "TOS",
+                        "Siri",
+                        "Diagnostics",
+                        "Privacy",
+                        "ScreenTime",
+                        "Appearance",
+                        "FileVault",
+                        "iCloudDiagnostics",
+                        "iCloudStorage",
+                        "TouchId",
+                        "Payment",
+                        "Accessibility",
+                        "TrueToneDisplay",
+                        "UnlockWithWatch",
+                        "Wallpaper"
+                      ]
+                    },
+                    "default": [
+                      "Siri",
+                      "Diagnostics",
+                      "ScreenTime",
+                      "AppleID",
+                      "Payment"
+                    ]
+                  },
+                  "auto_assign": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Assign this profile to every Mac Apple Business Manager assigns to Nexus"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppleAdeStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/sync": {
+      "post": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Sync Macs from Apple Business Manager now",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "changes": {
+                      "type": "integer"
+                    },
+                    "assigned": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "changes",
+                    "assigned"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/apple-mdm/ade/devices": {
+      "get": {
+        "tags": [
+          "Apple MDM"
+        ],
+        "summary": "Macs assigned to Nexus in Apple Business Manager",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "serial": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "color": {
+                            "type": "string"
+                          },
+                          "profile_status": {
+                            "type": "string"
+                          },
+                          "enrolled": {
+                            "type": "boolean"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "serial",
+                          "model",
+                          "description",
+                          "color",
+                          "profile_status",
+                          "enrolled",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/account": {
+      "get": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Your vault key material (encrypted), if you've set up the password manager",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Set up the password manager, or change your master password",
+        "description": "The first call stores your public key and encrypted private key. Later calls may only re-encrypt the same private key (a new master password); the public key can't change, or shared vaults would break.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultAccount"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/vaults": {
+      "get": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Vaults you're a member of",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Vault"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Create a vault (its key comes wrapped to your public key)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "personal",
+                      "shared"
+                    ],
+                    "default": "shared"
+                  },
+                  "name_enc": {
+                    "type": "object",
+                    "properties": {
+                      "iv": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9+/=]{16}$"
+                      },
+                      "ct": {
+                        "type": "string",
+                        "maxLength": 90000,
+                        "pattern": "^[A-Za-z0-9+/=]+$"
+                      }
+                    },
+                    "required": [
+                      "iv",
+                      "ct"
+                    ]
+                  },
+                  "wrapped_key": {
+                    "type": "string",
+                    "maxLength": 20000,
+                    "pattern": "^[A-Za-z0-9+/=]+$"
+                  }
+                },
+                "required": [
+                  "name_enc",
+                  "wrapped_key"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/vaults/{id}/items": {
+      "get": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "A vault's items (encrypted)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VaultItem"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Add an item (encrypted with the vault key)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "iv": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9+/=]{16}$"
+                      },
+                      "ct": {
+                        "type": "string",
+                        "maxLength": 90000,
+                        "pattern": "^[A-Za-z0-9+/=]+$"
+                      }
+                    },
+                    "required": [
+                      "iv",
+                      "ct"
+                    ]
+                  }
+                },
+                "required": [
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/items/{id}": {
+      "put": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Replace an item",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "object",
+                    "properties": {
+                      "iv": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9+/=]{16}$"
+                      },
+                      "ct": {
+                        "type": "string",
+                        "maxLength": 90000,
+                        "pattern": "^[A-Za-z0-9+/=]+$"
+                      }
+                    },
+                    "required": [
+                      "iv",
+                      "ct"
+                    ]
+                  }
+                },
+                "required": [
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Delete an item",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/items/{id}/used": {
+      "post": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Record that you revealed or copied an item's secret (no contents are sent)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "revealed",
+                      "copied_password",
+                      "copied_username",
+                      "copied_totp"
+                    ]
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/people": {
+      "get": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "People you can share a vault with (those who've set up the password manager), with their public keys",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "public_key": {
+                            "type": "string",
+                            "maxLength": 20000,
+                            "pattern": "^[A-Za-z0-9+/=]+$"
+                          }
+                        },
+                        "required": [
+                          "user_id",
+                          "email",
+                          "name",
+                          "public_key"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/vaults/{id}/members": {
+      "get": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Who has a vault",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "editor",
+                              "viewer"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "user_id",
+                          "email",
+                          "role"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/vaults/{id}/members/{user_id}": {
+      "put": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Share a vault with someone, or change their role (owners only)",
+        "description": "The vault key comes wrapped (in your browser) to their public key.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "user_id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "owner",
+                      "editor",
+                      "viewer"
+                    ]
+                  },
+                  "wrapped_key": {
+                    "type": "string",
+                    "maxLength": 20000,
+                    "pattern": "^[A-Za-z0-9+/=]+$"
+                  }
+                },
+                "required": [
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Shared"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Take someone off a vault (owners; anyone can leave)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "user_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/vaults/{id}": {
+      "delete": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "Delete a vault and its items (owners)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vault/overview": {
+      "get": {
+        "tags": [
+          "Passwords"
+        ],
+        "summary": "How the organization uses the password manager (counts only: nothing is readable)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "people_set_up": {
+                      "type": "integer"
+                    },
+                    "vaults": {
+                      "type": "integer"
+                    },
+                    "shared_vaults": {
+                      "type": "integer"
+                    },
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "people_set_up",
+                    "vaults",
+                    "shared_vaults",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}/remote-assist": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Ask to see a Mac's screen (the person at the Mac must allow it)",
+        "description": "Needs `devices:actions` and a recent MFA. The agent asks the signed-in person; if they allow it, the session becomes `active` and you (only you) can view it until it ends, at most `minutes` later.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 300
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 120,
+                    "default": 60
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Asked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAssistSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Recent Remote Assist sessions on a device",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RemoteAssistSession"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/remote-assist/sessions/{id}": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A Remote Assist session",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAssistSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/remote-assist/sessions/{id}/ticket": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A one-time ticket to open the session's viewer (the requester only)",
+        "description": "Open a websocket to `ws_url` within a minute, offering the subprotocols `binary` and `nexus-ticket.<ticket>`. The stream is the Mac's Screen Sharing (RFB/VNC).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ticket": {
+                      "type": "string"
+                    },
+                    "ws_url": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ticket",
+                    "ws_url",
+                    "expires_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/remote-assist/sessions/{id}/end": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "End a Remote Assist session (or withdraw the request)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAssistSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/remote-assist/{id}/state": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Report a Remote Assist decision or ending (called by the Nexus agent)",
+        "description": "Body `{state: accepted|declined|ended|failed, detail}`, signed with the device key.",
+        "responses": {
+          "204": {
+            "description": "Recorded"
           }
         }
       }

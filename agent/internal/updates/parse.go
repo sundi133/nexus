@@ -18,6 +18,10 @@ type Update struct {
 	Restart  bool   `json:"restart"`
 	Upgrade  bool   `json:"upgrade,omitempty"`
 	Label    string `json:"-"` // what softwareupdate installs it by
+	// Third-party apps (not the OS): winget ID or macOS catalog ID, and the version installed now.
+	ThirdParty bool   `json:"third_party,omitempty"`
+	ID         string `json:"app_id,omitempty"`
+	Current    string `json:"current,omitempty"`
 }
 
 var (

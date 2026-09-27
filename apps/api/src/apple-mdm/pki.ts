@@ -110,16 +110,32 @@ export class SignatureError extends Error {}
  */
 export function verifyMdmSignature(body: Buffer, header: string | undefined): { fingerprint: string; cert: X509Certificate } {
   if (!header) throw new SignatureError("missing Mdm-Signature");
-  let signed: SignedData;
+  const cms = Buffer.from(header, "base64");
+  return checkSigned(parseSigned(cms), cms, body);
+}
+
+/** Opens CMS SignedData that carries its content (a Mac's machine info in Setup Assistant) and checks it. */
+export function openSignedContent(cms: Buffer): { content: Buffer; fingerprint: string; cert: X509Certificate } {
+  const signed = parseSigned(cms);
+  const e = signed.encapContentInfo.eContent;
+  const content = e?.single ? Buffer.from(e.single.buffer) : e?.any ? Buffer.from(e.any) : null;
+  if (!content) throw new SignatureError("the signed data has no content");
+  return { content, ...checkSigned(signed, cms, content) };
+}
+
+function parseSigned(cms: Buffer): SignedData {
   try {
-    const ci = AsnConvert.parse(Buffer.from(header, "base64"), ContentInfo);
-    signed = AsnConvert.parse(ci.content, SignedData);
+    const ci = AsnConvert.parse(cms, ContentInfo);
+    return AsnConvert.parse(ci.content, SignedData);
   } catch {
-    throw new SignatureError("malformed Mdm-Signature");
+    throw new SignatureError("malformed signature");
   }
+}
+
+function checkSigned(signed: SignedData, cms: Buffer, body: Buffer): { fingerprint: string; cert: X509Certificate } {
   const si = signed.signerInfos[0];
   const certChoice = signed.certificates?.find((c) => c.certificate)?.certificate;
-  if (!si || !certChoice || signed.signerInfos.length !== 1) throw new SignatureError("Mdm-Signature needs exactly one signer with its certificate");
+  if (!si || !certChoice || signed.signerInfos.length !== 1) throw new SignatureError("the signature needs exactly one signer with its certificate");
   const certDer = Buffer.from(AsnConvert.serialize(certChoice));
   const cert = new X509Certificate(certDer);
   const hash = DIGEST[si.digestAlgorithm.algorithm];
@@ -133,13 +149,13 @@ export function verifyMdmSignature(body: Buffer, header: string | undefined): { 
     if (!mdBytes || !mdBytes.equals(contentDigest)) throw new SignatureError("the signature doesn't cover this body");
     // Signed attributes are signed as a DER SET OF (tag 0x31), not the [0] they're stored as.
     // Use the bytes exactly as sent: re-encoding could reorder them.
-    const der = rawSignedAttrs(Buffer.from(header, "base64"));
+    const der = rawSignedAttrs(cms);
     signedData = Buffer.concat([Buffer.from([0x31]), der.subarray(1)]);
   } else {
     signedData = body;
   }
   const ok = cryptoVerify(hash, signedData, createPublicKey(cert.publicKey.export({ type: "spki", format: "pem" })), Buffer.from(si.signature.buffer));
-  if (!ok) throw new SignatureError("bad Mdm-Signature");
+  if (!ok) throw new SignatureError("bad signature");
   return { fingerprint: certFingerprint(certDer), cert };
 }
 
