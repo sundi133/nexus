@@ -61,6 +61,7 @@ export const NAV: NavSection[] = [
       { label: "Device policies", href: "/device-policies", icon: Wrench },
       { label: "Software", href: "/software", icon: PackageSearch },
       { label: "Live query", href: "/live-query", icon: TerminalSquare },
+      { label: "Scripts", href: "/scripts", icon: ScrollText },
       { label: "Block rules", href: "/block-rules", icon: Ban },
       { label: "Agent updates", href: "/agent-updates", icon: PackageCheck },
     ],

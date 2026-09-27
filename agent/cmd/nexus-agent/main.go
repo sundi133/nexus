@@ -253,7 +253,7 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			}
 		}
 	}
-	runner := &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate)}, Log: log}
+	runner := &command.Runner{StateDir: store.Dir, DeviceID: e.DeviceID, Exec: command.Actions(), ArgExec: map[string]command.ArgExecutor{"osquery": command.QueryAction(osquery.Locate), "script": command.ScriptAction(store.Dir)}, Log: log}
 	ownHost := ""
 	if u, perr := url.Parse(e.Server); perr == nil {
 		ownHost = u.Hostname()

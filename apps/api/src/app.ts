@@ -1,3 +1,4 @@
+import { registerScriptRoutes } from "./devices/scripts.js";
 import { registerDirectoryServiceRoutes } from "./protocols/routes.js";
 import { registerMcpPeopleRoutes } from "./mcp/people-routes.js";
 import { registerBrowserRoutes } from "./browser/routes.js";
@@ -282,6 +283,7 @@ export function createApp(deps: Deps) {
   registerBrowserRoutes(app);
   registerMcpPeopleRoutes(app);
   registerDirectoryServiceRoutes(app);
+  registerScriptRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);

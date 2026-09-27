@@ -76,16 +76,28 @@ export const QueryResult = z.object({
   truncated: z.boolean().default(false),
 });
 
+/** A script's outcome, as the agent returns it. */
+export const ScriptResult = z.object({
+  exit_code: z.number().int(),
+  output: z.string().max(70_000),
+  truncated: z.boolean().default(false),
+  timed_out: z.boolean().default(false),
+  duration_ms: z.number().int().min(0),
+});
+
 /** What the agent says happened. Only this device's own, still-open commands can be settled. */
 export async function recordCommandResults(tx: Tx, device: { id: string; org_id: string; hostname: string }, results: z.infer<typeof CommandResults>, meta: { ip: string; userAgent: string; requestId: string }) {
   for (const r of results) {
-    const data = r.data === undefined ? null : QueryResult.safeParse(r.data);
+    // What a command returns depends on what it was: rows for a live query, exit code and output for a script.
+    const open = await tx.selectFrom("device_commands").select("action").where("id", "=", r.id).where("device_id", "=", device.id).executeTakeFirst();
+    const schema = open?.action === "script" ? ScriptResult : QueryResult;
+    const data = r.data === undefined ? null : schema.safeParse(r.data);
     const failedData = data && !data.success;
     const row = await tx
       .updateTable("device_commands")
       .set({
         status: failedData ? "failed" : r.status,
-        output: failedData ? "The device returned rows Nexus couldn't read" : r.output.slice(0, 2000),
+        output: failedData ? (open?.action === "script" ? "The device returned a result Nexus couldn't read" : "The device returned rows Nexus couldn't read") : r.output.slice(0, 2000),
         ...(data?.success ? { result: JSON.stringify(data.data) } : {}),
         finished_at: new Date(),
       })
@@ -107,7 +119,7 @@ export async function recordCommandResults(tx: Tx, device: { id: string; org_id:
 const CommandOut = z
   .object({
     id: Id,
-    action: z.enum(["refresh", "lock", "restart", "wipe", "osquery"]),
+    action: z.enum(["refresh", "lock", "restart", "wipe", "osquery", "script"]),
     channel: z.enum(["agent", "mdm"]),
     status: z.enum(["queued", "sent", "done", "failed", "expired", "canceled"]),
     reason: z.string(),

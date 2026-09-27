@@ -7866,7 +7866,7 @@ export interface paths {
                         name: string;
                         /** @default  */
                         description?: string;
-                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                        permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "devices:scripts" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                     };
                 };
             };
@@ -8035,7 +8035,7 @@ export interface paths {
                         name?: string;
                         /** @default  */
                         description?: string;
-                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                        permissions?: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "devices:scripts" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                     };
                 };
             };
@@ -22782,6 +22782,607 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/device-scripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The script library */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["DeviceScript"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Add a script to the library */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** @default  */
+                        description?: string;
+                        /** @enum {string} */
+                        shell: "sh" | "bash" | "zsh" | "powershell";
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeviceScript"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/device-scripts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change a library script */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        /** @default  */
+                        description?: string;
+                        /** @enum {string} */
+                        shell: "sh" | "bash" | "zsh" | "powershell";
+                        body: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DeviceScript"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Remove a library script (past runs keep their copy) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/script-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent script runs */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["ScriptRun"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Run a script on devices
+         * @description Sends the script to the chosen devices whose OS can run it (sh/bash/zsh: macOS and Linux; PowerShell: Windows) as signed commands. Each runs it as root/SYSTEM on its next check-in (offline devices within a day) and returns its exit code and output (up to 64 KB). Needs `devices:scripts` and a recent MFA.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uuid
+                         * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                         */
+                        script_id?: string;
+                        /** @description A one-off script, instead of one from the library */
+                        script?: {
+                            name: string;
+                            /** @enum {string} */
+                            shell: "sh" | "bash" | "zsh" | "powershell";
+                            body: string;
+                        };
+                        reason: string;
+                        target: {
+                            device_ids?: string[];
+                            /**
+                             * Format: uuid
+                             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                             */
+                            group_id?: string;
+                            /** @enum {boolean} */
+                            all?: true;
+                        };
+                        /** @default 300 */
+                        timeout_seconds?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ScriptRun"] & {
+                            skipped_incompatible: number;
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/script-runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A script run: the script, and each device's exit code and output */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ScriptRun"] & {
+                            body: string;
+                            body_sha256: string;
+                            results: {
+                                /**
+                                 * Format: uuid
+                                 * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                                 */
+                                device_id: string;
+                                hostname: string;
+                                status: string;
+                                exit_code: number | null;
+                                output: string;
+                                truncated: boolean;
+                                duration_ms: number | null;
+                                finished_at: string | null;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -24441,7 +25042,7 @@ export interface components {
             created_at: string;
         };
         /** @enum {string} */
-        Permission: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+        Permission: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "devices:scripts" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
         Factor: {
             /**
              * Format: uuid
@@ -24615,7 +25216,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            action: "refresh" | "lock" | "restart" | "wipe" | "osquery";
+            action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script";
             /** @enum {string} */
             channel: "agent" | "mdm";
             /** @enum {string} */
@@ -25441,13 +26042,13 @@ export interface components {
             builtin: {
                 /** @enum {string} */
                 key: "owner" | "admin" | "helpdesk" | "security_analyst" | "readonly";
-                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+                permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "devices:scripts" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
                 scopable: boolean;
             }[];
             custom: components["schemas"]["CustomRole"][];
             permissions: {
                 /** @enum {string} */
-                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
+                key: "org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "devices:scripts" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage";
                 /** @description Can be limited to groups in a scoped grant */
                 scopable: boolean;
                 in_custom_roles: boolean;
@@ -25461,7 +26062,7 @@ export interface components {
             id: string;
             name: string;
             description: string;
-            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
+            permissions: ("org:manage" | "admins:manage" | "users:read" | "users:write" | "users:lifecycle" | "users:erase" | "data:export" | "groups:read" | "groups:write" | "audit:read" | "apps:read" | "apps:write" | "apps:assign" | "devices:read" | "devices:write" | "policies:write" | "devices:updates" | "devices:actions" | "devices:wipe" | "devices:query" | "devices:enforce" | "devices:recovery_keys" | "devices:scripts" | "directory:sync" | "api_keys:manage" | "integrations:manage" | "access:manage" | "agents:read" | "agents:manage" | "agents:suspend" | "mcp:manage" | "alerts:read" | "alerts:triage" | "alerts:manage")[];
             holders: number;
             /**
              * Format: date-time
@@ -27059,6 +27660,38 @@ export interface components {
                     last_used_at: string | null;
                 }[];
             };
+        };
+        DeviceScript: {
+            name: string;
+            /** @default  */
+            description: string;
+            /** @enum {string} */
+            shell: "sh" | "bash" | "zsh" | "powershell";
+            body: string;
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            created_at: string;
+            updated_at: string;
+        };
+        ScriptRun: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            name: string;
+            shell: string;
+            reason: string;
+            requested_by: string | null;
+            created_at: string;
+            expires_at: string;
+            devices: number;
+            succeeded: number;
+            failed: number;
+            pending: number;
         };
         DevicePage: {
             data: components["schemas"]["Device"][];
