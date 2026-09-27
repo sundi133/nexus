@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/votal-ai/nexus/agent/internal/accounts"
 	"github.com/votal-ai/nexus/agent/internal/settings"
 	"github.com/votal-ai/nexus/agent/internal/software"
 )
@@ -340,4 +341,58 @@ func TestSoftwareFromThePolicyIsReconciledAndReported(t *testing.T) {
 	now = now.Add(SettingsEvery)
 	f.e.Report()
 	wait(2) // hourly, so a removed app comes back
+}
+
+func signSecret(t *testing.T, priv ed25519.PrivateKey, typ string, claims map[string]any) string {
+	t.Helper()
+	h := b64.EncodeToString([]byte(`{"alg":"EdDSA","typ":"` + typ + `"}`))
+	body, _ := json.Marshal(claims)
+	msg := h + "." + b64.EncodeToString(body)
+	return msg + "." + b64.EncodeToString(ed25519.Sign(priv, []byte(msg)))
+}
+
+func TestPasswordsMustBeSignedForThisDeviceAndCurrent(t *testing.T) {
+	f := newFixture(t)
+	now := time.Unix(1_800_000_000, 0)
+	f.e.Now = func() time.Time { return now }
+	var mu sync.Mutex
+	var offered []string
+	passes := 0
+	f.e.OfferPassword = func(uid string, ver int, ct string) (bool, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		offered = append(offered, uid+":"+ct)
+		return true, nil
+	}
+	f.e.ApplyAccounts = func(want []accounts.Account) []accounts.Status {
+		mu.Lock()
+		defer mu.Unlock()
+		passes++
+		return []accounts.Status{{UserID: "u-1", Username: "eve", Status: "active", PasswordVersion: 1}}
+	}
+	if err := f.e.Apply(signPolicy(t, f.priv, policyTyp, Policy{Device: "dev-1", TS: 1, Ver: "v1", Accounts: []accounts.Account{{UserID: "u-1", Username: "eve", State: "active"}}})); err != nil {
+		t.Fatal(err)
+	}
+	_, other, _ := ed25519.GenerateKey(nil)
+	exp := now.Add(time.Hour).Unix()
+	f.e.OfferPasswords([]string{
+		signSecret(t, f.priv, secretTyp, map[string]any{"sub": "dev-1", "uid": "u-1", "ver": 1, "ct": "good", "exp": exp}),
+		signSecret(t, other, secretTyp, map[string]any{"sub": "dev-1", "uid": "u-1", "ver": 1, "ct": "forged", "exp": exp}),
+		signSecret(t, f.priv, secretTyp, map[string]any{"sub": "dev-2", "uid": "u-1", "ver": 1, "ct": "elsewhere", "exp": exp}),
+		signSecret(t, f.priv, secretTyp, map[string]any{"sub": "dev-1", "uid": "u-1", "ver": 1, "ct": "stale", "exp": now.Add(-time.Minute).Unix()}),
+		signSecret(t, f.priv, policyTyp, map[string]any{"sub": "dev-1", "uid": "u-1", "ver": 1, "ct": "wrongtype", "exp": exp}),
+	})
+	mu.Lock()
+	got := append([]string(nil), offered...)
+	mu.Unlock()
+	if len(got) != 1 || got[0] != "u-1:good" {
+		t.Fatalf("offered %q", got)
+	}
+	for i := 0; i < 200; i++ {
+		if r := f.e.Report(); len(r.Accounts) == 1 {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("accounts never reported")
 }

@@ -12,6 +12,7 @@ import { bearer, body, Id, iso, isoOrNull, json, problemResponses } from "../sch
 import { commandKey, sign } from "./commands.js";
 import { getPolicies } from "./service.js";
 import { type PolicySoftware, recordSoftware, SoftwareReport, softwareFor } from "./software-deploy.js";
+import { AccountsReport, accountsFor, type PolicyAccount, recordAccounts } from "./local-accounts.js";
 
 /**
  * Device enforcement (DEV-ENF): block apps and domains on devices.
@@ -110,11 +111,12 @@ export async function settingsFor(tx: Tx): Promise<DeviceSettings> {
 }
 
 // Parts added later hash only when present, so existing devices' versions don't change.
-export const policyVersion = (rules: PolicyRule[], settings: DeviceSettings = {}, software: PolicySoftware[] = []) =>
+export const policyVersion = (rules: PolicyRule[], settings: DeviceSettings = {}, software: PolicySoftware[] = [], accounts: PolicyAccount[] = []) =>
   createHash("sha256")
     .update(JSON.stringify(rules))
     .update(Object.keys(settings).length ? JSON.stringify(settings) : "")
     .update(software.length ? JSON.stringify(software) : "")
+    .update(accounts.length ? JSON.stringify(accounts) : "")
     .digest("hex")
     .slice(0, 16);
 
@@ -123,9 +125,10 @@ export async function signedPolicy(tx: Tx, deps: Deps, device: { id: string; org
   const rules = await rulesFor(tx, device);
   const settings = await settingsFor(tx);
   const software = await softwareFor(tx, device);
+  const accounts = await accountsFor(tx, device);
   const key = await commandKey(tx, deps, device.org_id);
   // ts orders policies: the agent refuses one older than what it already applied (a replayed response).
-  return sign(key.privatePem, { sub: device.id, ts: Date.now(), ver: policyVersion(rules, settings, software), rules, settings, software }, POLICY_TYP);
+  return sign(key.privatePem, { sub: device.id, ts: Date.now(), ver: policyVersion(rules, settings, software, accounts), rules, settings, software, accounts }, POLICY_TYP);
 }
 
 // ---- What agents report -------------------------------------------------------------------------
@@ -159,6 +162,8 @@ export const EnforcementReport = z.object({
     .default([]),
   // Apps from the policy (null until the agent's first pass; absent from older agents).
   software: SoftwareReport.nullable().optional(),
+  // People's local accounts (null until the agent's first pass; absent from older agents).
+  accounts: AccountsReport.nullable().optional(),
   recovery_keys: z
     .array(
       z.object({
@@ -177,6 +182,7 @@ export async function recordEnforcement(tx: Tx, deps: Deps, device: { id: string
   await tx.updateTable("devices").set({ enforcement_version: rep.version, enforcement_status: rep.status }).where("id", "=", device.id).execute();
   await recordSettings(tx, device, rep.settings, meta);
   if (rep.software) await recordSoftware(tx, device, rep.software, meta);
+  if (rep.accounts) await recordAccounts(tx, device, rep.accounts, meta);
   if (rep.recovery_keys.length) await escrowKeys(tx, deps, device, rep.recovery_keys, meta);
   if (!rep.events.length) return;
   const known = new Map((await tx.selectFrom("enforcement_rules").select(["id", "name"]).execute()).map((r) => [r.id, r.name]));
@@ -529,7 +535,7 @@ export function registerEnforcementRoutes(app: App) {
         const d = await tx.selectFrom("devices").select(["id", "platform", "primary_user_id", "enforcement_version", "enforcement_status", "last_seen_at"]).where("id", "=", id).executeTakeFirst();
         if (!d) throw notFound("Device");
         const rules = await rulesFor(tx, d);
-        const expected = policyVersion(rules, await settingsFor(tx), await softwareFor(tx, d));
+        const expected = policyVersion(rules, await settingsFor(tx), await softwareFor(tx, d), await accountsFor(tx, d));
         return { rules, expected_version: expected, applied_version: d.enforcement_version, in_sync: d.enforcement_version === expected, status: d.enforcement_status, last_seen_at: isoOrNull(d.last_seen_at) };
       });
       return c.json(out, 200);

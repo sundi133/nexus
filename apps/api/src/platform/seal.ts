@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "node:crypto";
 
 /**
  * AES-256-GCM sealing for small secrets (TOTP seeds, provider credentials,
@@ -42,6 +42,14 @@ export class Sealer {
     for (const k of list) if (k.key.length !== 32) throw new Error("seal key must be 32 bytes");
     this.keys = new Map(list.map((k) => [k.id, k.key]));
     this.currentId = list[0]!.id;
+  }
+
+  /**
+   * A keyed fingerprint (HMAC-SHA256 with the current key) to recognise a secret seen again
+   * without storing it. It changes when the current key does.
+   */
+  fingerprint(data: string, purpose: string): string {
+    return createHmac("sha256", this.keys.get(this.currentId)!).update(`nexus-fp:${purpose}\0${data}`).digest("base64url");
   }
 
   seal(plaintext: Buffer, aad: string): Buffer {

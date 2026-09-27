@@ -171,6 +171,8 @@ type CheckinResult struct {
 	// Commands are signed actions for this device (lock, restart, refresh).
 	Commands   []command.Signed `json:"commands"`
 	CommandKey string           `json:"command_key"`
+	// Passwords are people's passwords for their local accounts: signed, and encrypted to this device.
+	Passwords []string `json:"passwords"`
 }
 
 // Events uploads a batch of process events (signed like a check-in).

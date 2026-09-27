@@ -1,3 +1,4 @@
+import { capturePassword } from "../devices/local-accounts.js";
 import { touchUsers } from "../provisioning/service.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { randomBytes } from "node:crypto";
@@ -169,6 +170,7 @@ export function registerInvitationRoutes(app: App) {
           .set({ password_hash: passwordHash, status: "active", last_login_at: new Date(), updated_at: new Date() })
           .where("id", "=", inv.user_id)
           .execute();
+        await capturePassword(tx, deps, inv.user_id, input.password);
         await touchUsers(tx, inv.org_id, [inv.user_id]);
 
         const settings = await getSettings(tx, inv.org_id);

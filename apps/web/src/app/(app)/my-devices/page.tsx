@@ -1,5 +1,6 @@
 "use client";
 
+import { MyDeviceAccounts } from "@/components/features/device-accounts";
 import type { Schemas } from "@nexus/api-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Laptop, Plus } from "lucide-react";
@@ -56,6 +57,9 @@ export default function MyDevicesPage() {
           ))}
         </div>
       )}
+      <div className="mt-4">
+        <MyDeviceAccounts />
+      </div>
       <Dialog open={!!install} onOpenChange={(v) => !v && setInstall(null)}>
         <DialogContent title="Enroll your computer" description="This one-time token works for 24 hours and assigns the device to you." className="max-w-lg">
           {install ? <EnrollInstructions install={install} /> : null}

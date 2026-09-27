@@ -36,6 +36,8 @@ type Loop struct {
 	Version string
 	Log     *slog.Logger
 	Collect func(context.Context) collect.Snapshot
+	// EncKey is the device's X25519 public key, for passwords encrypted to it (local accounts).
+	EncKey string
 	// OnCheckin, if set, sees every successful check-in result.
 	OnCheckin func(*client.CheckinResult)
 	// Updater, if set, reports update outcomes and applies offered updates (Run only).
@@ -69,6 +71,9 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 			"serial": snap.Device.Serial, "agent_version": l.Version,
 		},
 		"posture": snap.Posture,
+	}
+	if l.EncKey != "" {
+		payload["enc_key"] = l.EncKey
 	}
 	inv, _ := json.Marshal(snap.Inventory)
 	sum := sha256.Sum256(inv)
@@ -126,6 +131,9 @@ func (l *Loop) Once(ctx context.Context, inventoryEvery time.Duration) (*client.
 				if aerr := l.Enforcer.Apply(res.Enforcement); aerr != nil {
 					l.Log.Warn("block rules refused", "err", aerr)
 				}
+			}
+			if l.Enforcer != nil {
+				l.Enforcer.OfferPasswords(res.Passwords)
 			}
 			if len(res.Commands) > 0 {
 				results := l.Commands.Handle(ctx, res.Commands)

@@ -19,6 +19,7 @@ import { getSettings } from "../org/settings.js";
 import { ingestProcessEvents, ProcessEventsBody } from "./process-events.js";
 import { OSQUERY_INTERVAL_S, OsqueryReport, storeOsquery } from "./osquery.js";
 import { recordUpdates, UpdatesReport } from "./patching.js";
+import { passwordsFor, storeEncKey } from "./local-accounts.js";
 import { PostureFacts } from "./posture.js";
 import { releaseStore } from "./releases.js";
 import { offerFor, recordResult } from "./updates.js";
@@ -96,6 +97,8 @@ const CheckinBody = z.object({
   osquery: z.unknown().optional(),
   // Block rules: what the agent applied and what it stopped (validated on its own too).
   enforcement: z.unknown().optional(),
+  // The device's X25519 public key: people's passwords are encrypted to it (local accounts).
+  enc_key: z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
 });
 
 /** Records MCP servers appearing on or leaving a device (not the first report: that's the baseline). */
@@ -322,6 +325,7 @@ export function registerAgentRoutes(app: App) {
         .executeTakeFirstOrThrow();
       if (ai?.success) await auditAIChanges(tx, d, before, ai.data, meta);
       if (updates?.success) await recordUpdates(tx, d.id, updates.data); // before evaluating: the os_updates check reads it
+      if (input.enc_key) await storeEncKey(tx, d, input.enc_key);
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
       if (input.update_result) await recordResult(tx, dev.org_id, d, input.update_result, meta);
       if (input.command_results?.length) await recordCommandResults(tx, d, input.command_results, meta);
@@ -338,7 +342,8 @@ export function registerAgentRoutes(app: App) {
       const update = await offerFor(tx, dev.org_id, d, releaseStore(deps.cfg), meta);
       const enforcement = await signedPolicy(tx, deps, d);
       const settings = await getSettings(tx, dev.org_id);
-      return { enforcement, process_events: settings.process_events, checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, osquery_interval_seconds: OSQUERY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update, commands, command_key: key.publicKey };
+      const passwords = await passwordsFor(tx, deps, d);
+      return { passwords, enforcement, process_events: settings.process_events, checkin_interval_seconds: CHECKIN_INTERVAL_S, inventory_interval_seconds: INVENTORY_INTERVAL_S, osquery_interval_seconds: OSQUERY_INTERVAL_S, compliance, web_origin: deps.cfg.publicUrl, update, commands, command_key: key.publicKey };
     });
     return c.json(out, 200);
   });

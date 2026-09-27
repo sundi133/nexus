@@ -29,6 +29,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/votal-ai/nexus/agent/internal/accounts"
 	"github.com/votal-ai/nexus/agent/internal/client"
 	"github.com/votal-ai/nexus/agent/internal/collect"
 	"github.com/votal-ai/nexus/agent/internal/command"
@@ -268,6 +269,22 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		},
 		Has:    func(n string) bool { _, err := exec.LookPath(n); return err == nil },
 		Winget: func() string { return software.FindWinget(exec.LookPath) }}}
+	// People's local accounts, with passwords encrypted to this device's own key.
+	var users *accounts.Manager
+	encKey, kerr := accounts.LoadOrCreateKey(store.Dir)
+	if kerr != nil {
+		log.Warn("local accounts off: no encryption key", "err", kerr)
+	} else {
+		users = &accounts.Manager{StateDir: store.Dir, DeviceID: e.DeviceID, Key: encKey, Sys: accounts.Sys{GOOS: runtime.GOOS,
+			Run: func(ctx context.Context, stdin, name string, args ...string) (string, error) {
+				c := exec.CommandContext(ctx, name, args...)
+				if stdin != "" {
+					c.Stdin = strings.NewReader(stdin)
+				}
+				out, err := c.CombinedOutput()
+				return string(out), err
+			}}}
+	}
 	enforcer := &enforce.Enforcer{StateDir: store.Dir, DeviceID: e.DeviceID, Key: runner.Key, OwnHost: ownHost, Log: log,
 		Processes: enforce.ListProcesses, Kill: enforce.KillProcess, FlushDNS: enforce.FlushDNS,
 		ApplySettings: func(d settings.Desired) settings.Outcome {
@@ -283,6 +300,19 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 			}
 			return apps.Apply(context.Background(), items)
 		}}
+	if users != nil {
+		enforcer.OfferPassword = users.Offer
+		enforcer.ApplyAccounts = func(want []accounts.Account) []accounts.Status {
+			if err := requireAdmin(); err != nil {
+				out := make([]accounts.Status, 0, len(want))
+				for _, a := range want {
+					out = append(out, accounts.Status{UserID: a.UserID, Username: a.Username, Status: "failed", Detail: "the agent isn't running as root/SYSTEM"})
+				}
+				return out
+			}
+			return users.Apply(context.Background(), want)
+		}
+	}
 	enforcer.Load() // the last rules apply from boot, before the first check-in
 	// OS updates: checked in the background every 6 hours (slow), reported with the inventory.
 	updateChecker := &updates.Checker{GOOS: runtime.GOOS, Every: 6 * time.Hour,
@@ -299,7 +329,12 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		}
 		return s
 	}
-	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collectWithUpdates, OnCheckin: onCheckin, Enforcer: enforcer,
+	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collectWithUpdates, OnCheckin: onCheckin, Enforcer: enforcer, EncKey: func() string {
+		if encKey == nil {
+			return ""
+		}
+		return accounts.PublicKey(encKey)
+	}(),
 		Commands: runner,
 		Osquery: func(ctx context.Context) osquery.Report {
 			return osquery.Collect(ctx, osquery.Locate(), runtime.GOOS, time.Now())

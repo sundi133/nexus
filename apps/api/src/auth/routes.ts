@@ -1,3 +1,4 @@
+import { capturePassword } from "../devices/local-accounts.js";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sql } from "kysely";
 import * as OTPAuth from "otpauth";
@@ -383,6 +384,8 @@ export function registerAuthRoutes(app: App) {
           await tx.updateTable("users").set({ last_login_at: new Date() }).where("id", "=", found.user_id).execute();
         }
         await alertIfBreakGlass(tx, found.org_id, found.user_id, meta, "its password");
+        // Their laptops' local accounts get this password (encrypted to each device), if it's new to them.
+        await capturePassword(tx, deps, found.user_id, input.password);
         await audit(tx, found.org_id, who, {
           type: "auth.login",
           actor,
