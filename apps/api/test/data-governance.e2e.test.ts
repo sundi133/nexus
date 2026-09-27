@@ -1,10 +1,12 @@
 import { gunzipSync } from "node:zlib";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { deleteDueOrganizations } from "../src/data/org-deletion.js";
+import { applyRetention, RETENTION } from "../src/data/retention.js";
 import { bootApp, PASSWORD, totpCode, uniqueEmail } from "./harness.js";
 import { SoftDevice } from "./soft-device.js";
 
-/** Data governance: privacy requests about a person (export, erasure), and exporting the organization. */
+/** Data governance: privacy requests about a person (export, erasure), and exporting and deleting the organization. */
 
 let h: Awaited<ReturnType<typeof bootApp>>;
 let db: pg.Client;
@@ -150,5 +152,98 @@ describe("exporting the organization", () => {
     expect(rows.some((l) => "password_hash" in l.row || "secret_sealed" in l.row || "token_hash" in l.row || "private_key" in l.row)).toBe(false);
     expect(lines.find((l) => l.type === "table" && l.table === "users").omitted).toContain("password_hash");
     expect((await db.query("SELECT 1 FROM audit_events WHERE org_id = $1 AND type = 'organization.exported'", [orgId])).rowCount).toBe(1);
+  });
+});
+
+describe("deleting the organization", () => {
+  let doomed = "";
+  let doomedId = "";
+  let doomedAdmin = "";
+  const ownerEmail = uniqueEmail("rick");
+  const schedule = (token: string, confirm_name: string) => h.call("POST", "/v1/org/deletion", { token, body: { confirm_name, reason: "Moving to another provider" } });
+
+  beforeAll(async () => {
+    doomed = (await h.call("POST", "/v1/signup", { body: { organization_name: "Chotchkie's", email: ownerEmail, password: PASSWORD, given_name: "Rick" } })).body.token;
+    await h.call("PATCH", "/v1/org/settings", { token: doomed, body: { mfa_policy: "off" } });
+    doomedId = (await h.call("GET", "/v1/me", { token: doomed })).body.organization.id;
+    const a = uniqueEmail("stan");
+    await h.call("POST", "/v1/users", { token: doomed, body: { email: a, given_name: "Stan", password: PASSWORD, roles: ["admin"] } });
+    doomedAdmin = (await h.call("POST", "/v1/auth/login", { body: { email: a, password: PASSWORD } })).body.token;
+    await h.call("POST", "/v1/groups", { token: doomed, body: { name: "Waiters" } });
+  });
+
+  it("is for owners only, with the name typed exactly", async () => {
+    expect((await schedule(doomedAdmin, "Chotchkie's")).status).toBe(403);
+    expect((await schedule(doomed, "chotchkies")).body.code).toBe("confirmation_mismatch");
+  });
+
+  it("is scheduled after a grace period, shown to everyone, and can be cancelled", async () => {
+    const r = await schedule(doomed, "Chotchkie's");
+    expect(r.status).toBe(200);
+    const days = (Date.parse(r.body.scheduled_for) - Date.now()) / 86_400_000;
+    expect(days).toBeGreaterThan(29.9);
+    expect(r.body).toMatchObject({ requested_by: ownerEmail, reason: "Moving to another provider", grace_days: 30 });
+    expect((await h.call("GET", "/v1/me", { token: doomedAdmin })).body.organization.deletion_scheduled_for).toBe(r.body.scheduled_for);
+    expect((await schedule(doomed, "Chotchkie's")).body.code).toBe("already_scheduled");
+    expect(await deleteDueOrganizations(h.deps)).toEqual([]); // not due yet
+
+    expect((await h.call("DELETE", "/v1/org/deletion", { token: doomedAdmin })).status).toBe(403);
+    const c = await h.call("DELETE", "/v1/org/deletion", { token: doomed });
+    expect(c.body.scheduled_for).toBeNull();
+    const types = (await db.query("SELECT type FROM audit_events WHERE org_id = $1 AND type LIKE 'organization.deletion%' ORDER BY ts", [doomedId])).rows.map((x) => x.type);
+    expect(types).toEqual(["organization.deletion_scheduled", "organization.deletion_cancelled"]);
+  });
+
+  it("deletes every row of that organization when due, once, and leaves a certificate", async () => {
+    await schedule(doomed, "Chotchkie's");
+    await db.query("UPDATE organizations SET deletion_scheduled_for = now() - interval '1 minute' WHERE id = $1", [doomedId]);
+    const sentBefore = h.mailer.sent.length;
+    const runs = await Promise.all([deleteDueOrganizations(h.deps), deleteDueOrganizations(h.deps)]); // two workers racing
+    const certs = runs.flat().filter((x) => x.organization_id === doomedId);
+    expect(certs).toHaveLength(1);
+    expect(certs[0]!.row_counts).toMatchObject({ users: 2, groups: 1 });
+    expect(certs[0]!.row_counts.audit_events).toBeGreaterThan(0);
+
+    // Nothing of it is left in any tenant table, the append-only audit log included.
+    const tables = (await db.query(`SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r' AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'org_id')`)).rows.map((x) => x.relname);
+    for (const t of tables) expect((await db.query(`SELECT 1 FROM ${t} WHERE org_id = $1 LIMIT 1`, [doomedId])).rowCount, t).toBe(0);
+    expect((await db.query("SELECT 1 FROM organizations WHERE id = $1", [doomedId])).rowCount).toBe(0);
+    expect((await h.call("GET", "/v1/me", { token: doomed })).status).toBe(401);
+
+    const record = (await db.query("SELECT name, requested_by_email, reason, row_counts FROM deleted_organizations WHERE organization_id = $1", [doomedId])).rows[0];
+    expect(record).toMatchObject({ name: "Chotchkie's", requested_by_email: ownerEmail, reason: "Moving to another provider" });
+    const mail = h.mailer.sent.slice(sentBefore).filter((m) => m.subject === "Deletion certificate: Chotchkie's");
+    expect(mail.map((m) => m.to)).toEqual([ownerEmail]);
+    expect(mail[0]!.text).toContain("users: 2");
+
+    // Other organizations are untouched.
+    expect((await h.call("GET", "/v1/me", { token: owner })).status).toBe(200);
+  });
+});
+
+describe("retention", () => {
+  it("says what's kept and for how long", async () => {
+    expect((await h.call("GET", "/v1/org/data-retention", { token: helpdesk })).status).toBe(403);
+    const r = await h.call("GET", "/v1/org/data-retention", { token: owner });
+    expect(r.body.audit_retention_days).toBe(365);
+    expect(r.body.classes.map((x: { key: string }) => x.key)).toEqual(expect.arrayContaining(["audit_events", "sessions", "notifications"]));
+  });
+
+  it("deletes what's past its retention, and nothing else", async () => {
+    const email = uniqueEmail("ret");
+    const id = (await h.call("POST", "/v1/users", { token: owner, body: { email, given_name: "Ret", password: PASSWORD } })).body.id;
+    for (let i = 0; i < 3; i++) await h.call("POST", "/v1/auth/login", { body: { email, password: PASSWORD } });
+    const s = (await db.query("SELECT id FROM sessions WHERE user_id = $1 ORDER BY created_at", [id])).rows.map((x) => x.id);
+    await db.query("UPDATE sessions SET revoked_at = now() - interval '31 days' WHERE id = $1", [s[0]]); // ended long ago
+    await db.query("UPDATE sessions SET revoked_at = now() - interval '2 days' WHERE id = $1", [s[1]]); // ended recently
+    await db.query("UPDATE sessions SET expires_at = now() - interval '40 days' WHERE id = $1", [s[2]]); // expired long ago
+
+    const deleted = await applyRetention(h.deps);
+    expect(deleted.sessions).toBeGreaterThanOrEqual(2);
+    expect((await db.query("SELECT id FROM sessions WHERE user_id = $1", [id])).rows.map((x) => x.id)).toEqual([s[1]]);
+    // Every fixed rule ran.
+    for (const k of ["oidc_codes", "sessions", "invitations", "notifications", "event_deliveries", "device_commands", "live_queries"]) expect(deleted).toHaveProperty(k);
+    expect(RETENTION.find((r) => r.key === "sessions")?.kept).toBe("30 days after they end");
   });
 });

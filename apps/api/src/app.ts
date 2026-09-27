@@ -1,3 +1,5 @@
+import { registerRetentionRoutes, scheduleRetention } from "./data/retention.js";
+import { registerOrgDeletionRoutes, scheduleOrgDeletions } from "./data/org-deletion.js";
 import { registerOrgExportRoutes } from "./data/org-export.js";
 import { registerPersonDataRoutes } from "./data/person.js";
 import type { JobRunner } from "./platform/jobs.js";
@@ -270,6 +272,8 @@ export function createApp(deps: Deps) {
   registerProcessEventRoutes(app);
   registerPersonDataRoutes(app);
   registerOrgExportRoutes(app);
+  registerOrgDeletionRoutes(app);
+  registerRetentionRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
@@ -301,4 +305,6 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleRisk(jobs, deps);
   scheduleProcessEventRetention(jobs, deps);
   scheduleNoncePruning(jobs, deps);
+  scheduleOrgDeletions(jobs, deps);
+  scheduleRetention(jobs, deps);
 }

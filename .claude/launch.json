@@ -4,14 +4,40 @@
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@nexus/api", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@nexus/api",
+        "dev"
+      ],
       "port": 8080
     },
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@nexus/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@nexus/web",
+        "dev"
+      ],
       "port": 3100
+    },
+    {
+      "name": "api-verify",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/api && NEXUS_PORT=8095 NEXUS_API_PUBLIC_URL=http://localhost:8095 NEXUS_PUBLIC_URL=http://localhost:3105 exec pnpm dev"
+      ],
+      "port": 8095
+    },
+    {
+      "name": "web-verify",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/web && NEXUS_API_URL=http://localhost:8095 exec pnpm exec next dev --port 3105"
+      ],
+      "port": 3105
     }
   ]
 }

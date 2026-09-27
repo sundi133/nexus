@@ -1,5 +1,6 @@
 "use client";
 
+import { PersonDataActions } from "@/components/features/data-privacy";
 import type { Role, UserDetail } from "@nexus/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, ChevronLeft, KeyRound, LogOut, Mail, MoreHorizontal, Pencil, ShieldAlert, ShieldOff, Siren, UserCheck, UserMinus, UserX } from "lucide-react";
@@ -111,6 +112,7 @@ export default function UserPage({ params }: { params: Promise<{ id: string }> }
           ) : null}
         </div>
         <div className="flex gap-2">
+          {!isSelf ? <PersonDataActions user={u} /> : null}
           {can("users:write") ? (
             <Button onClick={() => setEditing(true)}>
               <Pencil /> Edit
