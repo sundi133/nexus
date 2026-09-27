@@ -68,7 +68,7 @@ The Linux packages (`nexus-agent_<version>_amd64.deb`, `nexus-agent-<version>-1.
 - **Removing:** removing the package keeps the device key, and `apt purge` deletes it. Upgrades restart the agent on the new version.
 - **Testing:** CI installs the `.deb` on a real systemd host and the `.rpm` in Fedora.
 
-Everything is declarative Windows Installer (no custom actions). CI installs, upgrades and uninstalls it on Windows and checks the service, ACLs and logs.
+The package is declarative Windows Installer, except one step that runs the agent to write `enroll.conf` when `TOKEN` is given (its command line is hidden from installer logs). CI installs, upgrades and uninstalls it on Windows and checks the service, the ACLs, and that the token never reaches the log.
 
 ## Updates (DEV-07, ADR-017)
 The server offers an update in the check-in response when this device's rollout stage is due. Agents move canary → 10% → everyone. The agent then:

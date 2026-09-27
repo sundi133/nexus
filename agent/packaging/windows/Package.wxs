@@ -1,9 +1,9 @@
 <!--
   Votal Nexus agent: Windows Installer package (WiX Toolset v5).
 
-  Built by build-msi.ps1. Everything is declarative, with no custom actions: Windows
-  Installer copies the binary, registers and starts the service, locks down the
-  state folder and, when TOKEN is given, leaves enroll.conf for the service to enroll with.
+  Built by build-msi.ps1. Windows Installer copies the binary, registers and starts the
+  service and locks down the state folder. When TOKEN is given, one step runs the agent to
+  leave enroll.conf for the service to enroll with (its command line is kept out of the log).
 
     msiexec /i nexus-agent-x64.msi /qn SERVER=https://api.nexus.example.com TOKEN=nxe_...
 
@@ -78,19 +78,22 @@
             <PermissionEx Sddl="D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)" />
           </CreateFolder>
         </Component>
-        <!-- Only with TOKEN: the service enrolls from this file, then deletes it. -->
-        <Component Id="EnrollConfig" Guid="1a75bfe4-1144-42e4-9744-d2e11efb0628" Condition="TOKEN">
-          <RegistryValue Root="HKLM" Key="SOFTWARE\Votal\Nexus Agent" Name="EnrollConfigWritten" Type="integer" Value="1" KeyPath="yes" />
-          <IniFile Id="EnrollServer" Action="addLine" Directory="STATEFOLDER" Name="enroll.conf" Section="Nexus" Key="server" Value="[SERVER]" />
-          <IniFile Id="EnrollToken" Action="addLine" Directory="STATEFOLDER" Name="enroll.conf" Section="Nexus" Key="token" Value="[TOKEN]" />
-        </Component>
+        <!-- Only with TOKEN, enroll.conf is written by the WriteEnrollConfig step below (not IniFile:
+             Windows Installer logs the values IniFile writes, which would put the token in verbose logs). -->
       </Directory>
     </StandardDirectory>
+
+    <!-- With TOKEN: the agent writes enroll.conf (SYSTEM, into the locked-down state folder) before the service
+         starts. HideTarget keeps the command line, and so the token, out of the installer's log. -->
+    <CustomAction Id="WriteEnrollConfig" FileRef="AgentExe" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes"
+                  ExeCommand="write-enroll-config --state-dir &quot;[CommonAppDataFolder]Nexus&quot; --server &quot;[SERVER]&quot; --token &quot;[TOKEN]&quot;" />
+    <InstallExecuteSequence>
+      <Custom Action="WriteEnrollConfig" After="InstallFiles" Condition="TOKEN AND NOT REMOVE" />
+    </InstallExecuteSequence>
 
     <Feature Id="Main" Title="Nexus agent">
       <ComponentRef Id="Agent" />
       <ComponentRef Id="StateFolder" />
-      <ComponentRef Id="EnrollConfig" />
       <?ifdef OsqueryDir?>
       <ComponentRef Id="Osquery" />
       <?endif?>
