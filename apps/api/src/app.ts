@@ -9,6 +9,7 @@ import { registerAuditRoutes } from "./audit/routes.js";
 import { sql } from "kysely";
 import { loadPrincipal } from "./auth/guard.js";
 import { metrics, renderMetrics } from "./platform/metrics.js";
+import { Gate, retryAfter } from "./platform/admission.js";
 import { LATEST_MIGRATION } from "./platform/migrate.js";
 import { unauthorized } from "./platform/errors.js";
 import { isPublicRoute } from "./auth/public-routes.js";
@@ -65,7 +66,7 @@ import { registerAIRoutes } from "./devices/ai-routes.js";
 import { registerOsqueryRoutes } from "./devices/osquery.js";
 import { registerEnforcementRoutes } from "./devices/enforcement.js";
 import { registerRiskRoutes, scheduleRisk } from "./risk/routes.js";
-import { registerProcessEventRoutes, scheduleProcessEventRetention } from "./devices/process-events.js";
+import { registerProcessEventRoutes, scheduleNoncePruning, scheduleProcessEventRetention } from "./devices/process-events.js";
 import { registerDeviceRoutes } from "./devices/routes.js";
 import { registerDeviceTrustRoutes } from "./access/device-trust.js";
 import { registerAccessPolicyRoutes } from "./access/routes.js";
@@ -129,6 +130,30 @@ export function createApp(deps: Deps) {
     }
   });
 
+  // Device agents share a bounded number of concurrent requests, leaving database connections for
+  // people. When a fleet arrives at once, the overflow waits briefly, then gets a quick 503 with a
+  // spread-out Retry-After instead of queueing until it times out.
+  const agentGate = new Gate(
+    Number(process.env.NEXUS_AGENT_CONCURRENCY) || Math.max(2, Math.floor((Number(process.env.NEXUS_DB_POOL_SIZE) || 20) * 0.7)),
+    Number(process.env.NEXUS_AGENT_QUEUE) || 500,
+    Number(process.env.NEXUS_AGENT_QUEUE_WAIT_MS) || 3000,
+  );
+  const agentRetryAfter = Number(process.env.NEXUS_AGENT_RETRY_AFTER) || 15;
+  app.use("/v1/agent/*", async (c, next) => {
+    if (!/^\/v1\/agent\/(enroll|checkin|events)$/.test(c.req.path) || c.req.method !== "POST") return next();
+    const release = await agentGate.acquire();
+    if (!release) {
+      metrics.agentShed.inc({ route: c.req.path });
+      c.header("Retry-After", String(retryAfter(agentRetryAfter)));
+      return problem(c, new ApiError(503, "busy", "The server is busy; try again after the Retry-After interval"));
+    }
+    try {
+      await next();
+    } finally {
+      release();
+    }
+  });
+
   // Request bodies are capped before anything reads them: 1 MB, with room for the few
   // endpoints that legitimately take more (CSV imports, device inventory, config as code).
   const LARGE: [RegExp, number][] = [
@@ -181,7 +206,8 @@ export function createApp(deps: Deps) {
       .unscoped(async (tx) => (await sql<{ status: string; kind: string; n: number }>`SELECT * FROM nexus_job_queue_stats()`.execute(tx)).rows)
       .catch(() => []);
     return c.text(
-      renderMetrics([{ name: "nexus_jobs", help: "Background jobs by status and kind", values: queue.map((q) => [{ status: q.status, kind: q.kind }, q.n] as [Record<string, string>, number]) }]),
+      renderMetrics([{ name: "nexus_jobs", help: "Background jobs by status and kind", values: queue.map((q) => [{ status: q.status, kind: q.kind }, q.n] as [Record<string, string>, number]) },
+        { name: "nexus_agent_requests", help: "Device agent requests running and waiting for a slot", values: [[{ state: "running" }, agentGate.stats.running], [{ state: "waiting" }, agentGate.stats.waiting]] }]),
       200,
       { "content-type": "text/plain; version=0.0.4" },
     );
@@ -263,4 +289,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleAlerts(jobs, deps);
   scheduleRisk(jobs, deps);
   scheduleProcessEventRetention(jobs, deps);
+  scheduleNoncePruning(jobs, deps);
 }

@@ -39,6 +39,10 @@ Production refuses to start on unsafe settings. It lists every problem at once, 
 | `NEXUS_APNS_*`, `NEXUS_FCM_SERVICE_ACCOUNT` | Mobile push. Without them, push is disabled in production |
 | `NEXUS_AGENT_RELEASES_DIR`, `NEXUS_AGENT_RELEASE_KEYS` | Signed agent releases (see `agent/README.md`) |
 | `NEXUS_LOG_FORMAT` | `json` (production default) or `pretty` |
+| `NEXUS_DB_POOL_SIZE` | Database connections per API process (default 20). Keep processes × pool size under the database's connection limit |
+| `NEXUS_AGENT_CONCURRENCY` | Device agent requests (enroll, check-in, process events) running at once per process (default 70% of the pool, 14). The rest of the pool stays free for people and integrations |
+| `NEXUS_AGENT_QUEUE`, `NEXUS_AGENT_QUEUE_WAIT_MS` | Agent requests that may wait for a slot (default 500) and for how long (default 3000 ms). Beyond that they get `503 busy` |
+| `NEXUS_AGENT_RETRY_AFTER` | Base `Retry-After` in seconds for a busy response (default 15). Each response picks a value from base up to twice the base, so devices come back spread out |
 
 ## Observing
 
@@ -47,12 +51,15 @@ Production refuses to start on unsafe settings. It lists every problem at once, 
   - `nexus_http_requests_total{method,route,status}` and `nexus_http_request_duration_seconds` (histogram)
   - `nexus_job_runs_total{kind,result}` and `nexus_job_duration_seconds`
   - `nexus_jobs{status,kind}`: queue depth and dead jobs
+  - `nexus_agent_requests{state}`: agent requests running and waiting for a slot
+  - `nexus_agent_requests_shed_total{route}`: agent requests turned away with `503 busy`
 - **Suggested alerts:**
   - 5xx ratio above 1% for 5 minutes.
   - p95 latency above 500 ms on `/v1/sso/*` or `/v1/agent/checkin`.
   - `nexus_jobs{status="queued"}` growing for 15 minutes (workers down or behind).
   - `nexus_jobs{status="dead"}` increasing.
   - `/readyz` failing.
+  - `nexus_agent_requests_shed_total` rising for 15 minutes. A short burst after a mass rollout or an outage is expected and harmless: devices wait and come back. Sustained shedding means the fleet has outgrown the deployment, so add API processes or database capacity.
 - **Product-level health** is also shown to customers' admins in the console: directory sync status, provisioning errors, stream delivery backlog, rollout halts.
 
 ## Backups and recovery
@@ -95,6 +102,26 @@ Measured on a single development API process (Apple M3 laptop, Postgres in Docke
 - At one check-in per device per minute, one API process handles about 55,000 devices.
 - API keys are limited to 600 requests per minute per key. The load test verifies that the limit holds.
 - Production numbers depend on the database tier. Re-run the load test after sizing changes.
+
+### Fleet simulator
+
+`nexus-loadsim` behaves like a fleet of real agents. Each simulated device has its own key and signs its requests. It sends posture every check-in, inventory with AI tools every 15th check-in, its osquery pack on the first one, and process events. It honors `Retry-After` as the agent does. Enrolled devices are cached in the state folder, so later runs skip enrollment.
+
+```bash
+cd agent && go build -o loadsim ./cmd/nexus-loadsim
+./loadsim -server http://localhost:8080 -token nxe_… -devices 3000 -interval 10s -duration 2m -events 6 -state ./loadsim-state
+```
+
+It prints each endpoint's rate, latency and errors every 10 seconds, and a JSON summary at the end. Measured on one API process with a 20-connection pool (Apple M3 laptop, Postgres in Docker):
+
+| Scenario | Result |
+|---|---|
+| 1,000 devices, check-in every 60 s | p95 ~50 ms, no errors |
+| 3,000 devices, check-in every 10 s, plus process events (600 req/s) | p50 6 ms, p95 ~25 ms, no errors. The database's CPU is the limit |
+| 5,000 devices enrolling at once | p95 104 ms. A token's use limit holds under concurrency |
+| 10,000 devices arriving together, every 20 s, each sending its first osquery pack plus events (well past one process's capacity) | Agent requests take at most ~2 s. The overflow gets `503 busy` and comes back later. The console stays fast (p95 46 ms, max 132 ms). Without the agent limit, requests queued for ~50 s, devices timed out, and the console waited behind them |
+
+Agents never take the whole database pool: each process runs at most `NEXUS_AGENT_CONCURRENCY` agent requests at once. When a fleet arrives together (a rollout, or everyone waking up after an outage), the overflow waits up to 3 seconds for a slot. After that it gets `503 busy` with a spread-out `Retry-After`. Agents wait as asked, and enrollment retries for up to 5 minutes, so an MDM push to thousands of machines still succeeds.
 
 ## Incident quick reference
 

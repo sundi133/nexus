@@ -19,7 +19,10 @@ export class Db {
   readonly kysely: Kysely<Database>;
 
   constructor(url: string) {
-    this.pool = new pg.Pool({ connectionString: url, max: 20 });
+    this.pool = new pg.Pool({ connectionString: url, max: Number(process.env.NEXUS_DB_POOL_SIZE) || 20 });
+    // A connection the server drops while idle (a restart, a failover) is reported here; without a
+    // listener Node would crash the whole process. The pool discards it and reconnects on next use.
+    this.pool.on("error", (err) => console.error(JSON.stringify({ level: "warn", msg: "database connection lost; reconnecting", error: err.message })));
     this.kysely = new Kysely<Database>({ dialect: new PostgresDialect({ pool: this.pool }) });
   }
 

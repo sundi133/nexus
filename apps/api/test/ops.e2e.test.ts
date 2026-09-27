@@ -124,3 +124,31 @@ describe("job retention", () => {
     expect(left.sort()).toEqual([newDone, oldDead].sort());
   });
 });
+
+describe("agent load shedding", () => {
+  it("turns away agent requests beyond its slots with 503 busy and a Retry-After, and never people's requests", async () => {
+    const env = { NEXUS_AGENT_CONCURRENCY: "1", NEXUS_AGENT_QUEUE: "1", NEXUS_AGENT_QUEUE_WAIT_MS: "1", NEXUS_AGENT_RETRY_AFTER: "20" };
+    const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
+    Object.assign(process.env, env);
+    const tiny = await bootApp();
+    for (const [k, v] of Object.entries(saved)) v === undefined ? delete process.env[k] : (process.env[k] = v);
+    try {
+      const rs = await Promise.all(Array.from({ length: 30 }, () => tiny.call("POST", "/v1/agent/checkin", { body: {} })));
+      const shed = rs.filter((r) => r.status === 503);
+      expect(shed.length).toBeGreaterThan(0);
+      expect(shed.length).toBeLessThan(30); // the first one ran
+      for (const r of shed) {
+        expect(r.body.code).toBe("busy");
+        const s = Number(r.headers.get("retry-after"));
+        expect(s).toBeGreaterThanOrEqual(20);
+        expect(s).toBeLessThan(40);
+      }
+      // Other endpoints never wait on the agents' slots.
+      const people = await Promise.all(Array.from({ length: 30 }, () => tiny.app.request("/readyz")));
+      expect(people.every((r) => r.status === 200)).toBe(true);
+      expect(await (await tiny.app.request("/metrics")).text()).toMatch(/nexus_agent_requests_shed_total\{route="\/v1\/agent\/checkin"\} [1-9]/);
+    } finally {
+      await tiny.close();
+    }
+  });
+});

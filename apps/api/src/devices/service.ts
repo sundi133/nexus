@@ -35,7 +35,7 @@ export async function evaluateDevice(tx: Tx, device: DeviceForEval, policies: Po
   await tx.selectFrom("devices").select("id").where("id", "=", device.id).forNoKeyUpdate().execute();
   const facts = PostureFacts.safeParse(device.posture).data ?? null;
   const previous = new Map(
-    (await tx.selectFrom("device_checks").select(["check_key", "status", "failing_since"]).where("device_id", "=", device.id).execute()).map((c) => [c.check_key, c]),
+    (await tx.selectFrom("device_checks").select(["check_key", "status", "detail", "enforced", "failing_since", "grace_until"]).where("device_id", "=", device.id).execute()).map((c) => [c.check_key, c]),
   );
   const ctx = await mdmContext(tx, device);
   if (policies.some((p) => p.key === "ai_mcp_governed" && p.enabled)) {
@@ -44,8 +44,16 @@ export async function evaluateDevice(tx: Tx, device: DeviceForEval, policies: Po
   }
   const { checks: results, compliance, grace_until } = enforce(evaluate(device, facts, policies, ctx), policies, previous);
 
-  await tx.deleteFrom("device_checks").where("device_id", "=", device.id).execute();
-  if (results.length) {
+  // Most check-ins change nothing: rewrite the rows only when a result did.
+  const t = (d: Date | null | undefined) => d?.getTime() ?? null;
+  const unchanged =
+    results.length === previous.size &&
+    results.every((r) => {
+      const p = previous.get(r.key);
+      return p && p.status === r.status && p.detail === r.detail && p.enforced === r.enforced && t(p.failing_since) === t(r.failing_since) && t(p.grace_until) === t(r.grace_until);
+    });
+  if (!unchanged) await tx.deleteFrom("device_checks").where("device_id", "=", device.id).execute();
+  if (!unchanged && results.length) {
     await tx
       .insertInto("device_checks")
       .values(

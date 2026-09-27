@@ -111,6 +111,10 @@ async function auditAIChanges(tx: Tx, d: { id: string; org_id: string; hostname:
   });
 }
 
+// More concurrent enrollments than this can't be in flight (replicas × pool size), so a token further
+// than this from its limit can't be overshot.
+const NEAR_LIMIT = 1000;
+
 const bsh = (body: string) => createHash("sha256").update(body).digest("base64url");
 
 function deviceError(status: 401 | 403, code: string, message: string) {
@@ -147,9 +151,8 @@ async function authenticateDevice(c: Context<Env>, raw: string) {
   return { dev, kid, payload };
 }
 
-/** Replay protection: a proof can be used once. */
+/** Replay protection: a proof can be used once (expired nonces are pruned by a job, not per request). */
 async function consumeProof(tx: Tx, orgId: string, kid: string, payload: { jti?: unknown; exp?: number }) {
-  await tx.deleteFrom("agent_nonces").where("device_id", "=", kid).where("expires_at", "<", new Date()).execute();
   const fresh = await tx
     .insertInto("agent_nonces")
     .values({ jti: String(payload.jti), org_id: orgId, device_id: kid, expires_at: new Date((payload.exp ?? 0) * 1000) })
@@ -210,15 +213,20 @@ export function registerAgentRoutes(app: App) {
     if (!found) throw deviceError(401, "invalid_enrollment_token", "This enrollment token is invalid, expired or used up");
 
     const out = await deps.db.tenant(found.org_id, async (tx) => {
-      // Consume one use atomically.
-      const tok = await tx
-        .updateTable("device_enrollment_tokens")
-        .set((eb) => ({ uses: eb("uses", "+", 1) }))
-        .where("id", "=", found.token_id)
-        .where((eb) => eb.or([eb("max_uses", "is", null), eb("uses", "<", eb.ref("max_uses"))]))
-        .returning(["id", "name", "assign_user_id"])
-        .executeTakeFirst();
-      if (!tok) throw deviceError(401, "invalid_enrollment_token", "This enrollment token is used up");
+      // Every device of an MDM rollout enrolls with the same token, all at once: no shared counter row.
+      const tok = await tx.selectFrom("device_enrollment_tokens").select(["id", "name", "assign_user_id", "max_uses"]).where("id", "=", found.token_id).executeTakeFirst();
+      if (!tok) throw deviceError(401, "invalid_enrollment_token", "This enrollment token is invalid, expired or used up");
+      if (tok.max_uses !== null) {
+        // Uses are the devices this token enrolled. Far from the limit, concurrent enrollments can't
+        // overshoot it; near it, they take turns, so the limit is exact without serializing a rollout.
+        const used = async () => Number((await tx.selectFrom("devices").select((eb) => eb.fn.countAll<number>().as("n")).where("enrollment_token_id", "=", tok.id).executeTakeFirst())?.n ?? 0);
+        let n = await used();
+        if (tok.max_uses - n <= NEAR_LIMIT) {
+          await sql`SELECT pg_advisory_xact_lock(hashtextextended(${`enroll:${tok.id}`}, 0))`.execute(tx);
+          n = await used();
+        }
+        if (n >= tok.max_uses) throw deviceError(401, "invalid_enrollment_token", "This enrollment token is used up");
+      }
       const dupe = await sql<{ n: number }>`SELECT count(*)::int AS n FROM devices WHERE key_thumbprint = ${thumbprint}`.execute(tx);
       if (dupe.rows[0]!.n > 0) throw conflict("already_enrolled", "This device key is already enrolled");
       const id = newId();

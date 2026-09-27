@@ -66,6 +66,16 @@ describe("device enrollment", () => {
     expect((await enroll(await new SoftDevice().init(), token)).status).toBe(201);
     expect((await enroll(await new SoftDevice().init(), token)).body.code).toBe("invalid_enrollment_token");
   });
+
+  it("never lets concurrent enrollments overshoot a token's limit, and counts its uses", async () => {
+    const t = (await h.call("POST", "/v1/devices/enrollment-tokens", { token: admin, body: { name: "Racy", max_uses: 3 } })).body.token;
+    const devices = await Promise.all(Array.from({ length: 10 }, () => new SoftDevice().init()));
+    const results = await Promise.all(devices.map((d) => enroll(d, t)));
+    expect(results.filter((r) => r.status === 201)).toHaveLength(3);
+    expect(results.filter((r) => r.status !== 201).every((r) => r.body.code === "invalid_enrollment_token")).toBe(true);
+    const list = (await h.call("GET", "/v1/devices/enrollment-tokens", { token: admin })).body.data;
+    expect(list.find((x: any) => x.name === "Racy")).toMatchObject({ uses: 3, max_uses: 3 });
+  });
 });
 
 describe("check-ins and compliance", () => {
