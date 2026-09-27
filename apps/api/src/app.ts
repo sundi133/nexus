@@ -1,4 +1,5 @@
 import { registerPatchingRoutes, schedulePatching } from "./devices/patching.js";
+import { registerSoftwareDeployRoutes } from "./devices/software-deploy.js";
 import { registerScriptRoutes } from "./devices/scripts.js";
 import { registerDirectoryServiceRoutes } from "./protocols/routes.js";
 import { registerMcpPeopleRoutes } from "./mcp/people-routes.js";
@@ -286,6 +287,7 @@ export function createApp(deps: Deps) {
   registerDirectoryServiceRoutes(app);
   registerScriptRoutes(app);
   registerPatchingRoutes(app);
+  registerSoftwareDeployRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);

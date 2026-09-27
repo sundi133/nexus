@@ -30,6 +30,7 @@ export const PERMISSIONS = [
   "devices:enforce", // block apps and domains on devices (can stop people working)
   "devices:recovery_keys", // reveal escrowed disk-encryption recovery keys (unlocks a device's data)
   "devices:scripts", // run scripts on devices as root/SYSTEM (anything the device can do)
+  "devices:software", // deploy apps to devices (installers run as root/SYSTEM)
   "directory:sync", // connect Google Workspace / Entra ID (can create and suspend many users)
   "api_keys:manage", // create and revoke API keys
   "integrations:manage", // webhooks and SIEM streaming (they export the audit log)
@@ -55,7 +56,7 @@ const GRANTS: Record<Role, readonly Permission[]> = {
 };
 
 /** What an API key may be granted: everything except managing admins and keys (a key can't entrench itself). */
-export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage" && p !== "devices:wipe" && p !== "devices:query" && p !== "devices:enforce" && p !== "devices:recovery_keys" && p !== "devices:scripts");
+export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage" && p !== "devices:wipe" && p !== "devices:query" && p !== "devices:enforce" && p !== "devices:recovery_keys" && p !== "devices:scripts" && p !== "devices:software");
 
 export function permissionsFor(roles: readonly Role[]): Permission[] {
   const set = new Set<Permission>();

@@ -41,6 +41,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/run"
 	"github.com/votal-ai/nexus/agent/internal/service"
 	"github.com/votal-ai/nexus/agent/internal/settings"
+	"github.com/votal-ai/nexus/agent/internal/software"
 	"github.com/votal-ai/nexus/agent/internal/state"
 	"github.com/votal-ai/nexus/agent/internal/update"
 	"github.com/votal-ai/nexus/agent/internal/updates"
@@ -259,10 +260,28 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 	if u, perr := url.Parse(e.Server); perr == nil {
 		ownHost = u.Hostname()
 	}
+	// Apps the organization assigns: installed and removed in the background, as root/SYSTEM.
+	apps := &software.Manager{Sys: software.Sys{GOOS: runtime.GOOS, Dir: filepath.Join(store.Dir, "downloads"), Download: software.Download,
+		Run: func(ctx context.Context, name string, args ...string) (string, error) {
+			out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+			return string(out), err
+		},
+		Has:    func(n string) bool { _, err := exec.LookPath(n); return err == nil },
+		Winget: func() string { return software.FindWinget(exec.LookPath) }}}
 	enforcer := &enforce.Enforcer{StateDir: store.Dir, DeviceID: e.DeviceID, Key: runner.Key, OwnHost: ownHost, Log: log,
 		Processes: enforce.ListProcesses, Kill: enforce.KillProcess, FlushDNS: enforce.FlushDNS,
 		ApplySettings: func(d settings.Desired) settings.Outcome {
 			return settings.Apply(settings.OS{Root: requireAdmin() == nil}, runtime.GOOS, d)
+		},
+		ApplySoftware: func(items []software.Item) []software.Result {
+			if err := requireAdmin(); err != nil {
+				out := make([]software.Result, 0, len(items))
+				for _, it := range items {
+					out = append(out, software.Result{ID: it.ID, Status: software.Unsupported, Detail: "the agent isn't running as root/SYSTEM", At: time.Now().UTC().Format(time.RFC3339)})
+				}
+				return out
+			}
+			return apps.Apply(context.Background(), items)
 		}}
 	enforcer.Load() // the last rules apply from boot, before the first check-in
 	// OS updates: checked in the background every 6 hours (slow), reported with the inventory.

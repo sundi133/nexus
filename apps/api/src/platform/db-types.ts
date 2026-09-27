@@ -302,6 +302,38 @@ export interface Database {
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
   };
+  software_packages: {
+    id: string;
+    org_id: string;
+    name: string;
+    description: Generated<string>;
+    platform: DevicePlatform;
+    kind: "winget" | "msi" | "pkg" | "apt" | "dnf";
+    ref: string;
+    url: Generated<string>;
+    sha256: Generated<string>;
+    args: Json<string[]>;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  software_assignments: {
+    id: string;
+    org_id: string;
+    package_id: string;
+    action: "install" | "remove";
+    group_id: string | null;
+    created_by: string | null;
+    created_at: Generated<Date>;
+  };
+  device_software: {
+    org_id: string;
+    device_id: string;
+    package_id: string;
+    status: "installed" | "absent" | "failed" | "unsupported";
+    detail: Generated<string>;
+    updated_at: Generated<Date>;
+  };
   patch_policies: {
     org_id: string;
     enabled: Generated<boolean>;
