@@ -3,6 +3,8 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig, validateProd } from "../src/config.js";
 import { LATEST_MIGRATION, migrate } from "../src/platform/migrate.js";
+import { lifecycle } from "../src/platform/lifecycle.js";
+import { Realtime } from "../src/platform/realtime.js";
 import { bootApp, PASSWORD, uniqueEmail } from "./harness.js";
 
 /** Operability: health, readiness, metrics, security headers, production config checks, job retention. */
@@ -29,6 +31,31 @@ describe("health", () => {
     const r = await h.app.request("/readyz");
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ ok: true, schema: LATEST_MIGRATION });
+  });
+
+  it("stays ready when the schema is newer (a rollout migrates first), not when it's older", async () => {
+    await owner.query("INSERT INTO schema_migrations (version, checksum) VALUES ('9999_next_release.sql', 'x')");
+    try {
+      const r = await h.app.request("/readyz");
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ ok: true, schema: "9999_next_release.sql" });
+    } finally {
+      await owner.query("DELETE FROM schema_migrations WHERE version = '9999_next_release.sql'");
+    }
+  });
+
+  it("stops being ready while draining for shutdown, and stays alive", async () => {
+    lifecycle.draining = true;
+    try {
+      const r = await h.app.request("/readyz");
+      expect(r.status).toBe(503);
+      expect(await r.json()).toEqual({ ok: false, reason: "shutting down" });
+      const live = await h.app.request("/healthz");
+      expect(live.status).toBe(200);
+      expect(live.headers.get("connection")).toBe("close"); // clients stop reusing the connection
+    } finally {
+      lifecycle.draining = false;
+    }
   });
 });
 
@@ -89,6 +116,9 @@ describe("production configuration", () => {
       NEXUS_METRICS_TOKEN: "a-long-random-scrape-token-1234",
     };
     expect(validateProd(loadConfig(env), env)).toEqual([]);
+    // The API doesn't need the schema owner's credentials (only migrations do).
+    const { NEXUS_DATABASE_OWNER_URL: _, ...apiOnly } = env;
+    expect(validateProd(loadConfig(apiOnly), apiOnly)).toEqual([]);
   });
 });
 
@@ -151,4 +181,29 @@ describe("agent load shedding", () => {
       await tiny.close();
     }
   });
+});
+
+describe("live updates survive a database connection loss", () => {
+  it("reconnects and delivers notifications again", async () => {
+    const url = new URL(process.env.NEXUS_DATABASE_URL!);
+    url.searchParams.set("application_name", "nexus-realtime-reconnect-test");
+    const rt = new Realtime(url.toString());
+    await rt.start();
+    const got: string[] = [];
+    const userId = randomUUID();
+    rt.subscribe(`user:${userId}`, (e) => got.push(e.data.id));
+    try {
+      // What a failover or restart does to the connection.
+      const killed = await owner.query("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'nexus-realtime-reconnect-test'");
+      expect(killed.rowCount).toBe(1);
+      const notify = (id: string) => owner.query("SELECT pg_notify('nexus_inbox', $1)", [JSON.stringify({ org_id: randomUUID(), user_id: userId, id, op: "insert" })]);
+      for (let i = 0; i < 50 && !got.includes("after"); i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        await notify("after");
+      }
+      expect(got).toContain("after");
+    } finally {
+      await rt.stop();
+    }
+  }, 20_000);
 });

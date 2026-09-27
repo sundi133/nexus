@@ -12,6 +12,7 @@ import { DeviceServers, TOOL_KIND } from "@/components/features/ai-bits";
 import { DeviceEnforcement } from "@/components/features/device-enforcement";
 import { DeviceInventory } from "@/components/features/device-inventory";
 import { DeviceProcesses } from "@/components/features/device-processes";
+import { DeviceSettingsCard } from "@/components/features/device-settings";
 import { CheckList, ComplianceBadge, OnlineDot, PLATFORM_LABEL, PlatformIcon } from "@/components/features/device-bits";
 import { CommandHistory, DeviceActions } from "@/components/features/device-actions";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,7 @@ export default function DevicePage({ params }: { params: Promise<{ id: string }>
             <CardHeader title="Policy checks" description={d.compliance_changed_at ? `Compliance last changed ${formatDateTime(d.compliance_changed_at)}` : "Evaluated on every check-in (about once a minute)."} />
             <CheckList checks={d.checks} />
           </Card>
+          <DeviceSettingsCard device={d} className="mt-5" />
         </TabsContent>
         <TabsContent value="details" className="grid gap-5 lg:grid-cols-2">
           <Card>

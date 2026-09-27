@@ -12,6 +12,8 @@ export const PERMISSIONS = [
   "users:read",
   "users:write",
   "users:lifecycle", // suspend / activate / contain / revoke sessions
+  "users:erase", // permanently delete a person and their personal data (privacy requests)
+  "data:export", // export all of the organization's data
   "groups:read",
   "groups:write",
   "audit:read",
@@ -26,6 +28,7 @@ export const PERMISSIONS = [
   "devices:wipe", // erase a device through its MDM (irreversible)
   "devices:query", // run live osquery queries on devices (reads anything osquery can see)
   "devices:enforce", // block apps and domains on devices (can stop people working)
+  "devices:recovery_keys", // reveal escrowed disk-encryption recovery keys (unlocks a device's data)
   "directory:sync", // connect Google Workspace / Entra ID (can create and suspend many users)
   "api_keys:manage", // create and revoke API keys
   "integrations:manage", // webhooks and SIEM streaming (they export the audit log)
@@ -45,13 +48,13 @@ const READ: Permission[] = ["users:read", "groups:read", "audit:read", "apps:rea
 const GRANTS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
   admin: PERMISSIONS.filter((p) => p !== "admins:manage"),
-  helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign", "devices:write", "devices:actions", "alerts:triage"],
+  helpdesk: [...READ, "users:write", "users:lifecycle", "apps:assign", "devices:write", "devices:actions", "devices:recovery_keys", "alerts:triage"],
   security_analyst: [...READ, "users:lifecycle", "devices:actions", "devices:query", "agents:suspend", "alerts:triage"],
   readonly: READ,
 };
 
 /** What an API key may be granted: everything except managing admins and keys (a key can't entrench itself). */
-export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage" && p !== "devices:wipe" && p !== "devices:query" && p !== "devices:enforce");
+export const GRANTABLE_TO_KEYS: readonly Permission[] = PERMISSIONS.filter((p) => p !== "admins:manage" && p !== "api_keys:manage" && p !== "integrations:manage" && p !== "devices:wipe" && p !== "devices:query" && p !== "devices:enforce" && p !== "devices:recovery_keys");
 
 export function permissionsFor(roles: readonly Role[]): Permission[] {
   const set = new Set<Permission>();
@@ -68,7 +71,7 @@ export const isAdmin = (roles: readonly Role[]) => roles.length > 0;
 // ---- RBAC v2: custom roles and scoped grants (SPEC RBAC-02, RBAC-03) ----------------------
 
 /** Permissions a grant can limit to groups: they act on people (and their devices). */
-export const SCOPABLE: readonly Permission[] = ["users:read", "users:write", "users:lifecycle", "devices:read", "devices:write", "devices:actions"];
+export const SCOPABLE: readonly Permission[] = ["users:read", "users:write", "users:lifecycle", "devices:read", "devices:write", "devices:actions", "devices:recovery_keys"];
 /** Kept organization-wide in a scoped grant, so a scoped admin can find their way around. */
 export const SCOPED_EXTRAS: readonly Permission[] = ["groups:read", "apps:read"];
 /** Built-in roles that can be limited to groups. Owner and Admin manage the organization itself. */

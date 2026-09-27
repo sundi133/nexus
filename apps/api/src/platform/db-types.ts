@@ -20,6 +20,10 @@ export interface Database {
     settings: Json;
     created_at: Generated<Date>;
     updated_at: Generated<Date>;
+    deletion_scheduled_for: Generated<Date | null>;
+    deletion_requested_by: Generated<string | null>;
+    deletion_requested_at: Generated<Date | null>;
+    deletion_reason: Generated<string | null>;
   };
   users: {
     id: string;
@@ -221,6 +225,8 @@ export interface Database {
     osquery_version: string | null;
     enforcement_version: Generated<string>;
     enforcement_status: Generated<string>;
+    settings_report: Json<unknown[]>;
+    settings_reported_at: Generated<Date | null>;
     events_status: Generated<string>;
     osquery_collected_at: NullableTimestamp;
     enrolled_at: Generated<Date>;
@@ -248,6 +254,16 @@ export interface Database {
     mode: Generated<"audit" | "enforce">;
     grace_hours: Generated<number>;
     updated_at: Timestamp;
+  };
+  device_recovery_keys: {
+    id: string;
+    org_id: string;
+    device_id: string;
+    volume: string;
+    key_id: string;
+    sealed: Buffer;
+    escrowed_at: Generated<Date>;
+    retired_at: Date | null;
   };
   agent_nonces: {
     jti: string;

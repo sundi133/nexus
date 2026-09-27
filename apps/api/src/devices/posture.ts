@@ -26,9 +26,15 @@ export const CHECK_KEYS = ["disk_encryption", "firewall", "screen_lock", "os_ver
 export type CheckKey = (typeof CHECK_KEYS)[number];
 
 export const PolicyParams = {
-  disk_encryption: z.object({}),
-  firewall: z.object({}),
-  screen_lock: z.object({ max_delay_minutes: z.number().int().min(0).max(60) }),
+  disk_encryption: z.object({
+    remediate: z.boolean().default(false).openapi({ description: "Turn BitLocker on where it's off (Windows with a ready TPM). FileVault and LUKS can't be turned on by the agent" }),
+    escrow_recovery_keys: z.boolean().default(true).openapi({ description: "Escrow BitLocker recovery keys, sealed, for help desk to reveal" }),
+  }),
+  firewall: z.object({ remediate: z.boolean().default(false).openapi({ description: "Turn the firewall on where it's off (macOS, Windows, Linux ufw/firewalld)" }) }),
+  screen_lock: z.object({
+    max_delay_minutes: z.number().int().min(0).max(60),
+    remediate: z.boolean().default(false).openapi({ description: "Set the inactivity lock where it's longer (Windows, Linux GNOME). macOS needs a configuration profile" }),
+  }),
   os_version: z.object({ minimum: z.object({ macos: z.string().max(20), windows: z.string().max(30), linux: z.string().max(20) }) }),
   system_integrity: z.object({}),
   mdm_compliant: z.object({}),
@@ -47,9 +53,10 @@ export type Policy = { key: CheckKey; enabled: boolean; params: Record<string, u
 
 const base = { enabled: true, mode: "enforce" as const, grace_hours: 0 };
 export const DEFAULT_POLICIES: Policy[] = [
-  { key: "disk_encryption", ...base, params: {} },
-  { key: "firewall", ...base, params: {} },
-  { key: "screen_lock", ...base, params: { max_delay_minutes: 10 } },
+  // Remediation is off until an admin opts in: turning settings on changes people's devices.
+  { key: "disk_encryption", ...base, params: { remediate: false, escrow_recovery_keys: true } },
+  { key: "firewall", ...base, params: { remediate: false } },
+  { key: "screen_lock", ...base, params: { max_delay_minutes: 10, remediate: false } },
   // Empty minimum = not enforced for that platform until an admin sets one.
   { key: "os_version", ...base, params: { minimum: { macos: "14.0", windows: "10.0.19045", linux: "" } } },
   { key: "system_integrity", ...base, params: {} },

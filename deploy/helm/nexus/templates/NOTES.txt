@@ -1,0 +1,11 @@
+Votal Nexus {{ .Chart.AppVersion }} is rolling out:
+  API     {{ .Values.api.replicas }} pods   {{ .Values.apiPublicUrl }}
+  worker  {{ .Values.worker.replicas }} pods
+  console {{ .Values.web.replicas }} pods   {{ .Values.publicUrl }}
+
+Watch it:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/component=migrate --tail 50
+
+New pods become ready once this release's migrations have run. Keep /metrics off the public
+edge (it needs the metrics token regardless). Operations and failover: docs/HA.md.

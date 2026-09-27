@@ -1,0 +1,44 @@
+{{- if .Values.migrations.enabled }}
+# One Job per release revision. It runs beside the rollout: new API pods report ready (and
+# workers start claiming jobs) only once the schema is at their release's version, so the
+# previous pods keep serving until then. Concurrent migrators serialize on an advisory lock.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Unique per image and revision: a Job's spec can't change, and GitOps tools (which render with
+  # revision 1) still get a new Job for each new image.
+  name: {{ printf "%s-migrate-%s-%d" (include "nexus.fullname" .) (include "nexus.image" (list .Values.image.api .) | sha256sum | trunc 8) .Release.Revision }}
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+spec:
+  backoffLimit: 5
+  ttlSecondsAfterFinished: {{ .Values.migrations.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "nexus.selector" (list . "migrate") | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "nexus.image" (list .Values.image.api .) }}
+          imagePullPolicy: {{ .Values.image.api.pullPolicy }}
+          command: ["node", "dist/cli/migrate.js"]
+          env:
+            # Only this Job gets the schema owner's credentials; the API and workers never do.
+            - name: NEXUS_DATABASE_OWNER_URL
+              valueFrom: { secretKeyRef: { name: {{ include "nexus.secretName" . }}, key: databaseOwnerUrl } }
+            {{- include "nexus.env" . | nindent 12 }}
+          resources: {{- toYaml .Values.migrations.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+{{- end }}

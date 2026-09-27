@@ -1,0 +1,25 @@
+# The chart as the CI drill installs it: production settings, images built in CI, small requests.
+publicUrl: https://nexus.ci.example
+apiPublicUrl: https://api.nexus.ci.example
+image:
+  api: { repository: votal/nexus-api, tag: ci, pullPolicy: Never }
+  web: { repository: votal/nexus-web, tag: ci, pullPolicy: Never }
+secret:
+  values:
+    databaseUrl: postgres://nexus_app:ci-app-password@postgres:5432/nexus
+    databaseOwnerUrl: postgres://nexus_owner:ci-owner-password@postgres:5432/nexus
+    sealKeys: "1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+    smtpUrl: smtp://localhost:1025
+    metricsToken: ci-metrics-token-0123456789abcdef
+config:
+  dbPoolSize: 10
+  signup: open   # each drill phase signs up its own organization
+api:
+  replicas: 3
+  resources: { requests: { cpu: 100m, memory: 192Mi }, limits: { memory: 768Mi } }
+worker:
+  replicas: 2
+  resources: { requests: { cpu: 50m, memory: 192Mi }, limits: { memory: 768Mi } }
+web:
+  replicas: 2
+  resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 512Mi } }

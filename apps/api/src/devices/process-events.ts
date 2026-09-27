@@ -251,20 +251,14 @@ export function registerProcessEventRoutes(app: App) {
 
 /** Every minute: expired device-request nonces go (replay protection needs them only while valid). */
 export function scheduleNoncePruning(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 60_000) return;
-    last = Date.now();
+  jobs.every("agent.nonces.prune", 60_000, async () => {
     await deps.db.unscoped((tx) => sql`SELECT nexus_prune_agent_nonces()`.execute(tx));
   });
 }
 
 /** Hourly: events older than the retention window go, across every organization. */
 export function scheduleProcessEventRetention(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 60 * 60_000) return;
-    last = Date.now();
+  jobs.every("process_events.prune", 60 * 60_000, async () => {
     await deps.db.unscoped((tx) => sql`SELECT nexus_prune_process_events(${`${RETENTION_DAYS} days`}::interval)`.execute(tx));
   });
 }

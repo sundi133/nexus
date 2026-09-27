@@ -1,0 +1,111 @@
+# Votal Nexus Helm values. Required: publicUrl, apiPublicUrl, and the secret (see `secret`).
+# Postgres is not part of the chart: use a managed, highly available one (docs/HA.md).
+
+publicUrl: ""       # console origin, https://nexus.example.com
+apiPublicUrl: ""    # API origin (agents, phones, SSO), https://api.nexus.example.com
+
+image:
+  api: { repository: votal/nexus-api, tag: "", pullPolicy: IfNotPresent }  # tag defaults to appVersion
+  web: { repository: votal/nexus-web, tag: "", pullPolicy: IfNotPresent }
+imagePullSecrets: []
+
+# Secret values. Either name an existing Secret (recommended: from your secret manager, e.g. via
+# External Secrets) with these keys, or set `secret.values` and the chart creates one.
+#   databaseUrl        postgres://nexus_app:…@host:5432/nexus      (runtime role; RLS applies)
+#   databaseOwnerUrl   postgres://nexus_owner:…@host:5432/nexus    (migrations only)
+#   sealKeys           1:<base64 32 bytes>[,…]
+#   smtpUrl            smtps://user:pass@smtp.example.com:465
+#   metricsToken       at least 24 characters
+#   optional: agentReleaseKeys, apnsTeamId, apnsKeyId, apnsKey, fcmServiceAccount
+secret:
+  existingSecret: ""
+  values: {}
+
+config:
+  mailFrom: "Votal Nexus <no-reply@example.com>"
+  signup: first            # first | open | closed
+  allowPrivateDirectory: false
+  logFormat: json
+  dbPoolSize: 20           # per pod; keep (api + worker pods) × dbPoolSize under the database's max_connections
+  agentConcurrency: ""     # default: 70% of dbPoolSize
+  extraEnv: {}             # any other NEXUS_* settings (docs/OPERATIONS.md)
+
+api:
+  replicas: 3
+  resources:
+    requests: { cpu: 500m, memory: 512Mi }
+    limits: { memory: 1Gi }
+  autoscaling:
+    enabled: false
+    minReplicas: 3
+    maxReplicas: 12
+    targetCPUUtilizationPercentage: 70
+  shutdownDelaySeconds: 5  # keep serving while the load balancer removes the pod
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+worker:
+  replicas: 2
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 1Gi }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+web:
+  replicas: 2
+  resources:
+    requests: { cpu: 250m, memory: 256Mi }
+    limits: { memory: 512Mi }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+migrations:
+  enabled: true            # a Job per release; new pods become ready once it has run
+  ttlSecondsAfterFinished: 86400
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }
+
+# Signed agent releases served to devices (docs: agent/README.md). A ReadOnlyMany claim holding
+# the files nexus-release publishes; without it, agent updates are off.
+agentReleases:
+  existingClaim: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  consoleHost: ""          # nexus.example.com
+  apiHost: ""              # api.nexus.example.com
+  tls: []                  # [{ secretName: nexus-tls, hosts: [nexus.example.com, api.nexus.example.com] }]
+
+podDisruptionBudget:
+  enabled: true            # at most one API, worker and console pod down at a time during node drains
+
+networkPolicy:
+  enabled: false           # only the ingress controller and Prometheus may reach the pods
+  ingressNamespaceLabels: { kubernetes.io/metadata.name: ingress-nginx }
+  prometheusNamespaceLabels: { kubernetes.io/metadata.name: monitoring }
+
+serviceMonitor:
+  enabled: false           # Prometheus Operator
+  interval: 30s
+  labels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile: { type: RuntimeDefault }
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+podAnnotations: {}
+podLabels: {}

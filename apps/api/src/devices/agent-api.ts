@@ -323,7 +323,7 @@ export function registerAgentRoutes(app: App) {
       if (input.command_results?.length) await recordCommandResults(tx, d, input.command_results, meta);
       if (input.enforcement !== undefined) {
         const rep = EnforcementReport.safeParse(input.enforcement);
-        if (rep.success) await recordEnforcement(tx, d, rep.data, meta);
+        if (rep.success) await recordEnforcement(tx, deps, d, rep.data, meta);
       }
       if (input.osquery !== undefined) {
         const rep = OsqueryReport.safeParse(input.osquery);

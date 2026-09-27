@@ -11,7 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
+
+	"github.com/votal-ai/nexus/agent/internal/settings"
 )
 
 var b64 = base64.RawURLEncoding
@@ -223,5 +227,61 @@ func TestHostsWrittenInPlaceWhenItCantBeReplaced(t *testing.T) {
 	}
 	if s := f.e.Report().Status; !strings.Contains(s, "1 domains blocked") {
 		t.Fatalf("status = %q", s)
+	}
+}
+
+func TestSettingsAppliedReportedAndKeysEscrowedOnce(t *testing.T) {
+	f := newFixture(t)
+	now := time.Unix(1_800_000_000, 0)
+	f.e.Now = func() time.Time { return now }
+	var mu sync.Mutex
+	var calls []settings.Desired
+	keys := []settings.RecoveryKey{{Volume: "C:", ID: "{A}", Password: "111111-222222-333333-444444-555555-666666-777777-888888"}}
+	f.e.ApplySettings = func(d settings.Desired) settings.Outcome {
+		mu.Lock()
+		defer mu.Unlock()
+		calls = append(calls, d)
+		return settings.Outcome{Results: []settings.Result{{Key: "firewall", Status: settings.Applied}}, RecoveryKeys: keys}
+	}
+	ncalls := func() int { mu.Lock(); defer mu.Unlock(); return len(calls) }
+	wait := func(n int) {
+		t.Helper()
+		for i := 0; i < 200 && (ncalls() < n || f.e.settingsBusy()); i++ {
+			time.Sleep(5 * time.Millisecond)
+		}
+		if ncalls() != n {
+			t.Fatalf("settings passes = %d, want %d", ncalls(), n)
+		}
+	}
+	want := settings.Desired{Firewall: true, EscrowRecoveryKeys: true}
+	if err := f.e.Apply(signPolicy(t, f.priv, policyTyp, Policy{Device: "dev-1", TS: 1, Ver: "v1", Settings: want})); err != nil {
+		t.Fatal(err)
+	}
+	wait(1)
+	if calls[0] != want {
+		t.Fatalf("applied %+v", calls[0])
+	}
+	r := f.e.Report()
+	if len(r.Settings) != 1 || r.Settings[0].Status != settings.Applied || len(r.RecoveryKeys) != 1 {
+		t.Fatalf("report %+v", r)
+	}
+	f.e.Delivered(r)
+	if r := f.e.Report(); len(r.RecoveryKeys) != 0 {
+		t.Fatal("keys sent again after the server had them")
+	}
+	wait(1) // not due again yet
+
+	now = now.Add(SettingsEvery + time.Minute) // an hour on: re-asserted, same keys stay unsent
+	f.e.Report()
+	wait(2)
+	if r := f.e.Report(); len(r.RecoveryKeys) != 0 {
+		t.Fatal("unchanged keys re-sent")
+	}
+	keys = append(keys, settings.RecoveryKey{Volume: "C:", ID: "{B}", Password: "999999-222222-333333-444444-555555-666666-777777-888888"}) // rotated
+	now = now.Add(SettingsEvery + time.Minute)
+	f.e.Report()
+	wait(3)
+	if r := f.e.Report(); len(r.RecoveryKeys) != 2 {
+		t.Fatalf("new keys not sent: %+v", r.RecoveryKeys)
 	}
 }

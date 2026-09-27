@@ -20,6 +20,7 @@ export function ConfirmAction({
   danger,
   typeToConfirm,
   askReason = true,
+  reasonPlaceholder = "e.g. Suspicious sign-in from new country",
   onConfirm,
 }: {
   open: boolean;
@@ -30,6 +31,7 @@ export function ConfirmAction({
   danger?: boolean;
   typeToConfirm?: string;
   askReason?: boolean;
+  reasonPlaceholder?: string;
   onConfirm: (reason: string) => Promise<unknown>;
 }) {
   const [reason, setReason] = useState("");
@@ -73,7 +75,7 @@ export function ConfirmAction({
           <ErrorBanner error={error} />
           {askReason ? (
             <Field label="Reason" htmlFor="reason" hint="Saved to the audit log.">
-              <Input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Suspicious sign-in from new country" autoFocus />
+              <Input id="reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={reasonPlaceholder} autoFocus />
             </Field>
           ) : null}
           {typeToConfirm ? (

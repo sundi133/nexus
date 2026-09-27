@@ -264,10 +264,7 @@ const RECONCILE_MS = 6 * 3600_000;
 
 /** Every 6 hours, reconcile every provisioned app (safety net for missed triggers and upstream drift). */
 export function scheduleProvisioningReconcile(jobs: JobRunner, deps: Deps) {
-  let last = Date.now(); // not at boot: the first run comes after one interval
-  jobs.onTick(async () => {
-    if (Date.now() - last < RECONCILE_MS) return;
-    last = Date.now();
+  jobs.every("provisioning.reconcile", RECONCILE_MS, async () => {
     const apps = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; app_id: string }>`SELECT * FROM nexus_provisioned_apps()`.execute(tx)).rows);
     for (const a of apps) {
       await deps.db.tenant(a.org_id, (tx) => enqueue(tx, a.org_id, "scim.reconcile", { app_id: a.app_id }, { dedupeKey: `scim.reconcile:${a.app_id}` }));

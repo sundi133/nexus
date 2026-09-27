@@ -1,0 +1,114 @@
+{{- include "nexus.required" . }}
+{{- $name := printf "%s-api" (include "nexus.fullname" .) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  replicas: {{ .Values.api.replicas }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }   # never below full capacity during a rollout
+  selector:
+    matchLabels:
+      {{- include "nexus.selector" (list . "api") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nexus.selector" (list . "api") | nindent 8 }}
+        {{- with .Values.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- with .Values.podAnnotations }}
+      annotations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: false
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Drain delay + 10 s for requests in flight + margin; the process force-exits at 25 s.
+      terminationGracePeriodSeconds: {{ add .Values.api.shutdownDelaySeconds 30 }}
+      {{- include "nexus.spread" (list . "api") | nindent 6 }}
+      containers:
+        - name: api
+          image: {{ include "nexus.image" (list .Values.image.api .) }}
+          imagePullPolicy: {{ .Values.image.api.pullPolicy }}
+          env:
+            - { name: NEXUS_ROLE, value: api }
+            - { name: NEXUS_SHUTDOWN_DELAY_MS, value: {{ mul .Values.api.shutdownDelaySeconds 1000 | toString | quote }} }
+            {{- include "nexus.env" . | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 8080 }
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:           # fails while draining, and until this release's migrations ran
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 3
+            timeoutSeconds: 3
+            failureThreshold: 1
+          resources: {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            {{- if .Values.agentReleases.existingClaim }}
+            - { name: releases, mountPath: /releases, readOnly: true }
+            {{- end }}
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        {{- if .Values.agentReleases.existingClaim }}
+        - name: releases
+          persistentVolumeClaim: { claimName: {{ .Values.agentReleases.existingClaim }}, readOnly: true }
+        {{- end }}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    {{- include "nexus.selector" (list . "api") | nindent 4 }}
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+{{- if .Values.api.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "nexus.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ $name }} }
+  minReplicas: {{ .Values.api.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.api.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ .Values.api.autoscaling.targetCPUUtilizationPercentage }} }
+{{- end }}

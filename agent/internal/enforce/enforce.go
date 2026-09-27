@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/votal-ai/nexus/agent/internal/command"
+	"github.com/votal-ai/nexus/agent/internal/settings"
 )
 
 const policyTyp = "nexus-policy+jwt"
@@ -39,10 +40,11 @@ type Rule struct {
 }
 
 type Policy struct {
-	Device string `json:"sub"`
-	TS     int64  `json:"ts"`
-	Ver    string `json:"ver"`
-	Rules  []Rule `json:"rules"`
+	Device   string           `json:"sub"`
+	TS       int64            `json:"ts"`
+	Ver      string           `json:"ver"`
+	Rules    []Rule           `json:"rules"`
+	Settings settings.Desired `json:"settings"` // device settings to enforce (firewall, screen lock, BitLocker)
 }
 
 // Event is reported on the next check-in; repeats are counted, not repeated.
@@ -57,9 +59,11 @@ type Event struct {
 }
 
 type Report struct {
-	Version string  `json:"version"`
-	Status  string  `json:"status"`
-	Events  []Event `json:"events"`
+	Version      string                 `json:"version"`
+	Status       string                 `json:"status"`
+	Events       []Event                `json:"events"`
+	Settings     []settings.Result      `json:"settings"`
+	RecoveryKeys []settings.RecoveryKey `json:"recovery_keys,omitempty"` // only when they changed
 }
 
 // Proc is a running process.
@@ -82,6 +86,8 @@ type Enforcer struct {
 	Kill      func(pid int) error
 	FlushDNS  func()
 	Now       func() time.Time
+	// ApplySettings makes the device match the policy's settings (settings.Apply on this OS).
+	ApplySettings func(settings.Desired) settings.Outcome
 
 	mu        sync.Mutex
 	monitored map[string]bool // rule|pid already reported in monitor mode
@@ -90,7 +96,15 @@ type Enforcer struct {
 	events    map[string]*Event
 	hashes    map[string]hashEntry
 	applied   bool
+
+	settingsRunning bool
+	settingsAt      time.Time
+	settingsRes     []settings.Result
+	pendingKeys     []settings.RecoveryKey
 }
+
+// SettingsEvery is how often settings are re-asserted, so ones someone turned off come back.
+const SettingsEvery = time.Hour
 
 type hashEntry struct {
 	size, mod int64
@@ -119,6 +133,7 @@ func (e *Enforcer) Load() {
 	e.policy = &p
 	e.mu.Unlock()
 	e.applyDomains()
+	e.settingsSoon()
 }
 
 // Apply verifies a signed policy from a check-in and, when it's new, applies it.
@@ -161,7 +176,56 @@ func (e *Enforcer) Apply(jws string) error {
 	}
 	e.applyDomains()
 	e.Log.Info("block rules applied", "version", p.Ver, "rules", len(p.Rules))
+	e.mu.Lock()
+	e.settingsAt = time.Time{} // a new policy: apply its settings now
+	e.mu.Unlock()
+	e.settingsSoon()
 	return nil
+}
+
+// settingsSoon applies the policy's settings in the background if they're due (new policy,
+// startup, or an hour since the last pass). Commands like manage-bde can take a while.
+func (e *Enforcer) settingsSoon() {
+	e.mu.Lock()
+	if e.ApplySettings == nil || e.policy == nil || e.settingsRunning || (!e.settingsAt.IsZero() && e.now().Sub(e.settingsAt) < SettingsEvery) {
+		e.mu.Unlock()
+		return
+	}
+	want := e.policy.Settings
+	e.settingsRunning = true
+	e.mu.Unlock()
+	go e.runSettings(want)
+}
+
+func (e *Enforcer) runSettings(want settings.Desired) {
+	out := e.ApplySettings(want)
+	for _, r := range out.Results {
+		if r.Status == settings.Applied || r.Status == settings.PendingRestart || r.Status == settings.Failed {
+			e.Log.Info("device setting", "key", r.Key, "status", r.Status, "detail", r.Detail)
+		}
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.settingsRunning = false
+	e.settingsAt = e.now()
+	e.settingsRes = out.Results
+	if len(out.RecoveryKeys) > 0 && settings.KeysDigest(out.RecoveryKeys) != e.escrowed() {
+		e.pendingKeys = out.RecoveryKeys
+	}
+}
+
+func (e *Enforcer) settingsBusy() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.settingsRunning
+}
+
+func (e *Enforcer) escrowPath() string { return filepath.Join(e.StateDir, "escrowed.digest") }
+
+// escrowed is the digest of the recovery keys the server already has.
+func (e *Enforcer) escrowed() string {
+	b, _ := os.ReadFile(e.escrowPath())
+	return strings.TrimSpace(string(b))
 }
 
 func (e *Enforcer) rules(kind string) []Rule {
@@ -484,9 +548,15 @@ func (e *Enforcer) addEvent(ev Event) {
 
 // Report is what goes in the next check-in.
 func (e *Enforcer) Report() Report {
+	r := e.report()
+	e.settingsSoon() // re-assert settings hourly
+	return r
+}
+
+func (e *Enforcer) report() Report {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	r := Report{Status: e.status, Events: []Event{}}
+	r := Report{Status: e.status, Events: []Event{}, Settings: append([]settings.Result{}, e.settingsRes...), RecoveryKeys: e.pendingKeys}
 	if e.policy != nil {
 		r.Version = e.policy.Ver
 	}
@@ -497,10 +567,16 @@ func (e *Enforcer) Report() Report {
 	return r
 }
 
-// Delivered forgets the events a check-in carried.
+// Delivered forgets the events a check-in carried, and remembers the recovery keys it escrowed.
 func (e *Enforcer) Delivered(sent Report) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if len(sent.RecoveryKeys) > 0 {
+		d := settings.KeysDigest(sent.RecoveryKeys)
+		if err := os.WriteFile(e.escrowPath(), []byte(d), 0o600); err == nil && settings.KeysDigest(e.pendingKeys) == d {
+			e.pendingKeys = nil
+		}
+	}
 	for _, ev := range sent.Events {
 		k := ev.RuleID + "|" + ev.Action + "|" + ev.Subject + "|" + ev.User + "|" + ev.Detail
 		if cur, ok := e.events[k]; ok && cur.Count <= ev.Count {
