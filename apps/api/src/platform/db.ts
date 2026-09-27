@@ -58,6 +58,9 @@ export class Db {
       query_timeout: opts.queryTimeoutMs ?? (Number(process.env.NEXUS_DB_QUERY_TIMEOUT_MS) || 30_000),
       Client: GuardedClient,
     });
+    // An idle connection the server drops (a restart, a failover) is reported here; without a
+    // listener Node would crash the whole process. The pool discards it and reconnects on next use.
+    this.pool.on("error", (err) => console.error(JSON.stringify({ level: "warn", msg: "database connection lost; reconnecting", error: err.message })));
     this.kysely = new Kysely<Database>({ dialect: new PostgresDialect({ pool: this.pool }) });
   }
 
