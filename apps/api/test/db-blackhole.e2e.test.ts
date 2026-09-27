@@ -73,7 +73,7 @@ describe("a database that stops answering", () => {
 });
 
 describe("the database ending a connection that's in use", () => {
-  it("fails that request without taking the process down", async () => {
+  it("fails that request, and drops idle ones, without taking the process down", async () => {
     const url = new URL(process.env.NEXUS_DATABASE_URL!);
     url.searchParams.set("application_name", "nexus-in-use-test");
     const local = new Db(url.toString(), { poolSize: 2 });
@@ -92,6 +92,9 @@ describe("the database ending a connection that's in use", () => {
         return sql`SELECT 2`.execute(tx);
       });
       await expect(inFlight).rejects.toThrow();
+      // And one sitting idle in the pool, which a shutdown or failover ends too.
+      await local.unscoped((tx) => sql`SELECT 1`.execute(tx));
+      await owner.query("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'nexus-in-use-test'");
       await new Promise((r) => setTimeout(r, 200));
       expect(crashes).toEqual([]);
       // And the next request gets a fresh connection.
