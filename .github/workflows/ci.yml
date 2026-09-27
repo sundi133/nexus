@@ -252,6 +252,7 @@ jobs:
         run: deploy/helm/ci/drill.sh
       - name: Cluster state on failure
         if: failure()
+        continue-on-error: true
         run: |
           kubectl -n nexus-drill get all
           kubectl -n nexus-drill get events --sort-by=.lastTimestamp | tail -40
