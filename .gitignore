@@ -20,3 +20,7 @@ agent/packaging/linux/.nfpm-*.yaml
 # Live vendor check credentials and reports (docs/LIVE-CHECK.md)
 live-check.env
 live-check-*.json
+
+# Browser extension build output (apps/browser-extension)
+apps/browser-extension/dist/
+apps/browser-extension/dist.zip
