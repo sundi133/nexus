@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os/user"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -227,6 +228,9 @@ func TestRefusals(t *testing.T) {
 }
 
 func TestMacPromptPassesTextAsArguments(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the prompt runs as a macOS account")
+	}
 	me, err := user.Current()
 	if err != nil {
 		t.Skip(err)

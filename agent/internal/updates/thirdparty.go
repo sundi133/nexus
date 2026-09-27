@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	posix "path" // macOS paths, whatever OS the tests run on
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -156,7 +157,7 @@ func (m Mac) exists(p string) bool {
 }
 
 func (m Mac) version(ctx context.Context, app string) string {
-	out, err := m.Run(ctx, "plutil", "-extract", "CFBundleShortVersionString", "raw", "-o", "-", filepath.Join(app, "Contents", "Info.plist"))
+	out, err := m.Run(ctx, "plutil", "-extract", "CFBundleShortVersionString", "raw", "-o", "-", posix.Join(app, "Contents", "Info.plist"))
 	if err != nil {
 		return ""
 	}
@@ -253,7 +254,7 @@ func (m Mac) Check(ctx context.Context) ([]Update, []string) {
 	var ups []Update
 	var errs []string
 	for _, a := range m.catalog() {
-		path := filepath.Join(m.apps(), a.Bundle)
+		path := posix.Join(m.apps(), a.Bundle)
 		if !m.exists(path) {
 			continue
 		}
@@ -284,14 +285,14 @@ func (m Mac) Install(ctx context.Context, ids []string) (string, error) {
 		if len(want) > 0 && !want[a.ID] {
 			continue
 		}
-		path := filepath.Join(m.apps(), a.Bundle)
+		path := posix.Join(m.apps(), a.Bundle)
 		if !m.exists(path) {
 			continue
 		}
 		running := m.Running
 		if running == nil {
 			running = func(ctx context.Context, bundle string) bool {
-				_, err := m.Run(ctx, "pgrep", "-f", filepath.Join(bundle, "Contents", "MacOS"))
+				_, err := m.Run(ctx, "pgrep", "-f", posix.Join(bundle, "Contents", "MacOS"))
 				return err == nil
 			}
 		}
