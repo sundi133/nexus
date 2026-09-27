@@ -67,7 +67,16 @@ const ConditionSchema = z
 
 const PermissionInput = z.object({
   effect: z.enum(["allow", "deny"]),
-  subject: z.discriminatedUnion("type", [z.object({ type: z.literal("all_agents") }), z.object({ type: z.literal("agent"), id: Id }), z.object({ type: z.literal("agent_tag"), tag: z.string().trim().min(1).max(50) })]),
+  subject: z
+    .discriminatedUnion("type", [
+      z.object({ type: z.literal("all_agents") }),
+      z.object({ type: z.literal("agent"), id: Id }),
+      z.object({ type: z.literal("agent_tag"), tag: z.string().trim().min(1).max(50) }),
+      z.object({ type: z.literal("all_people") }),
+      z.object({ type: z.literal("user"), id: Id }),
+      z.object({ type: z.literal("group"), id: Id }),
+    ])
+    .openapi({ description: "An agent, agents with a tag, or all agents; or a person, a group, or all people (through their own MCP clients)" }),
   tools: z.array(z.string().min(1).max(128)).min(1).max(200).openapi({ description: 'Tool names, or ["*"] for every approved tool' }),
   risks: z.array(Risk).min(1).nullable().default(null).openapi({ description: "Only tools of these risk classes; null for any" }),
   conditions: z.array(ConditionSchema).max(10).default([]),
@@ -78,7 +87,7 @@ const PermissionOut = z
   .object({
     id: Id,
     effect: z.enum(["allow", "deny"]),
-    subject: z.object({ type: z.enum(["all_agents", "agent", "agent_tag"]), id: Id.nullable(), tag: z.string().nullable(), name: z.string() }),
+    subject: z.object({ type: z.enum(["all_agents", "agent", "agent_tag", "all_people", "user", "group"]), id: Id.nullable(), tag: z.string().nullable(), name: z.string() }),
     tools: z.array(z.string()),
     risks: z.array(Risk).nullable(),
     conditions: z.array(ConditionSchema),
@@ -152,12 +161,31 @@ const toTool = (t: ToolRow): z.infer<typeof ToolOut> => ({
   approved_at: t.approved_at ? iso(t.approved_at) : null,
 });
 
+const subjectName = (r: { subject_type: string; subject_tag: string | null; agent_name: string | null; user_email: string | null; group_name: string | null }) => {
+  switch (r.subject_type) {
+    case "all_agents":
+      return "All agents";
+    case "agent_tag":
+      return `Agents tagged ${r.subject_tag}`;
+    case "agent":
+      return r.agent_name ?? "Deleted agent";
+    case "all_people":
+      return "All people";
+    case "user":
+      return r.user_email ?? "Deleted person";
+    default:
+      return r.group_name ? `Group ${r.group_name}` : "Deleted group";
+  }
+};
+
 async function permissionsOf(tx: Tx, serverId: string): Promise<z.infer<typeof PermissionOut>[]> {
   const rows = await tx
     .selectFrom("mcp_permissions")
     .leftJoin("ai_agents", "ai_agents.id", "mcp_permissions.subject_id")
+    .leftJoin("users", "users.id", "mcp_permissions.subject_id")
+    .leftJoin("groups", "groups.id", "mcp_permissions.subject_id")
     .selectAll("mcp_permissions")
-    .select("ai_agents.name as agent_name")
+    .select(["ai_agents.name as agent_name", "users.email as user_email", "groups.name as group_name"])
     .where("server_id", "=", serverId)
     .orderBy("effect", "desc") // deny first
     .orderBy("created_at")
@@ -165,7 +193,7 @@ async function permissionsOf(tx: Tx, serverId: string): Promise<z.infer<typeof P
   return rows.map((r) => ({
     id: r.id,
     effect: r.effect,
-    subject: { type: r.subject_type, id: r.subject_id, tag: r.subject_tag, name: r.subject_type === "all_agents" ? "All agents" : r.subject_type === "agent_tag" ? `Agents tagged ${r.subject_tag}` : (r.agent_name ?? "Deleted agent") },
+    subject: { type: r.subject_type, id: r.subject_id, tag: r.subject_tag, name: subjectName(r) },
     tools: r.tools,
     risks: r.risks as z.infer<typeof Risk>[] | null,
     conditions: r.conditions as unknown as z.infer<typeof ConditionSchema>[],
@@ -411,6 +439,8 @@ export function registerMcpRoutes(app: App) {
 
   const checkPermission = async (tx: Tx, serverId: string, input: z.infer<typeof PermissionInput>) => {
     if (input.subject.type === "agent" && !(await tx.selectFrom("ai_agents").select("id").where("id", "=", input.subject.id).executeTakeFirst())) throw notFound("Agent");
+    if (input.subject.type === "user" && !(await tx.selectFrom("users").select("id").where("id", "=", input.subject.id).executeTakeFirst())) throw notFound("User");
+    if (input.subject.type === "group" && !(await tx.selectFrom("groups").select("id").where("id", "=", input.subject.id).executeTakeFirst())) throw notFound("Group");
     if (input.tools.includes("*") && input.tools.length > 1) throw badRequest("invalid_tools", 'Use ["*"] alone, or list tools by name');
     if (!input.tools.includes("*")) {
       const known = new Set((await toolsOf(tx, serverId)).map((t) => t.name));
@@ -421,7 +451,7 @@ export function registerMcpRoutes(app: App) {
   const permissionValues = (input: z.infer<typeof PermissionInput>) => ({
     effect: input.effect,
     subject_type: input.subject.type,
-    subject_id: input.subject.type === "agent" ? input.subject.id : null,
+    subject_id: input.subject.type === "agent" || input.subject.type === "user" || input.subject.type === "group" ? input.subject.id : null,
     subject_tag: input.subject.type === "agent_tag" ? input.subject.tag.toLowerCase() : null,
     tools: input.tools,
     risks: input.risks,
@@ -435,7 +465,7 @@ export function registerMcpRoutes(app: App) {
       path: "/v1/mcp/servers/{id}/permissions",
       tags: ["MCP gateway"],
       summary: "Add a tool permission",
-      description: "Deny by default: agents can call a tool only when an allow rule matches (agent, tag or everyone; tool; risk; argument conditions) and no deny rule does.",
+      description: "Deny by default: an agent or person can call a tool only when an allow rule matches (for agents: an agent, a tag or all agents; for people: a person, a group or all people; plus tool, risk and argument conditions) and no deny rule does.",
       security: bearer,
       request: { params: z.object({ id: Id }), ...body(PermissionInput) },
       responses: { 201: json(z.object({ permissions: z.array(PermissionOut) }), "Added"), ...problemResponses },

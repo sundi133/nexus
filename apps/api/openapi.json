@@ -2192,7 +2192,10 @@
                 "enum": [
                   "all_agents",
                   "agent",
-                  "agent_tag"
+                  "agent_tag",
+                  "all_people",
+                  "user",
+                  "group"
                 ]
               },
               "id": {
@@ -3348,8 +3351,8 @@
                       },
                       "subject": {
                         "type": "string",
-                        "maxLength": 150,
-                        "description": "all_agents, agent:<name> or tag:<tag>"
+                        "maxLength": 350,
+                        "description": "all_agents, agent:<name>, tag:<tag>, all_people, user:<email> or group:<name>"
                       },
                       "tools": {
                         "type": "array",
@@ -8887,6 +8890,310 @@
           "detector",
           "count",
           "detail"
+        ]
+      },
+      "McpDataProtection": {
+        "type": "object",
+        "properties": {
+          "arguments": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "off",
+                "monitor",
+                "block"
+              ]
+            }
+          },
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "off",
+                "monitor",
+                "redact"
+              ]
+            }
+          },
+          "custom": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9_-]{1,40}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "pattern": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 200
+                },
+                "arguments": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "monitor",
+                    "block"
+                  ],
+                  "default": "off"
+                },
+                "results": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "monitor",
+                    "redact"
+                  ],
+                  "default": "off"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "pattern"
+              ]
+            }
+          },
+          "defaults": {
+            "type": "object",
+            "properties": {
+              "arguments": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "monitor",
+                    "block"
+                  ]
+                }
+              },
+              "results": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "monitor",
+                    "redact"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "arguments",
+              "results"
+            ]
+          }
+        },
+        "required": [
+          "arguments",
+          "results",
+          "custom",
+          "defaults"
+        ]
+      },
+      "McpDataProtectionInput": {
+        "type": "object",
+        "properties": {
+          "arguments": {
+            "type": "object",
+            "properties": {
+              "secret": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "block"
+                ]
+              },
+              "private_key": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "block"
+                ]
+              },
+              "credit_card": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "block"
+                ]
+              },
+              "us_ssn": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "block"
+                ]
+              },
+              "iban": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "block"
+                ]
+              },
+              "email_list": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "block"
+                ]
+              }
+            },
+            "default": {},
+            "description": "What tool arguments may carry: off, monitor, or block the call"
+          },
+          "results": {
+            "type": "object",
+            "properties": {
+              "secret": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "redact"
+                ]
+              },
+              "private_key": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "redact"
+                ]
+              },
+              "credit_card": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "redact"
+                ]
+              },
+              "us_ssn": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "redact"
+                ]
+              },
+              "iban": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "redact"
+                ]
+              },
+              "email_list": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "monitor",
+                  "redact"
+                ]
+              }
+            },
+            "default": {},
+            "description": "What the AI may read in results: off, monitor, or redact first"
+          },
+          "custom": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9_-]{1,40}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "pattern": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 200
+                },
+                "arguments": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "monitor",
+                    "block"
+                  ],
+                  "default": "off"
+                },
+                "results": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "monitor",
+                    "redact"
+                  ],
+                  "default": "off"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "pattern"
+              ]
+            },
+            "maxItems": 50,
+            "default": []
+          }
+        }
+      },
+      "McpConnection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "client": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "client",
+          "resource",
+          "created_at",
+          "last_used_at",
+          "expires_at"
         ]
       },
       "DevicePage": {
@@ -17173,7 +17480,7 @@
           "MCP gateway"
         ],
         "summary": "Add a tool permission",
-        "description": "Deny by default: agents can call a tool only when an allow rule matches (agent, tag or everyone; tool; risk; argument conditions) and no deny rule does.",
+        "description": "Deny by default: an agent or person can call a tool only when an allow rule matches (for agents: an agent, a tag or all agents; for people: a person, a group or all people; plus tool, risk and argument conditions) and no deny rule does.",
         "security": [
           {
             "bearer": []
@@ -17260,8 +17567,63 @@
                           "type",
                           "tag"
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "all_people"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "user"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "group"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id"
+                        ]
                       }
-                    ]
+                    ],
+                    "description": "An agent, agents with a tag, or all agents; or a person, a group, or all people (through their own MCP clients)"
                   },
                   "tools": {
                     "type": "array",
@@ -17492,8 +17854,63 @@
                           "type",
                           "tag"
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "all_people"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "user"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "group"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id"
+                        ]
                       }
-                    ]
+                    ],
+                    "description": "An agent, agents with a tag, or all agents; or a person, a group, or all people (through their own MCP clients)"
                   },
                   "tools": {
                     "type": "array",
@@ -36620,6 +37037,519 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/mcp/data-protection": {
+      "get": {
+        "tags": [
+          "MCP gateway"
+        ],
+        "summary": "What tool calls may carry, and what AI may read",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpDataProtection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "MCP gateway"
+        ],
+        "summary": "Set data protection for tool calls",
+        "description": "Applies to every MCP server behind the gateway, for agents and people alike. Needs `mcp:manage` and a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpDataProtectionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpDataProtection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/mcp-connections": {
+      "get": {
+        "tags": [
+          "MCP gateway"
+        ],
+        "summary": "AI clients I've connected to MCP servers through Nexus",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/McpConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/mcp-connections/{id}": {
+      "delete": {
+        "tags": [
+          "MCP gateway"
+        ],
+        "summary": "Disconnect one of my AI clients",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Disconnected"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{id}/mcp-connections": {
+      "get": {
+        "tags": [
+          "MCP gateway"
+        ],
+        "summary": "A person's AI clients connected through the gateway",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/McpConnection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{id}/mcp-connections/{grantId}": {
+      "delete": {
+        "tags": [
+          "MCP gateway"
+        ],
+        "summary": "Disconnect one of a person's AI clients",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "grantId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Disconnected"
           },
           "400": {
             "description": "Invalid request",

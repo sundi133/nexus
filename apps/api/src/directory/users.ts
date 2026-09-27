@@ -1,4 +1,5 @@
 import { touchUsers } from "../provisioning/service.js";
+import { revokeMcpGrants } from "../mcp/oauth.js";
 import { scheduleDynamicEvaluation } from "./dynamic-groups-schedule.js";
 import { isPrivileged, notPrivileged } from "./privileged.js";
 import { suspendOwnedAgents } from "../ai-agents/lifecycle.js";
@@ -103,6 +104,7 @@ async function checkManager(tx: Tx, userId: string, managerId: string) {
   }
 }
 
+/** Signs a person out everywhere: web, mobile and CLI sessions, and their AI clients' access to the MCP gateway. */
 export async function revokeUserSessions(tx: Tx, userId: string) {
   const r = await tx
     .updateTable("sessions")
@@ -110,6 +112,7 @@ export async function revokeUserSessions(tx: Tx, userId: string) {
     .where("user_id", "=", userId)
     .where("revoked_at", "is", null)
     .executeTakeFirst();
+  await revokeMcpGrants(tx, userId);
   return Number(r.numUpdatedRows);
 }
 

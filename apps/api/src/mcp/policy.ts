@@ -47,14 +47,15 @@ export type Condition = { argument: string; op: "equals" | "in" | "not_in" | "pr
 export type Rule = {
   id: string;
   effect: "allow" | "deny";
-  subject_type: "all_agents" | "agent" | "agent_tag";
+  subject_type: "all_agents" | "agent" | "agent_tag" | "all_people" | "user" | "group";
   subject_id: string | null;
   subject_tag: string | null;
   tools: string[];
   risks: string[] | null;
   conditions: Condition[];
 };
-export type Caller = { agentId: string; tags: string[] };
+/** Who's calling: an AI agent (its own identity), or a person through their own MCP client. */
+export type Caller = { kind?: "agent"; agentId: string; tags: string[] } | { kind: "user"; userId: string; groupIds: string[] };
 export type Tool = { name: string; status: string; risk: Risk; hash: string; approved_hash: string | null };
 export type Decision = { allow: boolean; reason: string; rule_id: string | null };
 
@@ -101,7 +102,11 @@ export function conditionHolds(c: Condition, args: Record<string, unknown>, rule
   }
 }
 
-const subjectMatches = (r: Rule, who: Caller) => r.subject_type === "all_agents" || (r.subject_type === "agent" && r.subject_id === who.agentId) || (r.subject_type === "agent_tag" && who.tags.includes(r.subject_tag!));
+/** Agent rules apply to agents and people rules to people: never across. */
+const subjectMatches = (r: Rule, who: Caller) =>
+  who.kind === "user"
+    ? r.subject_type === "all_people" || (r.subject_type === "user" && r.subject_id === who.userId) || (r.subject_type === "group" && who.groupIds.includes(r.subject_id!))
+    : r.subject_type === "all_agents" || (r.subject_type === "agent" && r.subject_id === who.agentId) || (r.subject_type === "agent_tag" && who.tags.includes(r.subject_tag!));
 const toolMatches = (r: Rule, t: Tool) => (r.tools.includes("*") || r.tools.includes(t.name)) && (!r.risks || r.risks.includes(t.risk));
 
 export const isUsable = (t: Tool) => t.status === "approved" && t.approved_hash === t.hash;
@@ -120,7 +125,7 @@ export function authorize(tool: Tool | undefined, rules: Rule[], who: Caller, ar
     if (args === null ? !r.conditions.length : r.conditions.every((c) => conditionHolds(c, args, "deny"))) return { allow: false, reason: "Denied by a rule", rule_id: r.id };
   }
   const allows = applicable.filter((x) => x.effect === "allow");
-  if (!allows.length) return { allow: false, reason: "No rule allows this agent to use this tool", rule_id: null };
+  if (!allows.length) return { allow: false, reason: `No rule allows this ${who.kind === "user" ? "person" : "agent"} to use this tool`, rule_id: null };
   // For listing (args unknown), a tool is visible if some allow rule could apply.
   if (args === null) return { allow: true, reason: "Allowed", rule_id: allows[0]!.id };
   const ok = allows.find((r) => r.conditions.every((c) => conditionHolds(c, args)));

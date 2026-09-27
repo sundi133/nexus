@@ -23,6 +23,9 @@ importers:
       '@hono/zod-openapi':
         specifier: ^1.6.3
         version: 1.6.3(hono@4.13.9)(zod@4.6.5)
+      '@nexus/dlp':
+        specifier: workspace:^
+        version: link:../../packages/dlp
       '@nexus/ldap-directory':
         specifier: workspace:^
         version: link:../../packages/ldap-directory
@@ -113,6 +116,10 @@ importers:
         version: 2.9.1
 
   apps/browser-extension:
+    dependencies:
+      '@nexus/dlp':
+        specifier: workspace:^
+        version: link:../../packages/dlp
     devDependencies:
       esbuild:
         specifier: ^0.28.2
@@ -286,6 +293,15 @@ importers:
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
+
+  packages/dlp:
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(vite@8.3.0)
 
   packages/ldap-directory:
     dependencies:

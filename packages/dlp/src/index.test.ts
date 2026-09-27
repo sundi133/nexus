@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ibanValid, luhn, scan } from "./detectors.js";
+import { ibanValid, luhn, redact, scan } from "./index.js";
 
 const ALL = ["secret", "private_key", "credit_card", "us_ssn", "iban", "email_list"];
 const detectors = (text: string) => scan(text, ALL).map((f) => f.detector);
@@ -67,5 +67,30 @@ describe("detectors", () => {
     const t = performance.now();
     scan(big, ALL);
     expect(performance.now() - t).toBeLessThan(500);
+  });
+});
+
+describe("redaction", () => {
+  it("replaces what it finds, keeps everything else, and says what it removed", () => {
+    const text = [
+      "id,name,card,ssn",
+      "1,Pat Lee,4242 4242 4242 4242,123-45-6789",
+      "config: AWS_KEY=AKIAIOSFODNN7EXAMPLE region=us-east-1",
+      "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA7\n-----END RSA PRIVATE KEY-----",
+      "build 1234567812345678, order #4111 1111 1111 1112",
+    ].join("\n");
+    const r = redact(text, ["secret", "private_key", "credit_card", "us_ssn"]);
+    expect(r.text).toContain("1,Pat Lee,[redacted: Payment card number],[redacted: US Social Security number]");
+    expect(r.text).toContain("AWS_KEY=[redacted: AWS access key] region=us-east-1");
+    expect(r.text).toContain("[redacted: Private key]");
+    expect(r.text).not.toContain("MIIEowIBAAKCAQEA7");
+    expect(r.text).toContain("build 1234567812345678, order #4111 1111 1111 1112"); // not cards: untouched
+    expect(r.findings.map((f) => f.detector).sort()).toEqual(["credit_card", "private_key", "secret", "us_ssn"]);
+    expect(JSON.stringify(r.findings)).not.toContain("AKIAIOSFODNN7EXAMPLE");
+  });
+
+  it("leaves text alone when nothing is enabled or found", () => {
+    expect(redact("SSN 123-45-6789", [])).toEqual({ text: "SSN 123-45-6789", findings: [] });
+    expect(redact("just prose", ["secret", "credit_card"]).text).toBe("just prose");
   });
 });

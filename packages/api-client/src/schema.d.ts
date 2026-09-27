@@ -5791,7 +5791,7 @@ export interface paths {
         put?: never;
         /**
          * Add a tool permission
-         * @description Deny by default: agents can call a tool only when an allow rule matches (agent, tag or everyone; tool; risk; argument conditions) and no deny rule does.
+         * @description Deny by default: an agent or person can call a tool only when an allow rule matches (for agents: an agent, a tag or all agents; for people: a person, a group or all people; plus tool, risk and argument conditions) and no deny rule does.
          */
         post: {
             parameters: {
@@ -5807,6 +5807,7 @@ export interface paths {
                     "application/json": {
                         /** @enum {string} */
                         effect: "allow" | "deny";
+                        /** @description An agent, agents with a tag, or all agents; or a person, a group, or all people (through their own MCP clients) */
                         subject: {
                             /** @enum {string} */
                             type: "all_agents";
@@ -5822,6 +5823,25 @@ export interface paths {
                             /** @enum {string} */
                             type: "agent_tag";
                             tag: string;
+                        } | {
+                            /** @enum {string} */
+                            type: "all_people";
+                        } | {
+                            /** @enum {string} */
+                            type: "user";
+                            /**
+                             * Format: uuid
+                             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                             */
+                            id: string;
+                        } | {
+                            /** @enum {string} */
+                            type: "group";
+                            /**
+                             * Format: uuid
+                             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                             */
+                            id: string;
                         };
                         /** @description Tool names, or ["*"] for every approved tool */
                         tools: string[];
@@ -5926,6 +5946,7 @@ export interface paths {
                     "application/json": {
                         /** @enum {string} */
                         effect: "allow" | "deny";
+                        /** @description An agent, agents with a tag, or all agents; or a person, a group, or all people (through their own MCP clients) */
                         subject: {
                             /** @enum {string} */
                             type: "all_agents";
@@ -5941,6 +5962,25 @@ export interface paths {
                             /** @enum {string} */
                             type: "agent_tag";
                             tag: string;
+                        } | {
+                            /** @enum {string} */
+                            type: "all_people";
+                        } | {
+                            /** @enum {string} */
+                            type: "user";
+                            /**
+                             * Format: uuid
+                             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                             */
+                            id: string;
+                        } | {
+                            /** @enum {string} */
+                            type: "group";
+                            /**
+                             * Format: uuid
+                             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+                             */
+                            id: string;
                         };
                         /** @description Tool names, or ["*"] for every approved tool */
                         tools: string[];
@@ -21731,6 +21771,490 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mcp/data-protection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What tool calls may carry, and what AI may read */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["McpDataProtection"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        /**
+         * Set data protection for tool calls
+         * @description Applies to every MCP server behind the gateway, for agents and people alike. Needs `mcp:manage` and a recent MFA.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["McpDataProtectionInput"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["McpDataProtection"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/mcp-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI clients I've connected to MCP servers through Nexus */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["McpConnection"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/mcp-connections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect one of my AI clients */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Disconnected */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/users/{id}/mcp-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A person's AI clients connected through the gateway */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["McpConnection"][];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/users/{id}/mcp-connections/{grantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect one of a person's AI clients */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    grantId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Disconnected */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -23960,7 +24484,7 @@ export interface components {
             effect: "allow" | "deny";
             subject: {
                 /** @enum {string} */
-                type: "all_agents" | "agent" | "agent_tag";
+                type: "all_agents" | "agent" | "agent_tag" | "all_people" | "user" | "group";
                 /**
                  * Format: uuid
                  * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
@@ -24335,7 +24859,7 @@ export interface components {
                 permissions: {
                     /** @enum {string} */
                     effect: "allow" | "deny";
-                    /** @description all_agents, agent:<name> or tag:<tag> */
+                    /** @description all_agents, agent:<name>, tag:<tag>, all_people, user:<email> or group:<name> */
                     subject: string;
                     tools: string[];
                     /** @default null */
@@ -25869,6 +26393,103 @@ export interface components {
             detector: string;
             count: number;
             detail: string;
+        };
+        McpDataProtection: {
+            arguments: {
+                [key: string]: "off" | "monitor" | "block";
+            };
+            results: {
+                [key: string]: "off" | "monitor" | "redact";
+            };
+            custom: {
+                id: string;
+                name: string;
+                pattern: string;
+                /**
+                 * @default off
+                 * @enum {string}
+                 */
+                arguments: "off" | "monitor" | "block";
+                /**
+                 * @default off
+                 * @enum {string}
+                 */
+                results: "off" | "monitor" | "redact";
+            }[];
+            defaults: {
+                arguments: {
+                    [key: string]: "off" | "monitor" | "block";
+                };
+                results: {
+                    [key: string]: "off" | "monitor" | "redact";
+                };
+            };
+        };
+        McpDataProtectionInput: {
+            /**
+             * @description What tool arguments may carry: off, monitor, or block the call
+             * @default {}
+             */
+            arguments: {
+                /** @enum {string} */
+                secret?: "off" | "monitor" | "block";
+                /** @enum {string} */
+                private_key?: "off" | "monitor" | "block";
+                /** @enum {string} */
+                credit_card?: "off" | "monitor" | "block";
+                /** @enum {string} */
+                us_ssn?: "off" | "monitor" | "block";
+                /** @enum {string} */
+                iban?: "off" | "monitor" | "block";
+                /** @enum {string} */
+                email_list?: "off" | "monitor" | "block";
+            };
+            /**
+             * @description What the AI may read in results: off, monitor, or redact first
+             * @default {}
+             */
+            results: {
+                /** @enum {string} */
+                secret?: "off" | "monitor" | "redact";
+                /** @enum {string} */
+                private_key?: "off" | "monitor" | "redact";
+                /** @enum {string} */
+                credit_card?: "off" | "monitor" | "redact";
+                /** @enum {string} */
+                us_ssn?: "off" | "monitor" | "redact";
+                /** @enum {string} */
+                iban?: "off" | "monitor" | "redact";
+                /** @enum {string} */
+                email_list?: "off" | "monitor" | "redact";
+            };
+            /** @default [] */
+            custom: {
+                id: string;
+                name: string;
+                pattern: string;
+                /**
+                 * @default off
+                 * @enum {string}
+                 */
+                arguments: "off" | "monitor" | "block";
+                /**
+                 * @default off
+                 * @enum {string}
+                 */
+                results: "off" | "monitor" | "redact";
+            }[];
+        };
+        McpConnection: {
+            /**
+             * Format: uuid
+             * @example 01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f
+             */
+            id: string;
+            client: string;
+            resource: string;
+            created_at: string;
+            last_used_at: string;
+            expires_at: string;
         };
         DevicePage: {
             data: components["schemas"]["Device"][];

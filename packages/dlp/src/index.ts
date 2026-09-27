@@ -132,3 +132,50 @@ export function scan(text: string, enabled: readonly string[], custom: readonly 
   }
   return out;
 }
+
+export type Redaction = { text: string; findings: Finding[] };
+
+const PRIVATE_KEY_BLOCK = /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----|$)/g;
+
+/**
+ * Replaces what the enabled detectors find with "[redacted: <kind>]", with the same checks as
+ * scan() (Luhn, IBAN checksum, code-shaped passwords left alone). For data on its way to an AI:
+ * tool results, for example.
+ */
+export function redact(text: string, enabled: readonly string[], custom: readonly Custom[] = []): Redaction {
+  const on = new Set(enabled);
+  const findings: Finding[] = [];
+  let out = text;
+  const sub = (detector: string, name: string, re: RegExp, valid?: (m: string) => boolean, hint: (m: string) => string = (m) => mask(m)) => {
+    let n = 0;
+    let first = "";
+    out = out.replace(re, (m) => {
+      if (valid && !valid(m)) return m;
+      if (!n) first = m;
+      n++;
+      return `[redacted: ${name}]`;
+    });
+    if (n) findings.push({ detector, name, count: n, hint: hint(first) });
+  };
+  if (on.has("private_key")) sub("private_key", "Private key", PRIVATE_KEY_BLOCK, undefined, () => "-----BEGIN … PRIVATE KEY-----");
+  if (on.has("secret")) for (const [name, re] of SECRET_PATTERNS) sub("secret", name, re, name === "Password" ? literalValue : undefined);
+  if (on.has("credit_card")) {
+    sub("credit_card", "Payment card number", CARD, (m) => {
+      const d = m.replace(/[ -]/g, "");
+      return CARD_PREFIX.test(d) && luhn(d);
+    }, (m) => `•••• ${m.replace(/[ -]/g, "").slice(-4)}`);
+  }
+  if (on.has("us_ssn")) sub("us_ssn", "US Social Security number", SSN, undefined, (m) => `•••-••-${m.slice(-4)}`);
+  if (on.has("iban")) sub("iban", "IBAN", IBAN, ibanValid);
+  if (on.has("email_list") && new Set((out.match(EMAIL) ?? []).map((e) => e.toLowerCase())).size >= 10) sub("email_list", "Email address", EMAIL, undefined, () => "list of addresses");
+  for (const c of custom) {
+    let re: RegExp;
+    try {
+      re = new RegExp(c.pattern, "gi");
+    } catch {
+      continue;
+    }
+    sub(`custom:${c.id}`, c.name, re);
+  }
+  return { text: out, findings };
+}
