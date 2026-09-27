@@ -8730,6 +8730,9 @@
           "message": {
             "type": "string"
           },
+          "saas_discovery": {
+            "type": "boolean"
+          },
           "version": {
             "type": "string"
           },
@@ -8749,6 +8752,7 @@
           "dlp",
           "uploads",
           "message",
+          "saas_discovery",
           "version",
           "updated_at",
           "server"
@@ -8893,6 +8897,10 @@
             "maxLength": 500,
             "default": "",
             "description": "Shown to people on warnings and blocks, e.g. a link to your AI policy"
+          },
+          "saas_discovery": {
+            "type": "boolean",
+            "description": "Count visits to known SaaS apps (and password sign-ins) per person per day. Nothing else about browsing is reported. Left as it is when omitted"
           }
         }
       },
@@ -10639,6 +10647,122 @@
           "accepted_at",
           "ended_at",
           "expires_at"
+        ]
+      },
+      "SaasApp": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "hosts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "approved",
+              "unapproved"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "warn",
+              "block"
+            ],
+            "description": "For unapproved apps: what browsers do (allow and count, warn, or block)"
+          },
+          "owner": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "email"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "people": {
+            "type": "integer"
+          },
+          "visits": {
+            "type": "integer"
+          },
+          "password_logins": {
+            "type": "integer",
+            "description": "Sign-ins with a password rather than SSO"
+          },
+          "password_people": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "integer"
+          },
+          "last_seen": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sso": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "The Nexus application for it, if it's set up for single sign-on"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "hosts",
+          "status",
+          "action",
+          "owner",
+          "notes",
+          "people",
+          "visits",
+          "password_logins",
+          "password_people",
+          "blocked",
+          "last_seen",
+          "sso"
         ]
       },
       "DevicePage": {
@@ -47160,6 +47284,590 @@
         "responses": {
           "204": {
             "description": "Recorded"
+          }
+        }
+      }
+    },
+    "/v1/saas/apps": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "SaaS apps people use, and what the organization decided about them",
+        "description": "Apps seen in managed browsers in the last `days` (while discovery is on), plus every app with a decision.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 180,
+              "default": 30
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "unreviewed",
+                "approved",
+                "unapproved"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SaasApp"
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "discovery": {
+                          "type": "boolean"
+                        },
+                        "apps": {
+                          "type": "integer"
+                        },
+                        "people": {
+                          "type": "integer"
+                        },
+                        "unreviewed": {
+                          "type": "integer"
+                        },
+                        "unapproved_in_use": {
+                          "type": "integer"
+                        },
+                        "password_apps": {
+                          "type": "integer",
+                          "description": "Apps set up for SSO that people still sign in to with a password"
+                        }
+                      },
+                      "required": [
+                        "discovery",
+                        "apps",
+                        "people",
+                        "unreviewed",
+                        "unapproved_in_use",
+                        "password_apps"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "summary"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/apps/{key}": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "One SaaS app: who uses it and how they sign in",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,40}$"
+            },
+            "required": true,
+            "name": "key",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 180,
+              "default": 30
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "app": {
+                      "$ref": "#/components/schemas/SaasApp"
+                    },
+                    "people": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "user_id": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "visits": {
+                            "type": "integer"
+                          },
+                          "password_logins": {
+                            "type": "integer"
+                          },
+                          "blocked": {
+                            "type": "integer"
+                          },
+                          "last_seen": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "email",
+                          "user_id",
+                          "name",
+                          "visits",
+                          "password_logins",
+                          "blocked",
+                          "last_seen"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "app",
+                    "people"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Approve an app, or mark it unapproved and choose what browsers do",
+        "description": "Warning or blocking needs a recent MFA. Browsers pick up the change on their next sync (about a minute).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,40}$"
+            },
+            "required": true,
+            "name": "key",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "unreviewed",
+                      "approved",
+                      "unapproved"
+                    ]
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "allow",
+                      "warn",
+                      "block"
+                    ],
+                    "default": "allow"
+                  },
+                  "owner_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaasApp"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saas/catalog": {
+      "get": {
+        "tags": [
+          "SaaS"
+        ],
+        "summary": "Search the SaaS apps Nexus recognises",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": ""
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "required": false,
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "hosts": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "name",
+                          "category",
+                          "hosts"
+                        ]
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "total",
+                    "categories"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }

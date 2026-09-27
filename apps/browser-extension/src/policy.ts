@@ -5,15 +5,17 @@ export type AppAction = "allow" | "warn" | "block";
 export type DlpAction = "off" | "monitor" | "warn" | "block";
 export type Policy = {
   version: string;
-  apps: { key: string; name: string; hosts: string[]; action: AppAction }[];
+  apps: { key: string; name: string; hosts: string[]; action: AppAction; kind?: "ai" | "saas" }[];
   dlp: { detectors: Record<string, DlpAction>; custom: (Custom & { action: DlpAction })[] };
   uploads: AppAction;
   message: string;
+  /** SaaS discovery: which hosts belong to which app (empty while discovery is off). */
+  saas?: { discovery: boolean; apps: { key: string; hosts: string[] }[] };
 };
 
 export type Event = {
   at: string;
-  kind: "visit" | "dlp" | "upload";
+  kind: "visit" | "dlp" | "upload" | "saas" | "saas_login";
   action: "allowed" | "monitored" | "warned" | "continued" | "blocked";
   app: string;
   host: string;
@@ -26,6 +28,38 @@ export type Event = {
 export function appFor(policy: Policy | null, hostname: string) {
   const h = hostname.toLowerCase().replace(/\.$/, "");
   return policy?.apps.find((a) => a.hosts.some((x) => h === x || h.endsWith(`.${x}`))) ?? null;
+}
+
+/** The SaaS app a host belongs to, while discovery is on: the most specific (longest) host wins. */
+export function saasFor(policy: Policy | null, hostname: string) {
+  if (!policy?.saas?.discovery) return null;
+  const h = hostname.toLowerCase().replace(/\.$/, "");
+  let best: string | null = null;
+  let len = 0;
+  for (const a of policy.saas.apps) {
+    for (const x of a.hosts) {
+      if ((h === x || h.endsWith(`.${x}`)) && x.length > len) {
+        best = a.key;
+        len = x.length;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Adds one SaaS visit or sign-in to the queue: counted into the same app's event for the same day
+ * (UTC), so a busy day is one event per app, and only the app and the count are ever reported.
+ */
+export function countSaas(queue: Event[], kind: "saas" | "saas_login", app: string, now = new Date()): Event[] {
+  const day = now.toISOString().slice(0, 10);
+  const i = queue.findIndex((e) => e.kind === kind && e.app === app && e.at.slice(0, 10) === day);
+  if (i >= 0) {
+    const next = queue.slice();
+    next[i] = { ...next[i]!, count: (next[i]!.count ?? 1) + 1, at: now.toISOString() };
+    return next;
+  }
+  return [...queue, { at: now.toISOString(), kind, action: "allowed", app, host: "" }];
 }
 
 const RANK: Record<DlpAction, number> = { off: 0, monitor: 1, warn: 2, block: 3 };

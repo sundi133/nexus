@@ -9,11 +9,15 @@ const $ = (id: string) => document.getElementById(id)!;
 
 void chrome.runtime.sendMessage({ type: "policy" }).then((r: { policy: Policy | null }) => {
   const app = r?.policy?.apps.find((a) => a.key === appKey);
-  const name = app?.name ?? "This AI app";
+  const saas = app?.kind === "saas";
+  const name = app?.name ?? (saas ? "This app" : "This AI app");
   document.title = `${name}: ${mode === "block" ? "blocked" : "check first"}`;
   $("title").textContent = mode === "block" ? `${name} is blocked by your organization` : `Your organization asks you to check before using ${name}`;
-  $("body").textContent =
-    mode === "block"
+  $("body").textContent = saas
+    ? mode === "block"
+      ? "It isn't one of the apps your organization approves. Ask IT for an approved alternative, or ask for this one to be reviewed."
+      : "It isn't one your organization has approved yet. Don't put company, customer or personal data in it."
+    : mode === "block"
       ? "Company data shouldn't go to this AI app. Use one your organization approves instead."
       : "It isn't one your organization approves. Don't share company, customer or personal data in it.";
   if (r?.policy?.message) $("message").textContent = r.policy.message;

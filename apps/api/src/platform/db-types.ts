@@ -617,6 +617,28 @@ export interface Database {
     dlp: Json;
     uploads: "allow" | "warn" | "block";
     message: string;
+    saas_discovery: Generated<boolean>;
+    updated_at: Generated<Date>;
+    updated_by: string | null;
+  };
+  saas_usage: {
+    org_id: string;
+    app_key: string;
+    user_email: string;
+    user_id: string | null;
+    day: string;
+    visits: Generated<number>;
+    password_logins: Generated<number>;
+    blocked: Generated<number>;
+    last_at: Date;
+  };
+  saas_apps: {
+    org_id: string;
+    app_key: string;
+    status: "approved" | "unapproved";
+    action: Generated<"allow" | "warn" | "block">;
+    owner_id: string | null;
+    notes: Generated<string>;
     updated_at: Generated<Date>;
     updated_by: string | null;
   };

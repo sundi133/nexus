@@ -8,7 +8,7 @@ mkdirSync("dist");
 const common = { bundle: true, conditions: ["development"], // workspace packages bundle from source
   target: "chrome116", minify: false, sourcemap: false, logLevel: "warning", legalComments: "none" };
 await build({ ...common, entryPoints: ["src/background.ts"], outfile: "dist/background.js", format: "esm" });
-for (const name of ["content", "interstitial", "popup"]) {
+for (const name of ["content", "saas", "interstitial", "popup"]) {
   await build({ ...common, entryPoints: [`src/${name}.ts`], outfile: `dist/${name}.js`, format: "iife" });
 }
 for (const f of readdirSync("static")) cpSync(`static/${f}`, `dist/${f}`);

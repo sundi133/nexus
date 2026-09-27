@@ -5,6 +5,7 @@ import {
   BellRing,
   Ban,
   Bot,
+  Cloud,
   BrainCircuit,
   ClipboardCheck,
   FileBarChart,
@@ -78,6 +79,7 @@ export const NAV: NavSection[] = [
     title: "Access",
     items: [
       { label: "Applications", href: "/apps", icon: AppWindow },
+      { label: "SaaS apps", href: "/saas", icon: Cloud },
       { label: "Conditional access", href: "/conditional-access", icon: ShieldCheck },
       { label: "Access requests", href: "/access-requests", icon: KeyRound },
       { label: "Access reviews", href: "/access-reviews", icon: ClipboardCheck },

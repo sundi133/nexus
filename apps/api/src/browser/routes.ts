@@ -9,6 +9,8 @@ import type { Tx } from "../platform/db.js";
 import { ApiError, badRequest, notFound } from "../platform/errors.js";
 import { newId } from "../platform/ids.js";
 import { bearer, body, Id, iso, isoOrNull, json, problemResponses } from "../schemas.js";
+import { SAAS_APPS, SAAS_BY_KEY } from "../saas/catalog.js";
+import { recordSaasEvents, saasDecisions } from "../saas/usage.js";
 import { AI_APPS, APP_KEYS } from "./catalog.js";
 
 /**
@@ -61,10 +63,19 @@ const PolicyIn = z
       .default({ detectors: {}, custom: [] }),
     uploads: z.enum(["allow", "warn", "block"]).default("allow").openapi({ description: "File uploads to AI apps" }),
     message: z.string().trim().max(500).default("").openapi({ description: "Shown to people on warnings and blocks, e.g. a link to your AI policy" }),
+    saas_discovery: z.boolean().optional().openapi({ description: "Count visits to known SaaS apps (and password sign-ins) per person per day. Nothing else about browsing is reported. Left as it is when omitted" }),
   })
   .openapi("BrowserPolicyInput");
 
-type Policy = { apps: Record<string, "allow" | "warn" | "block">; dlp: { detectors: Record<string, string>; custom: z.infer<typeof CustomPattern>[] }; uploads: "allow" | "warn" | "block"; message: string; updated_at: Date | null };
+type Policy = {
+  apps: Record<string, "allow" | "warn" | "block">;
+  dlp: { detectors: Record<string, string>; custom: z.infer<typeof CustomPattern>[] };
+  uploads: "allow" | "warn" | "block";
+  message: string;
+  saas_discovery: boolean;
+  saas: Map<string, "allow" | "warn" | "block">; // unapproved SaaS apps' actions
+  updated_at: Date | null;
+};
 
 async function loadPolicy(tx: Tx): Promise<Policy> {
   const r = await tx.selectFrom("browser_policies").selectAll().executeTakeFirst();
@@ -74,6 +85,8 @@ async function loadPolicy(tx: Tx): Promise<Policy> {
     dlp: { detectors: { ...DEFAULT_DLP, ...(dlp.detectors ?? {}) }, custom: dlp.custom ?? [] },
     uploads: r?.uploads ?? "allow",
     message: r?.message ?? "",
+    saas_discovery: r?.saas_discovery ?? false,
+    saas: await saasDecisions(tx),
     updated_at: r?.updated_at ?? null,
   };
 }
@@ -81,10 +94,19 @@ async function loadPolicy(tx: Tx): Promise<Policy> {
 /** What the extension gets: the catalog with actions, and the version it compares against. */
 function extensionPolicy(p: Policy) {
   const body = {
-    apps: AI_APPS.map((a) => ({ key: a.key, name: a.name, hosts: a.hosts, action: p.apps[a.key] ?? "allow" })),
+    apps: [
+      ...AI_APPS.map((a) => ({ key: a.key, name: a.name, hosts: a.hosts, action: p.apps[a.key] ?? "allow", kind: "ai" as const })),
+      // Unapproved SaaS apps the organization warns about or blocks.
+      ...[...p.saas].filter(([, action]) => action !== "allow").flatMap(([key, action]) => {
+        const a = SAAS_BY_KEY.get(key);
+        return a ? [{ key: a.key, name: a.name, hosts: a.hosts, action, kind: "saas" as const }] : [];
+      }),
+    ],
     dlp: { detectors: p.dlp.detectors, custom: p.dlp.custom },
     uploads: p.uploads,
     message: p.message,
+    // Discovery: which hosts belong to which app, so the browser can count visits without reporting addresses.
+    saas: p.saas_discovery ? { discovery: true, apps: SAAS_APPS.map((a) => ({ key: a.key, hosts: a.hosts })) } : { discovery: false, apps: [] },
   };
   return { version: createHash("sha256").update(JSON.stringify(body)).digest("hex").slice(0, 16), ...body };
 }
@@ -95,6 +117,7 @@ const PolicyOut = z
     dlp: z.object({ detectors: z.record(z.string(), DlpAction), custom: z.array(CustomPattern) }),
     uploads: z.enum(["allow", "warn", "block"]),
     message: z.string(),
+    saas_discovery: z.boolean(),
     version: z.string(),
     updated_at: z.string().nullable(),
     server: z.string().openapi({ description: "The API address browsers are configured with" }),
@@ -107,13 +130,14 @@ const policyOut = (p: Policy, server: string) => ({
   dlp: p.dlp as z.infer<typeof PolicyOut>["dlp"],
   uploads: p.uploads,
   message: p.message,
+  saas_discovery: p.saas_discovery,
   version: extensionPolicy(p).version,
   updated_at: isoOrNull(p.updated_at),
 });
 
 const EventIn = z.object({
   at: z.iso.datetime(),
-  kind: z.enum(["visit", "dlp", "upload"]),
+  kind: z.enum(["visit", "dlp", "upload", "saas", "saas_login"]),
   action: z.enum(["allowed", "monitored", "warned", "continued", "blocked"]),
   app: z.string().max(40).default(""),
   host: z.string().max(253).default(""),
@@ -160,10 +184,15 @@ export function registerBrowserRoutes(app: App) {
           const e = EventIn.safeParse(raw);
           return e.success ? [e.data] : [];
         });
+        const policy = await loadPolicy(tx);
+        // SaaS: counted per person per day (only while discovery is on), never kept as events.
+        const saas = events.filter((e) => e.kind === "saas" || e.kind === "saas_login" || (e.kind === "visit" && SAAS_BY_KEY.has(e.app)));
+        await recordSaasEvents(tx, found.org_id, { email, userId: user?.id ?? null, discovery: policy.saas_discovery }, saas);
         for (const e of events) {
+          if (saas.includes(e)) continue;
           await tx
             .insertInto("browser_events")
-            .values({ id: newId(), org_id: found.org_id, at: new Date(e.at), user_email: email, user_id: user?.id ?? null, kind: e.kind, action: e.action, app: APP_KEYS.has(e.app) ? e.app : "", host: e.host.toLowerCase(), detector: e.detector, count: e.count, detail: e.detail, extension_version: input.extension_version })
+            .values({ id: newId(), org_id: found.org_id, at: new Date(e.at), user_email: email, user_id: user?.id ?? null, kind: e.kind as "visit" | "dlp" | "upload", action: e.action, app: APP_KEYS.has(e.app) ? e.app : "", host: e.host.toLowerCase(), detector: e.detector, count: e.count, detail: e.detail, extension_version: input.extension_version })
             .execute();
           // Sensitive data and uploads stopped or let through after a warning are security events.
           if (e.kind !== "visit" && (e.action === "blocked" || e.action === "continued")) {
@@ -176,7 +205,7 @@ export function registerBrowserRoutes(app: App) {
             });
           }
         }
-        const p = extensionPolicy(await loadPolicy(tx));
+        const p = extensionPolicy(policy);
         return { version: p.version, policy: input.policy_version === p.version ? null : p, accepted: events.length };
       });
       return c.json(out, 200);
@@ -214,12 +243,12 @@ export function registerBrowserRoutes(app: App) {
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         requireRecentMfa(c, p, (await verifiedFactorTypes(tx, p.userId)).length > 0);
         const before = await loadPolicy(tx);
-        const row = { apps: JSON.stringify(input.apps), dlp: JSON.stringify(input.dlp), uploads: input.uploads, message: input.message, updated_at: new Date(), updated_by: p.userId };
+        const row = { apps: JSON.stringify(input.apps), dlp: JSON.stringify(input.dlp), uploads: input.uploads, message: input.message, saas_discovery: input.saas_discovery ?? before.saas_discovery, updated_at: new Date(), updated_by: p.userId };
         await tx.insertInto("browser_policies").values({ org_id: p.orgId, ...row }).onConflict((oc) => oc.column("org_id").doUpdateSet(row)).execute();
         const after = await loadPolicy(tx);
         await audit(tx, p.orgId, { principal: p, meta: c.get("meta") }, {
           type: "browser.policy_updated",
-          details: { from: { apps: before.apps, dlp: before.dlp, uploads: before.uploads }, to: { apps: after.apps, dlp: after.dlp, uploads: after.uploads } },
+          details: { from: { apps: before.apps, dlp: before.dlp, uploads: before.uploads, saas_discovery: before.saas_discovery }, to: { apps: after.apps, dlp: after.dlp, uploads: after.uploads, saas_discovery: after.saas_discovery } },
         });
         return policyOut(after, c.get("deps").cfg.apiPublicUrl);
       });

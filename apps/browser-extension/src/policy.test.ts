@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from "vitest";
-import { appFor, check, describe, dlpEvents, navigationRules, type Policy } from "./policy.js";
+import { appFor, check, countSaas, describe, dlpEvents, navigationRules, type Policy, saasFor } from "./policy.js";
 
 const policy: Policy = {
   version: "v1",
@@ -50,5 +50,31 @@ group("policy", () => {
     expect(re.test("https://evilchat.deepseek.com.attacker.io/")).toBe(false);
     expect(re.test("https://chat-deepseek.com/")).toBe(false);
     expect(navigationRules(policy, "chrome-extension://abc", ["character.ai"])).toHaveLength(1);
+  });
+});
+
+group("SaaS discovery", () => {
+  const withSaas: Policy = { ...policy, saas: { discovery: true, apps: [{ key: "zoom", hosts: ["zoom.us"] }, { key: "zoom-events", hosts: ["events.zoom.us"] }, { key: "slack", hosts: ["slack.com"] }] } };
+
+  it("maps a host to the most specific app, only while discovery is on", () => {
+    expect(saasFor(withSaas, "acme.zoom.us")).toBe("zoom");
+    expect(saasFor(withSaas, "events.zoom.us")).toBe("zoom-events");
+    expect(saasFor(withSaas, "app.slack.com")).toBe("slack");
+    expect(saasFor(withSaas, "notslack.com")).toBeNull();
+    expect(saasFor({ ...withSaas, saas: { ...withSaas.saas!, discovery: false } }, "slack.com")).toBeNull();
+    expect(saasFor(policy, "slack.com")).toBeNull();
+  });
+
+  it("counts into one event per app per day, with no address", () => {
+    const d1 = new Date("2026-09-27T10:00:00Z");
+    let q = countSaas([], "saas", "slack", d1);
+    q = countSaas(q, "saas", "slack", new Date("2026-09-27T11:00:00Z"));
+    q = countSaas(q, "saas_login", "slack", d1);
+    q = countSaas(q, "saas", "slack", new Date("2026-09-28T09:00:00Z"));
+    expect(q.map((e) => [e.kind, e.app, e.count ?? 1, e.at.slice(0, 10), e.host])).toEqual([
+      ["saas", "slack", 2, "2026-09-27", ""],
+      ["saas_login", "slack", 1, "2026-09-27", ""],
+      ["saas", "slack", 1, "2026-09-28", ""],
+    ]);
   });
 });

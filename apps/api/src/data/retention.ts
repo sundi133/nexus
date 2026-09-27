@@ -23,6 +23,7 @@ export const RETENTION = [
   { key: "device_commands", name: "Device commands (lock, restart…)", kept: "90 days after they finish", notes: "Each is also in the audit log" },
   { key: "live_queries", name: "Live device queries and results", kept: "30 days after they expire", notes: "" },
   { key: "browser_events", name: "AI app activity from browsers", kept: "90 days", notes: "What the Nexus browser extension reports: never the text people typed" },
+  { key: "saas_usage", name: "SaaS app use from browsers", kept: "180 days", notes: "Only while SaaS discovery is on: the app, and visits and password sign-ins per person per day; never addresses or pages" },
   { key: "sign_in_artifacts", name: "Sign-in codes and challenges", kept: "1 day after they expire", notes: "OIDC codes, MFA and passkey challenges, password reset links, pairing codes" },
   { key: "jobs", name: "Background job records", kept: "7 days (30 days if they failed)", notes: "" },
   { key: "everything_else", name: "Everything else (people, groups, apps, devices, policies…)", kept: "Until you delete it, or the organization", notes: "Erase a person under Users; delete the organization under Settings" },

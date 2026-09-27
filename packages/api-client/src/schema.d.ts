@@ -28580,6 +28580,384 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/saas/apps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SaaS apps people use, and what the organization decided about them
+         * @description Apps seen in managed browsers in the last `days` (while discovery is on), plus every app with a decision.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    days?: number;
+                    status?: "unreviewed" | "approved" | "unapproved";
+                    q?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["SaasApp"][];
+                            summary: {
+                                discovery: boolean;
+                                apps: number;
+                                people: number;
+                                unreviewed: number;
+                                unapproved_in_use: number;
+                                /** @description Apps set up for SSO that people still sign in to with a password */
+                                password_apps: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/saas/apps/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One SaaS app: who uses it and how they sign in */
+        get: {
+            parameters: {
+                query?: {
+                    days?: number;
+                };
+                header?: never;
+                path: {
+                    key: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            app: components["schemas"]["SaasApp"];
+                            people: {
+                                email: string;
+                                user_id: string | null;
+                                name: string;
+                                visits: number;
+                                password_logins: number;
+                                blocked: number;
+                                last_seen: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        /**
+         * Approve an app, or mark it unapproved and choose what browsers do
+         * @description Warning or blocking needs a recent MFA. Browsers pick up the change on their next sync (about a minute).
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    key: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "unreviewed" | "approved" | "unapproved";
+                        /**
+                         * @default allow
+                         * @enum {string}
+                         */
+                        action?: "allow" | "warn" | "block";
+                        /**
+                         * Format: uuid
+                         * @default null
+                         */
+                        owner_id?: string | null;
+                        /** @default  */
+                        notes?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SaasApp"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/saas/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the SaaS apps Nexus recognises */
+        get: {
+            parameters: {
+                query?: {
+                    q?: string;
+                    category?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                key: string;
+                                name: string;
+                                category: string;
+                                hosts: string[];
+                            }[];
+                            total: number;
+                            categories: string[];
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/devices": {
         parameters: {
             query?: never;
@@ -32651,6 +33029,7 @@ export interface components {
             /** @enum {string} */
             uploads: "allow" | "warn" | "block";
             message: string;
+            saas_discovery: boolean;
             version: string;
             updated_at: string | null;
             /** @description The API address browsers are configured with */
@@ -32706,6 +33085,8 @@ export interface components {
              * @default
              */
             message: string;
+            /** @description Count visits to known SaaS apps (and password sign-ins) per person per day. Nothing else about browsing is reported. Left as it is when omitted */
+            saas_discovery?: boolean;
         };
         BrowserToken: {
             /**
@@ -33243,6 +33624,36 @@ export interface components {
             ended_at: string | null;
             /** @description While asking: the approval deadline. While active: when it ends on its own */
             expires_at: string;
+        };
+        SaasApp: {
+            key: string;
+            name: string;
+            category: string;
+            hosts: string[];
+            /** @enum {string} */
+            status: "unreviewed" | "approved" | "unapproved";
+            /**
+             * @description For unapproved apps: what browsers do (allow and count, warn, or block)
+             * @enum {string}
+             */
+            action: "allow" | "warn" | "block";
+            owner: {
+                id: string;
+                email: string;
+            } | null;
+            notes: string;
+            people: number;
+            visits: number;
+            /** @description Sign-ins with a password rather than SSO */
+            password_logins: number;
+            password_people: number;
+            blocked: number;
+            last_seen: string | null;
+            /** @description The Nexus application for it, if it's set up for single sign-on */
+            sso: {
+                id: string;
+                name: string;
+            } | null;
         };
         DevicePage: {
             data: components["schemas"]["Device"][];

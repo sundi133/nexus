@@ -54,7 +54,10 @@ const policy = {
   apps: [
     { key: "testai", name: "Test AI", hosts: ["chat.localhost"], action: "allow" },
     { key: "blockedai", name: "Blocked AI", hosts: ["blocked.localhost"], action: "block" },
+    { key: "shadow-app", name: "Shadow App", hosts: ["shadow.localhost"], action: "block", kind: "saas" },
   ],
+  // As many hosts as the real catalog (about 2,400), so registering the sign-in script is tested at scale.
+  saas: { discovery: true, apps: [{ key: "work-app", hosts: ["work.localhost"] }, ...Array.from({ length: 2400 }, (_, i) => ({ key: `app-${i}`, hosts: [`app${i}.example.com`] }))] },
   dlp: { detectors: { secret: "block", private_key: "block", credit_card: "warn", us_ssn: "monitor", iban: "off", email_list: "off" }, custom: [] },
   uploads: "block",
   message: "See go/ai-policy",
@@ -72,6 +75,8 @@ const server = createServer((req, res) => {
     });
     return;
   }
+  // A work app's sign-in page: no form, a button (like many single-page apps).
+  if (String(req.headers.host).startsWith("work.localhost")) return res.writeHead(200, { "content-type": "text/html" }).end(`<!doctype html><title>Work</title><input id="email"><input type="password" id="pw"><button id="login">Sign in</button>`);
   res.writeHead(200, { "content-type": "text/html" }).end(page);
 });
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -135,9 +140,9 @@ try {
   pass("synced with the organization token, as the profile's user");
   await until("rules and content scripts", async () => {
     const [rules, scripts] = await evaluate(swSession, `Promise.all([chrome.declarativeNetRequest.getDynamicRules(), chrome.scripting.getRegisteredContentScripts()]).then(([r, s]) => [r.length, s.length])`);
-    return rules === 1 && scripts === 1;
+    return rules === 2 && scripts === 2;
   });
-  pass("a navigation rule for the blocked app, and the content script on AI apps");
+  pass("navigation rules for the blocked AI and SaaS apps; content scripts on AI apps and, for sign-ins, on known SaaS apps");
 
   console.log("==> in an AI app");
   const { targetId } = await cdp("Target.createTarget", { url: `http://chat.localhost:${port}/` });
@@ -175,6 +180,17 @@ try {
   });
   pass(`it's replaced by the interstitial: "${title}"`);
 
+  console.log("==> SaaS discovery and access control");
+  await cdp("Page.navigate", { url: `http://work.localhost:${port}/login` }, tab);
+  await until("the work app and its script", async () => (await evaluate(tab, `location.hostname === "work.localhost" && document.readyState === "complete" && !!document.getElementById("pw")`)) && (await sleep(800), true));
+  await evaluate(tab, `(() => { document.getElementById("email").value = "pat@example.test"; document.getElementById("pw").value = "hunter2-Secret!"; document.getElementById("login").click(); })()`);
+  await cdp("Page.navigate", { url: `http://shadow.localhost:${port}/` }, tab);
+  const shadowTitle = await until("the SaaS interstitial", async () => {
+    const t = (await evaluate(tab, "location.href")).startsWith(`${extOrigin}/interstitial.html`) && (await evaluate(tab, `document.getElementById("body").textContent`));
+    return t && t.includes("apps your organization approves") && t;
+  });
+  pass(`an unapproved SaaS app is blocked: "${shadowTitle.slice(0, 60)}…"`);
+
   console.log("==> what Nexus hears");
   const before = synced.length;
   await evaluate(swSession, `chrome.storage.local.get("devConfig").then(({ devConfig }) => chrome.storage.local.set({ devConfig: { ...devConfig, nudge: Date.now() } }))`);
@@ -187,8 +203,13 @@ try {
   if (!has({ kind: "upload", action: "blocked", detail: "1 file (csv)" })) fail("no blocked upload");
   if (!has({ kind: "visit", action: "blocked", app: "blockedai" })) fail("no blocked visit");
   if (!has({ kind: "visit", action: "allowed", app: "testai" })) fail("no visit");
+  if (!has({ kind: "saas", app: "work-app", host: "" })) fail(`no SaaS visit: ${JSON.stringify(events.filter((e) => e.kind.startsWith("saas")))}`);
+  if (!has({ kind: "saas_login", app: "work-app" })) fail("no password sign-in");
+  if (!has({ kind: "visit", action: "blocked", app: "shadow-app" })) fail("no blocked SaaS visit");
+  if (events.some((e) => e.kind === "saas" && e.app !== "work-app")) fail("a page outside the catalog was counted");
   const raw = JSON.stringify(synced);
   if (raw.includes("AKIAIOSFODNN7EXAMPLE") || raw.includes("123-45-6789") || raw.includes("binary search")) fail("pasted text reached the server");
+  if (raw.includes("hunter2") || raw.includes("/login")) fail("a password or a page address reached the server");
   pass(`${events.length} events, with detectors and masked hints; no pasted text reached the server`);
   console.log("==> browser extension e2e passed");
 } finally {

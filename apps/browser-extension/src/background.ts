@@ -1,9 +1,10 @@
-import { type Event, navigationRules, type Policy } from "./policy.js";
+import { countSaas, type Event, navigationRules, type Policy, saasFor } from "./policy.js";
 
 /**
  * Service worker: syncs with Nexus every minute (sends queued events, gets the policy when it
  * changed), keeps navigation rules for blocked and warned apps, and runs the content script only
- * on AI apps' pages.
+ * on AI apps' pages. With SaaS discovery on, it counts visits to known work apps (and password
+ * sign-ins on them) per app per day: never addresses, pages or what was typed.
  *
  * Configuration comes from managed policy (Google Admin, Intune, Group Policy):
  *   { "server": "https://api.nexus.example.com", "token": "nxb_…" }
@@ -60,6 +61,21 @@ export function report(events: Event[]) {
   });
 }
 
+/** One SaaS visit or password sign-in, counted into the day's event for that app. */
+function saasSeen(kind: "saas" | "saas_login", url: string | undefined, policy: Policy | undefined) {
+  let host = "";
+  try {
+    const u = new URL(url ?? "");
+    if (u.protocol !== "https:" && u.protocol !== "http:") return Promise.resolve();
+    host = u.hostname;
+  } catch {
+    return Promise.resolve();
+  }
+  const app = saasFor(policy ?? null, host);
+  if (!app) return Promise.resolve();
+  return withQueue((queue) => ({ queue: countSaas(queue, kind, app), result: undefined }));
+}
+
 let syncing: Promise<void> | null = null;
 async function sync() {
   syncing ??= doSync().finally(() => (syncing = null));
@@ -111,11 +127,15 @@ async function applyPolicy(policy: Policy) {
   const old = await chrome.declarativeNetRequest.getDynamicRules();
   await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: old.map((r: { id: number }) => r.id), addRules: rules });
 
-  const matches = [...new Set(policy.apps.flatMap((a) => a.hosts.flatMap((h) => [`*://${h}/*`, `*://*.${h}/*`])))];
+  const patterns = (hosts: string[]) => [...new Set(hosts.flatMap((h) => [`*://${h}/*`, `*://*.${h}/*`]))];
+  const ai = patterns(policy.apps.filter((a) => (a.kind ?? "ai") === "ai").flatMap((a) => a.hosts));
+  // Password sign-in detection runs only on known SaaS apps, and only while discovery is on.
+  const saas = policy.saas?.discovery ? patterns(policy.saas.apps.flatMap((a) => a.hosts)) : [];
   await chrome.scripting.unregisterContentScripts().catch(() => {});
-  if (matches.length) {
-    await chrome.scripting.registerContentScripts([{ id: "nexus-ai", js: ["content.js"], matches, runAt: "document_start", allFrames: false, persistAcrossSessions: true }]);
-  }
+  const scripts = [];
+  if (ai.length) scripts.push({ id: "nexus-ai", js: ["content.js"], matches: ai, runAt: "document_start", allFrames: false, persistAcrossSessions: true });
+  if (saas.length) scripts.push({ id: "nexus-saas", js: ["saas.js"], matches: saas, runAt: "document_idle", allFrames: false, persistAcrossSessions: true });
+  if (scripts.length) await chrome.scripting.registerContentScripts(scripts);
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -126,6 +146,11 @@ chrome.runtime.onStartup.addListener(() => void sync());
 chrome.alarms.onAlarm.addListener((a: { name: string }) => {
   if (a.name === "sync") void sync();
   if (a.name === "allowances") void local().then((s) => s.policy && applyPolicy(s.policy));
+});
+// SaaS discovery: a page finished loading on a known app.
+chrome.tabs.onUpdated.addListener((_id: number, change: { status?: string }, tab: { url?: string }) => {
+  if (change.status !== "complete") return;
+  void local().then((s) => saasSeen("saas", tab.url, s.policy));
 });
 chrome.storage.onChanged.addListener((changes: Record<string, unknown>, area: string) => {
   if (area === "managed" || (area === "local" && "devConfig" in changes)) void sync();
@@ -141,6 +166,10 @@ chrome.runtime.onMessage.addListener((msg: any, _sender: unknown, reply: (v: unk
       case "report":
         await report(msg.events as Event[]);
         return reply({ ok: true });
+      case "saas-login":
+        // Someone signed in to a known app with a password (the password itself never leaves the page).
+        await saasSeen("saas_login", (_sender as { tab?: { url?: string } })?.tab?.url, st.policy);
+        return reply({ ok: true });
       case "allow": {
         // "Continue" on a warning: this app's hosts pass for an hour.
         const app = st.policy?.apps.find((a) => a.key === msg.app);
@@ -153,7 +182,7 @@ chrome.runtime.onMessage.addListener((msg: any, _sender: unknown, reply: (v: unk
         return reply({ ok: true });
       }
       case "status":
-        return reply({ configured: !!(await config()), user: st.user ?? "", policy: st.policy ?? null, lastSync: st.lastSync ?? null, lastError: st.lastError ?? "", queued: st.queue?.length ?? 0 });
+        return reply({ configured: !!(await config()), user: st.user ?? "", policy: st.policy ?? null, lastSync: st.lastSync ?? null, lastError: st.lastError ?? "", queued: st.queue?.length ?? 0, discovery: !!st.policy?.saas?.discovery });
       case "sync":
         await sync();
         return reply({ ok: true });
