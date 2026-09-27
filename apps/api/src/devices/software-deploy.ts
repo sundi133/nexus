@@ -57,18 +57,27 @@ function validate(p: PackageIn) {
 }
 
 const Counts = z.object({ targeted: z.number().int(), installed: z.number().int(), absent: z.number().int(), failed: z.number().int(), unsupported: z.number().int(), pending: z.number().int() });
-const Assignment = z.object({ id: Id, action: z.enum(["install", "remove"]), group_id: Id.nullable(), group_name: z.string().nullable(), created_at: z.string() });
+const Assignment = z.object({
+  id: Id,
+  action: z.enum(["install", "remove"]),
+  group_id: Id.nullable(),
+  group_name: z.string().nullable(),
+  user_id: Id.nullable().openapi({ description: "One person's devices (an approved request)" }),
+  user_email: z.string().nullable(),
+  created_at: z.string(),
+});
 const PackageOut = PackageIn.extend({ id: Id, platform: z.enum(["macos", "windows", "linux"]), created_at: z.string(), updated_at: z.string(), assignments: z.array(Assignment), counts: Counts }).openapi("SoftwarePackage");
 
 type Pkg = { id: string; name: string; platform: DevicePlatform; kind: Kind; ref: string; url: string; sha256: string; args: string[] };
-type Asg = { package_id: string; action: "install" | "remove"; group_id: string | null };
+type Asg = { package_id: string; action: "install" | "remove"; group_id: string | null; user_id?: string | null };
 
 /** What a device should have: per package, install or remove (install wins when both apply). */
-function desiredFor(pkgs: Pkg[], asgs: Asg[], device: { platform: DevicePlatform }, groups: Set<string>) {
+function desiredFor(pkgs: Pkg[], asgs: Asg[], device: { platform: DevicePlatform; primary_user_id?: string | null }, groups: Set<string>) {
   const out = new Map<string, "install" | "remove">();
   for (const a of asgs) {
     const p = pkgs.find((x) => x.id === a.package_id);
     if (!p || p.platform !== device.platform) continue;
+    if (a.user_id && a.user_id !== device.primary_user_id) continue;
     if (a.group_id && !groups.has(a.group_id)) continue;
     if (out.get(p.id) !== "install") out.set(p.id, a.action);
   }
@@ -79,7 +88,7 @@ export type PolicySoftware = { id: string; name: string; action: "install" | "re
 
 /** The apps in a device's signed policy. */
 export async function softwareFor(tx: Tx, device: { platform: DevicePlatform; primary_user_id: string | null }): Promise<PolicySoftware[]> {
-  const asgs = await tx.selectFrom("software_assignments").select(["package_id", "action", "group_id"]).execute();
+  const asgs = await tx.selectFrom("software_assignments").select(["package_id", "action", "group_id", "user_id"]).execute();
   if (!asgs.length) return [];
   const pkgs = (await tx.selectFrom("software_packages").select(["id", "name", "platform", "kind", "ref", "url", "sha256", "args"]).where("platform", "=", device.platform).orderBy("name").execute()) as Pkg[];
   const groups = device.primary_user_id ? new Set((await tx.selectFrom("group_members").select("group_id").where("user_id", "=", device.primary_user_id).execute()).map((g) => g.group_id)) : new Set<string>();
@@ -129,7 +138,8 @@ async function loadPackages(tx: Tx, ids?: string[]) {
   const asgs = await tx
     .selectFrom("software_assignments")
     .leftJoin("groups", "groups.id", "software_assignments.group_id")
-    .select(["software_assignments.id", "software_assignments.package_id", "software_assignments.action", "software_assignments.group_id", "software_assignments.created_at", "groups.name as group_name"])
+    .leftJoin("users", "users.id", "software_assignments.user_id")
+    .select(["software_assignments.id", "software_assignments.package_id", "software_assignments.action", "software_assignments.group_id", "software_assignments.user_id", "software_assignments.created_at", "groups.name as group_name", "users.email as user_email"])
     .orderBy("software_assignments.created_at")
     .execute();
   const states = await tx.selectFrom("device_software").select(["device_id", "package_id", "status"]).execute();
@@ -157,7 +167,9 @@ async function loadPackages(tx: Tx, ids?: string[]) {
       args: p.args,
       created_at: iso(p.created_at),
       updated_at: iso(p.updated_at),
-      assignments: asgs.filter((a) => a.package_id === p.id).map((a) => ({ id: a.id, action: a.action, group_id: a.group_id, group_name: a.group_name ?? null, created_at: iso(a.created_at) })),
+      assignments: asgs
+        .filter((a) => a.package_id === p.id)
+        .map((a) => ({ id: a.id, action: a.action, group_id: a.group_id, group_name: a.group_name ?? null, user_id: a.user_id, user_email: a.user_email ?? null, created_at: iso(a.created_at) })),
       counts: { targeted: on.size, installed: n("installed"), absent: n("absent"), failed: n("failed"), unsupported: n("unsupported"), pending: on.size - mine.length },
     };
   });
@@ -291,7 +303,7 @@ export function registerSoftwareDeployRoutes(app: App) {
       const out = await c.get("deps").db.tenant(p.orgId, async (tx) => {
         const pkg = (await tx.selectFrom("software_packages").select(["id", "name", "platform", "kind", "ref", "url", "sha256", "args"]).where("id", "=", id).executeTakeFirst()) as Pkg | undefined;
         if (!pkg) throw notFound("App");
-        const asgs = await tx.selectFrom("software_assignments").select(["package_id", "action", "group_id"]).where("package_id", "=", id).execute();
+        const asgs = await tx.selectFrom("software_assignments").select(["package_id", "action", "group_id", "user_id"]).where("package_id", "=", id).execute();
         const devices = await tx.selectFrom("devices").select(["id", "hostname", "platform", "primary_user_id"]).where("status", "=", "active").where("platform", "=", pkg.platform).orderBy("hostname").execute();
         const members = await tx.selectFrom("group_members").select(["group_id", "user_id"]).where("group_id", "in", [...asgs.map((a) => a.group_id).filter((g): g is string => !!g), "00000000-0000-0000-0000-000000000000"]).execute();
         const states = new Map((await tx.selectFrom("device_software").selectAll().where("package_id", "=", id).execute()).map((s) => [s.device_id, s]));

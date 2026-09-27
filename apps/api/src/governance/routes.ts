@@ -25,7 +25,7 @@ const JIT_ROLES = ["admin", "helpdesk", "security_analyst", "readonly"] as const
 const CatalogItem = z
   .object({
     id: Id,
-    resource_type: z.enum(["app", "group", "role"]),
+    resource_type: z.enum(["app", "group", "role", "block_exception", "software"]),
     resource_id: Id.nullable(),
     role: z.string().nullable(),
     name: z.string(),
@@ -42,7 +42,7 @@ const CatalogItem = z
 const RequestOut = z
   .object({
     id: Id,
-    resource: z.object({ type: z.enum(["app", "group", "role"]), id: Id.nullable(), role: z.string().nullable(), name: z.string() }),
+    resource: z.object({ type: z.enum(["app", "group", "role", "block_exception", "software"]), id: Id.nullable(), role: z.string().nullable(), name: z.string() }),
     requester: z.object({ id: Id, email: z.string() }),
     justification: z.string(),
     duration_hours: z.number().int().nullable(),
@@ -134,6 +134,15 @@ async function checkRefs(tx: Tx, input: { resource_type?: string; resource_id?: 
     if (missing.length) throw badRequest("unknown_reference", `Unknown ${table === "applications" ? "app" : table.slice(0, -1)}: ${missing.join(", ")}`);
   };
   if (input.resource_type === "app") await exists("applications", [input.resource_id!]);
+  if (input.resource_type === "block_exception") {
+    const r = await tx.selectFrom("enforcement_rules").select("kind").where("id", "=", input.resource_id!).executeTakeFirst();
+    if (!r) throw badRequest("unknown_reference", `Unknown block rule: ${input.resource_id}`);
+    if (r.kind !== "app") throw badRequest("domain_rule", "Only app rules can have exceptions (a domain is blocked for the whole device)");
+  }
+  if (input.resource_type === "software") {
+    const pkg = await tx.selectFrom("software_packages").select("id").where("id", "=", input.resource_id!).executeTakeFirst();
+    if (!pkg) throw badRequest("unknown_reference", `Unknown app: ${input.resource_id}`);
+  }
   if (input.resource_type === "group") {
     await exists("groups", [input.resource_id!]);
     // Membership of dynamic and directory groups is decided elsewhere; a grant would be undone.
@@ -153,7 +162,7 @@ async function checkRefs(tx: Tx, input: { resource_type?: string; resource_id?: 
 export function registerAccessRequestRoutes(app: App) {
   const idParam = { params: z.object({ id: Id }) };
   const CatalogIn = z.object({
-    resource_type: z.enum(["app", "group", "role"]),
+    resource_type: z.enum(["app", "group", "role", "block_exception", "software"]),
     resource_id: Id.optional(),
     role: z.enum(JIT_ROLES).optional().openapi({ description: "For role requests. Owner can't be requested." }),
     description: z.string().trim().max(500).default(""),
@@ -185,11 +194,11 @@ export function registerAccessRequestRoutes(app: App) {
   );
 
   app.openapi(
-    createRoute({ method: "post", path: "/v1/access/catalog", tags: ["Access requests"], summary: "Make an app, group or admin role requestable (requires recent MFA)", security: bearer, request: body(CatalogIn), responses: { 201: json(z.object({ data: z.array(CatalogItem) }), "Created"), ...problemResponses } }),
+    createRoute({ method: "post", path: "/v1/access/catalog", tags: ["Access requests"], summary: "Make an app, group, admin role, blocked-app exception or software requestable (requires recent MFA)", security: bearer, request: body(CatalogIn), responses: { 201: json(z.object({ data: z.array(CatalogItem) }), "Created"), ...problemResponses } }),
     async (c) => {
       const p = requirePermission(c, "access:manage");
       const input = c.req.valid("json");
-      if (input.resource_type === "role" ? !input.role || input.resource_id : !input.resource_id || input.role) throw badRequest("invalid_resource", "Role requests need a role; app and group requests need resource_id");
+      if (input.resource_type === "role" ? !input.role || input.resource_id : !input.resource_id || input.role) throw badRequest("invalid_resource", "Role requests need a role; the others need resource_id");
       if (input.resource_type === "role" && input.allow_permanent) throw badRequest("role_permanent", "Admin roles are always time-limited");
       try {
         const data = await c.get("deps").db.tenant(p.orgId, async (tx) => {

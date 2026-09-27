@@ -74,7 +74,7 @@ export default function AppDeploymentPage() {
                     {p.assignments.length ? (
                       p.assignments.map((a) => (
                         <span key={a.id} className="rounded bg-bg-subtle px-1.5 py-0.5 text-xs text-fg-muted">
-                          {a.action === "install" ? "Install" : "Remove"} · {a.group_name ?? `every ${p.platform === "macos" ? "Mac" : p.platform === "windows" ? "Windows PC" : "Linux device"}`}
+                          {a.action === "install" ? "Install" : "Remove"} · {a.user_email ? `${a.user_email}'s devices (request)` : a.group_name ?? `every ${p.platform === "macos" ? "Mac" : p.platform === "windows" ? "Windows PC" : "Linux device"}`}
                         </span>
                       ))
                     ) : (
@@ -208,7 +208,7 @@ function AssignDialog({ pkg, onClose }: { pkg: Pkg; onClose: () => void }) {
               {pkg.assignments.map((a) => (
                 <li key={a.id} className="flex items-center justify-between px-3 py-1.5">
                   <span>
-                    {a.action === "install" ? "Install on" : "Remove from"} {a.group_name ? `devices of people in ${a.group_name}` : "every device"} <span className="text-xs text-fg-muted">· {timeAgo(a.created_at)}</span>
+                    {a.action === "install" ? "Install on" : "Remove from"} {a.user_email ? `${a.user_email}'s devices (approved request)` : a.group_name ? `devices of people in ${a.group_name}` : "every device"} <span className="text-xs text-fg-muted">· {timeAgo(a.created_at)}</span>
                   </span>
                   <Button type="button" size="sm" variant="ghost" aria-label="Remove assignment" onClick={() => drop.mutate(a.id)}>
                     <Trash2 className="size-3.5" />

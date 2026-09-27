@@ -12,7 +12,8 @@ import { assignedAppIds } from "../sso/apps.js";
 /**
  * Access requests (JIT-01/02/04, OPS-11). A request moves through the catalog
  * entry's approval stages; the last approval grants the access (an app
- * assignment, a group membership or an admin role), which ends by itself when
+ * assignment, a group membership, an admin role, an exception to a block rule on
+ * the person's devices, or software installed on them), which ends by itself when
  * its time is up. Every step is audited with the request ID, so request →
  * approvals → grant → end can be followed in the audit log.
  */
@@ -22,7 +23,7 @@ export type Eligible = { users: string[]; groups: string[] };
 export type CatalogRow = {
   id: string;
   org_id: string;
-  resource_type: "app" | "group" | "role";
+  resource_type: "app" | "group" | "role" | "block_exception" | "software";
   resource_id: string | null;
   role: string | null;
   max_hours: number;
@@ -53,6 +54,14 @@ const eligibleOf = (c: CatalogRow): Eligible => {
 export async function resourceName(tx: Tx, c: Pick<CatalogRow, "resource_type" | "resource_id" | "role">) {
   if (c.resource_type === "role") return `${String(c.role).replace("_", " ")} role`;
   if (c.resource_type === "app") return (await tx.selectFrom("applications").select("name").where("id", "=", c.resource_id!).executeTakeFirst())?.name ?? "a removed app";
+  if (c.resource_type === "block_exception") {
+    const r = await tx.selectFrom("enforcement_rules").select("name").where("id", "=", c.resource_id!).executeTakeFirst();
+    return r ? `${r.name} (unblocked on your devices)` : "a removed block rule";
+  }
+  if (c.resource_type === "software") {
+    const p = await tx.selectFrom("software_packages").select("name").where("id", "=", c.resource_id!).executeTakeFirst();
+    return p ? `${p.name} (installed on your devices)` : "a removed app";
+  }
   return (await tx.selectFrom("groups").select("name").where("id", "=", c.resource_id!).executeTakeFirst())?.name ?? "a removed group";
 }
 
@@ -89,6 +98,8 @@ export async function isEligible(tx: Tx, c: CatalogRow, userId: string) {
 export async function alreadyHas(tx: Tx, c: CatalogRow, userId: string) {
   if (c.resource_type === "app") return (await assignedAppIds(tx, userId)).has(c.resource_id!);
   if (c.resource_type === "group") return !!(await tx.selectFrom("group_members").select("user_id").where("group_id", "=", c.resource_id!).where("user_id", "=", userId).executeTakeFirst());
+  if (c.resource_type === "block_exception") return !!(await tx.selectFrom("enforcement_exceptions").select("user_id").where("rule_id", "=", c.resource_id!).where("user_id", "=", userId).executeTakeFirst());
+  if (c.resource_type === "software") return !!(await tx.selectFrom("software_assignments").select("id").where("package_id", "=", c.resource_id!).where("user_id", "=", userId).where("action", "=", "install").executeTakeFirst());
   return !!(await tx.selectFrom("user_roles").select("role").where("user_id", "=", userId).where("role", "=", c.role!).executeTakeFirst());
 }
 
@@ -123,6 +134,11 @@ export async function grant(tx: Tx, c: CatalogRow, req: RequestRow, meta: Reques
     await tx.insertInto("group_members").values({ org_id: req.org_id, group_id: c.resource_id!, user_id: req.requester_id }).onConflict((oc) => oc.doNothing()).execute();
     await touchUsers(tx, req.org_id, [req.requester_id]);
     await touchGroups(tx, req.org_id, [c.resource_id!]);
+  } else if (c.resource_type === "block_exception") {
+    // Their devices get a policy without this rule at their next check-in.
+    await tx.insertInto("enforcement_exceptions").values({ org_id: req.org_id, rule_id: c.resource_id!, user_id: req.requester_id, request_id: req.id }).onConflict((oc) => oc.doNothing()).execute();
+  } else if (c.resource_type === "software") {
+    await tx.insertInto("software_assignments").values({ id: newId(), org_id: req.org_id, package_id: c.resource_id!, action: "install", group_id: null, user_id: req.requester_id, created_by: null }).onConflict((oc) => oc.doNothing()).execute();
   } else {
     await tx.insertInto("user_roles").values({ org_id: req.org_id, user_id: req.requester_id, role: c.role! }).onConflict((oc) => oc.doNothing()).execute();
   }
@@ -141,7 +157,7 @@ export async function grant(tx: Tx, c: CatalogRow, req: RequestRow, meta: Reques
     title: `You have ${what}${expires ? ` until ${expires.toUTCString().slice(0, 22)} UTC` : ""}`,
     body: why,
     entity: { type: "access_request", id: req.id },
-    link: c.resource_type === "app" ? "/my-apps" : "/access-requests",
+    link: c.resource_type === "app" ? "/my-apps" : c.resource_type === "block_exception" || c.resource_type === "software" ? "/my-devices" : "/access-requests",
   });
 }
 
@@ -154,6 +170,11 @@ export async function endGrant(tx: Tx, c: CatalogRow, req: RequestRow, meta: Req
     await tx.deleteFrom("group_members").where("group_id", "=", c.resource_id!).where("user_id", "=", req.requester_id).execute();
     await touchUsers(tx, req.org_id, [req.requester_id]);
     await touchGroups(tx, req.org_id, [c.resource_id!]);
+  } else if (c.resource_type === "block_exception") {
+    await tx.deleteFrom("enforcement_exceptions").where("rule_id", "=", c.resource_id!).where("user_id", "=", req.requester_id).execute();
+  } else if (c.resource_type === "software") {
+    // The app stays installed (like any unassignment); it just isn't kept there any more.
+    await tx.deleteFrom("software_assignments").where("package_id", "=", c.resource_id!).where("user_id", "=", req.requester_id).execute();
   } else {
     await tx.deleteFrom("user_roles").where("user_id", "=", req.requester_id).where("role", "=", c.role!).execute();
   }
