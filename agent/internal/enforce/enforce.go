@@ -96,6 +96,8 @@ type Enforcer struct {
 	ApplySettings func(settings.Desired) settings.Outcome
 	// ApplySoftware installs and removes the policy's apps (software.Manager.Apply).
 	ApplySoftware func([]software.Item) []software.Result
+	// Stopped tells the person at the computer that an app was closed (desktop.Notifier).
+	Stopped func(ruleID, ruleName, user, path string)
 	// ApplyAccounts makes people's local accounts match the policy (accounts.Manager.Apply);
 	// OfferPassword hands it a password the server sent (accounts.Manager.Offer).
 	ApplyAccounts func([]accounts.Account) []accounts.Status
@@ -661,6 +663,9 @@ func (e *Enforcer) Scan() {
 			} else {
 				e.Log.Info("terminated a blocked app", "rule", r.Name, "path", p.Path, "pid", p.PID)
 				e.record(Event{RuleID: r.ID, Action: "terminated", Subject: p.Path, User: p.User})
+				if e.Stopped != nil {
+					e.Stopped(r.ID, r.Name, p.User, p.Path)
+				}
 			}
 			break
 		}
