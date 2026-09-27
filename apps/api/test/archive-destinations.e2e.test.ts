@@ -197,10 +197,10 @@ describe("Microsoft Sentinel", () => {
 });
 
 /**
- * Against a real S3 implementation, when one is available (CI starts MinIO):
+ * Against a real S3 implementation, when one is available (CI starts RustFS; MinIO works too):
  * NEXUS_TEST_S3_ENDPOINT=http://127.0.0.1:9000 with the default minioadmin credentials.
  */
-describe.skipIf(!process.env.NEXUS_TEST_S3_ENDPOINT)("real S3 (MinIO)", () => {
+describe.skipIf(!process.env.NEXUS_TEST_S3_ENDPOINT)("real S3 (RustFS or MinIO)", () => {
   const endpoint = process.env.NEXUS_TEST_S3_ENDPOINT!;
   const creds = { accessKeyId: process.env.NEXUS_TEST_S3_KEY ?? "minioadmin", secretAccessKey: process.env.NEXUS_TEST_S3_SECRET ?? "minioadmin", region: "us-east-1" };
   const bucket = `nexus-test-${Date.now()}`;

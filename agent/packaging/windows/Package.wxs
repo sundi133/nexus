@@ -94,6 +94,9 @@
       <ComponentRef Id="Agent" />
       <ComponentRef Id="StateFolder" />
       <ComponentRef Id="EnrollConfig" />
+      <?ifdef OsqueryDir?>
+      <ComponentRef Id="Osquery" />
+      <?endif?>
     </Feature>
   </Package>
 </Wix>

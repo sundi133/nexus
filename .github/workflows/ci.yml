@@ -49,8 +49,10 @@ jobs:
           pnpm --filter @nexus/ldap-directory typecheck
       - name: Build the nexus CLI
         run: pnpm --filter @nexus/cli build && node packages/cli/dist/nexus.mjs --help
-      - name: Start MinIO (real S3 for the archive tests)
-        run: docker run -d -p 9010:9000 minio/minio:latest server /data
+      - name: Start RustFS (real S3 that verifies SigV4, for the archive tests; MinIO no longer publishes images)
+        run: |
+          docker run -d -p 9010:9000 -e RUSTFS_ACCESS_KEY=minioadmin -e RUSTFS_SECRET_KEY=minioadmin rustfs/rustfs:1.0.0
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:9010 && break; sleep 1; done
       - name: Start OpenLDAP (real LDAPS/StartTLS on a private CA for the directory tests)
         run: |
           apps/api/test/fixtures/ldap/make-certs.sh /tmp/ldap-certs
