@@ -14,7 +14,7 @@ Discovery is **off** until someone with `devices:enforce` turns it on (with a re
 
 Nothing else about browsing is reported: no addresses, page titles or contents, and nothing people type. The password itself never leaves the page, only the fact that one was used. Sites that aren't in the catalog aren't counted at all. The extension's popup tells people what's reported. Turning discovery off stops counting straight away, even from browsers that haven't picked up the change yet.
 
-The catalog covers about 1,700 business apps in 21 categories, each matched by the hosts people use it on (and their subdomains). It leaves out personal sites on purpose: social feeds, personal banking, airlines and hotels, job boards and health apps. The same catalog feeds the app directory under **Applications**.
+The catalog covers about 1,700 business apps in 21 categories, each matched by the hosts people use it on (and their subdomains). It leaves out personal sites on purpose: social feeds, personal banking, airlines and hotels, job boards and health apps. The same catalog feeds the app directory under **Applications → Add app**. The directory has about 1,800 apps: 42 with ready-made templates, 274 whose SAML or OIDC support is verified, and the rest from this catalog, marked **check SSO support** (many offer single sign-on only on business plans). Any of them opens the generic SAML/OIDC setup with its name filled in.
 
 ## What you see
 

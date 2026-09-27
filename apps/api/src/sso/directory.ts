@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import type { App } from "../context.js";
 import { requirePermission } from "../auth/guard.js";
 import { bearer, json, problemResponses } from "../schemas.js";
+import { SAAS_APPS } from "../saas/catalog.js";
 import { CATALOG } from "./catalog.js";
 
 /**
@@ -9,6 +10,9 @@ import { CATALOG } from "./catalog.js";
  * (usually on their business plans). Unlike catalog templates, an entry carries no vendor URLs:
  * choosing one opens the generic SAML/OIDC form with its name, and the admin imports the vendor's
  * SP metadata (or copies its URLs). Nothing is guessed, so nothing is wrong.
+ *
+ * Apps from the SaaS catalog (saas/catalog.ts) that aren't listed here are in the directory too,
+ * marked unverified: many offer SAML or OIDC on some plans, but Nexus doesn't claim it for them.
  */
 
 type Protocol = "saml" | "oidc";
@@ -76,7 +80,14 @@ const ENTRIES: [string, string, Protocol[]][] = [
 ];
 
 const DirectoryEntry = z
-  .object({ key: z.string(), name: z.string(), category: z.string(), protocols: z.array(z.enum(["saml", "oidc"])), template: z.string().nullable().openapi({ description: "A catalog template to use instead, when there is one" }) })
+  .object({
+    key: z.string(),
+    name: z.string(),
+    category: z.string(),
+    protocols: z.array(z.enum(["saml", "oidc"])).openapi({ description: "Empty when SSO support isn't verified" }),
+    template: z.string().nullable().openapi({ description: "A catalog template to use instead, when there is one" }),
+    verified: z.boolean().openapi({ description: "Known to support SAML or OIDC single sign-on. Otherwise check the vendor's documentation (it's often on business plans only)" }),
+  })
   .openapi("AppDirectoryEntry");
 
 const slug = (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -85,11 +96,16 @@ const slug = (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(
 export function directory() {
   const byName = new Map(CATALOG.map((t) => [t.name.toLowerCase(), t.key]));
   const out = new Map<string, z.infer<typeof DirectoryEntry>>();
-  for (const t of CATALOG) out.set(t.key, { key: t.key, name: t.name, category: t.category, protocols: [t.protocol], template: t.key });
+  for (const t of CATALOG) out.set(t.key, { key: t.key, name: t.name, category: t.category, protocols: [t.protocol], template: t.key, verified: true });
   for (const [name, category, protocols] of ENTRIES) {
     const key = slug(name);
     if (out.has(key) || byName.has(name.toLowerCase())) continue;
-    out.set(key, { key, name, category, protocols, template: null });
+    out.set(key, { key, name, category, protocols, template: null, verified: true });
+    byName.set(name.toLowerCase(), key);
+  }
+  for (const a of SAAS_APPS) {
+    if (out.has(a.key) || byName.has(a.name.toLowerCase())) continue;
+    out.set(a.key, { key: a.key, name: a.name, category: a.category, protocols: [], template: null, verified: false });
   }
   return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

@@ -41,11 +41,15 @@ describe("the app catalog", () => {
   });
 
   it("lists a directory of apps: templates first-class, the rest set up as generic SAML/OIDC", async () => {
-    const d = (await h.call("GET", "/v1/app-directory", { token: admin })).body.data as { key: string; name: string; protocols: string[]; template: string | null }[];
-    expect(d.length).toBeGreaterThanOrEqual(250);
+    const d = (await h.call("GET", "/v1/app-directory", { token: admin })).body.data as { key: string; name: string; protocols: string[]; template: string | null; verified: boolean }[];
+    expect(d.length).toBeGreaterThanOrEqual(1000);
     expect(new Set(d.map((x) => x.key)).size).toBe(d.length);
     expect(d.find((x) => x.name === "Zendesk")).toMatchObject({ template: "zendesk" });
     expect(d.find((x) => x.name === "Rippling")).toMatchObject({ template: null, protocols: ["saml"] });
     expect(d.filter((x) => x.template).length).toBeGreaterThanOrEqual(40);
+    expect(d.filter((x) => x.verified).length).toBeGreaterThanOrEqual(250);
+    // From the SaaS catalog: named, but SSO support isn't claimed.
+    expect(d.find((x) => x.name === "Carrd")).toMatchObject({ verified: false, protocols: [], template: null });
+    expect(d.filter((x) => x.name.toLowerCase() === "slack")).toHaveLength(1);
   });
 });

@@ -32820,9 +32820,12 @@ export interface components {
             key: string;
             name: string;
             category: string;
+            /** @description Empty when SSO support isn't verified */
             protocols: ("saml" | "oidc")[];
             /** @description A catalog template to use instead, when there is one */
             template: string | null;
+            /** @description Known to support SAML or OIDC single sign-on. Otherwise check the vendor's documentation (it's often on business plans only) */
+            verified: boolean;
         };
         SigningKey: {
             kid: string;

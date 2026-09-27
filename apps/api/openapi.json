@@ -5946,7 +5946,8 @@
                 "saml",
                 "oidc"
               ]
-            }
+            },
+            "description": "Empty when SSO support isn't verified"
           },
           "template": {
             "type": [
@@ -5954,6 +5955,10 @@
               "null"
             ],
             "description": "A catalog template to use instead, when there is one"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Known to support SAML or OIDC single sign-on. Otherwise check the vendor's documentation (it's often on business plans only)"
           }
         },
         "required": [
@@ -5961,7 +5966,8 @@
           "name",
           "category",
           "protocols",
-          "template"
+          "template",
+          "verified"
         ]
       },
       "SigningKey": {
