@@ -5,6 +5,7 @@ import {
   BellRing,
   Ban,
   Bot,
+  Boxes,
   Cloud,
   BrainCircuit,
   ClipboardCheck,
@@ -63,6 +64,7 @@ export const NAV: NavSection[] = [
     title: "Devices",
     items: [
       { label: "All devices", href: "/devices", icon: Laptop, shortcut: "G D" },
+      { label: "Assets", href: "/assets", icon: Boxes },
       { label: "Device management", href: "/mdm", icon: Server },
       { label: "Apple MDM", href: "/apple-mdm", icon: Apple },
       { label: "Device policies", href: "/device-policies", icon: Wrench },

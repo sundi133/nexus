@@ -7119,6 +7119,31 @@
               ]
             }
           },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                },
+                "tag": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "tag",
+                "name"
+              ]
+            },
+            "description": "Hardware checked out to them: to collect"
+          },
           "agents": {
             "type": "array",
             "items": {
@@ -7169,6 +7194,7 @@
           "groups",
           "apps",
           "devices",
+          "assets",
           "agents",
           "factors",
           "scheduled"
@@ -10951,6 +10977,171 @@
           "reclaimable_annual",
           "activity_from",
           "sso_app"
+        ]
+      },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "laptop",
+              "desktop",
+              "phone",
+              "tablet",
+              "monitor",
+              "peripheral",
+              "network",
+              "server",
+              "other"
+            ]
+          },
+          "make": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_stock",
+              "assigned",
+              "in_repair",
+              "retired",
+              "lost"
+            ]
+          },
+          "assigned_to": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "left": {
+                "type": "boolean",
+                "description": "They've been suspended or offboarded: collect it"
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "name",
+              "left"
+            ]
+          },
+          "location": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "purchase_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purchase_cost": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "warranty_until": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warranty": {
+            "type": "string",
+            "enum": [
+              "none",
+              "active",
+              "expiring",
+              "expired"
+            ]
+          },
+          "device": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "hostname": {
+                "type": "string"
+              },
+              "last_seen_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "hostname",
+              "last_seen_at"
+            ],
+            "description": "The enrolled device with the same serial number"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tag",
+          "name",
+          "kind",
+          "make",
+          "model",
+          "serial",
+          "status",
+          "assigned_to",
+          "location",
+          "vendor",
+          "purchase_date",
+          "purchase_cost",
+          "currency",
+          "warranty_until",
+          "warranty",
+          "device",
+          "notes",
+          "updated_at"
         ]
       },
       "DevicePage": {
@@ -48835,6 +49026,1306 @@
                     "holders",
                     "added",
                     "removed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Hardware the organization owns",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "in_stock",
+                "assigned",
+                "in_repair",
+                "retired",
+                "lost"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "laptop",
+                "desktop",
+                "phone",
+                "tablet",
+                "monitor",
+                "peripheral",
+                "network",
+                "server",
+                "other"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": false,
+            "name": "assigned_to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Asset"
+                      }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "assigned": {
+                          "type": "integer"
+                        },
+                        "in_stock": {
+                          "type": "integer"
+                        },
+                        "to_collect": {
+                          "type": "integer",
+                          "description": "Assigned to people who've left"
+                        },
+                        "warranty_expiring": {
+                          "type": "integer"
+                        },
+                        "unenrolled_devices": {
+                          "type": "integer",
+                          "description": "Enrolled devices with no asset record"
+                        },
+                        "value": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "currency": {
+                                "type": "string"
+                              },
+                              "total": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "currency",
+                              "total"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "assigned",
+                        "in_stock",
+                        "to_collect",
+                        "warranty_expiring",
+                        "unenrolled_devices",
+                        "value"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "summary"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Add an asset",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "laptop",
+                      "desktop",
+                      "phone",
+                      "tablet",
+                      "monitor",
+                      "peripheral",
+                      "network",
+                      "server",
+                      "other"
+                    ],
+                    "default": "other"
+                  },
+                  "make": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "model": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "serial": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "vendor": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "purchase_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "purchase_cost": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100000000,
+                    "default": null
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "default": "USD"
+                  },
+                  "warranty_until": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "tag"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{id}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "An asset and its history",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asset": {
+                      "$ref": "#/components/schemas/Asset"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "at": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "user": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "note": {
+                            "type": "string"
+                          },
+                          "by": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "at",
+                          "kind",
+                          "user",
+                          "status",
+                          "note",
+                          "by"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "asset",
+                    "history"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Change an asset's details",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "laptop",
+                      "desktop",
+                      "phone",
+                      "tablet",
+                      "monitor",
+                      "peripheral",
+                      "network",
+                      "server",
+                      "other"
+                    ],
+                    "default": "other"
+                  },
+                  "make": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "model": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "serial": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "default": ""
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "vendor": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "default": ""
+                  },
+                  "purchase_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "purchase_cost": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100000000,
+                    "default": null
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$",
+                    "default": "USD"
+                  },
+                  "warranty_until": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "default": null
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "tag"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Delete an asset record (to keep its history, retire it instead)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{id}/checkout": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Give an asset to someone",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/{id}/checkin": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Take an asset back (to stock, repair, retirement, or report it lost)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "in_stock",
+                      "in_repair",
+                      "retired",
+                      "lost"
+                    ],
+                    "default": "in_stock"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/import": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Import assets (from a spreadsheet): new tags are added, existing tags updated",
+        "description": "Rows may name the holder by `assigned_to_email`; an asset given a holder is marked assigned.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "tag": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "default": ""
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "laptop",
+                            "desktop",
+                            "phone",
+                            "tablet",
+                            "monitor",
+                            "peripheral",
+                            "network",
+                            "server",
+                            "other"
+                          ],
+                          "default": "other"
+                        },
+                        "make": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "default": ""
+                        },
+                        "model": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "default": ""
+                        },
+                        "serial": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "default": ""
+                        },
+                        "location": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "default": ""
+                        },
+                        "vendor": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "default": ""
+                        },
+                        "purchase_date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date",
+                          "default": null
+                        },
+                        "purchase_cost": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "minimum": 0,
+                          "maximum": 100000000,
+                          "default": null
+                        },
+                        "currency": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{3}$",
+                          "default": "USD"
+                        },
+                        "warranty_until": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date",
+                          "default": null
+                        },
+                        "notes": {
+                          "type": "string",
+                          "maxLength": 2000,
+                          "default": ""
+                        },
+                        "assigned_to_email": {
+                          "type": "string",
+                          "maxLength": 320,
+                          "default": ""
+                        }
+                      },
+                      "required": [
+                        "tag"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 5000
+                  }
+                },
+                "required": [
+                  "rows"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "created": {
+                      "type": "integer"
+                    },
+                    "updated": {
+                      "type": "integer"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "row": {
+                            "type": "integer"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "row",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "created",
+                    "updated",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assets/from-devices": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Add an asset for every enrolled device that doesn't have one (matched by serial)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "created": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "created"
                   ]
                 }
               }

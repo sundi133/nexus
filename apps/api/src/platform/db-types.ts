@@ -6,6 +6,8 @@ type Json<T = Record<string, unknown>> = ColumnType<T, string | undefined, strin
 
 export type DevicePlatform = "macos" | "windows" | "linux";
 export type Compliance = "compliant" | "non_compliant" | "unknown";
+export type AssetKind = "laptop" | "desktop" | "phone" | "tablet" | "monitor" | "peripheral" | "network" | "server" | "other";
+export type AssetStatus = "in_stock" | "assigned" | "in_repair" | "retired" | "lost";
 export type CheckStatus = "pass" | "fail" | "unknown" | "not_applicable";
 
 export type SessionState = "pending_mfa" | "enroll_mfa" | "active";
@@ -633,6 +635,38 @@ export interface Database {
     password_logins: Generated<number>;
     blocked: Generated<number>;
     last_at: Date;
+  };
+  assets: {
+    id: string;
+    org_id: string;
+    tag: string;
+    name: Generated<string>;
+    kind: Generated<AssetKind>;
+    make: Generated<string>;
+    model: Generated<string>;
+    serial: Generated<string>;
+    status: Generated<AssetStatus>;
+    assigned_to: string | null;
+    location: Generated<string>;
+    vendor: Generated<string>;
+    purchase_date: string | null;
+    purchase_cost_cents: number | null;
+    currency: Generated<string>;
+    warranty_until: string | null;
+    notes: Generated<string>;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  asset_events: {
+    id: string;
+    org_id: string;
+    asset_id: string;
+    at: Generated<Date>;
+    kind: "created" | "checked_out" | "checked_in" | "updated";
+    user_id: string | null;
+    status: Generated<string>;
+    note: Generated<string>;
+    actor_id: string | null;
   };
   saas_licenses: {
     id: string;
