@@ -5,6 +5,7 @@ import { registerAppleMdmProtocol } from "./apple-mdm/protocol.js";
 import { registerAppleMdmRoutes } from "./apple-mdm/routes.js";
 import { registerAppleMdmProfileRoutes } from "./apple-mdm/profiles.js";
 import { registerAdeRoutes, scheduleAdeSyncs } from "./apple-mdm/ade.js";
+import { scheduleDeviceHealth } from "./devices/health.js";
 import { registerRemoteAssistRoutes } from "./remote-assist/routes.js";
 import { registerSaasLicenseRoutes } from "./saas/licenses.js";
 import { registerSaasRoutes } from "./saas/routes.js";
@@ -343,4 +344,5 @@ export function registerSchedules(jobs: JobRunner, deps: Deps) {
   scheduleRetention(jobs, deps);
   schedulePatching(jobs, deps);
   scheduleAdeSyncs(jobs, deps);
+  scheduleDeviceHealth(jobs, deps);
 }

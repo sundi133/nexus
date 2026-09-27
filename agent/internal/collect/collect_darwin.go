@@ -65,5 +65,6 @@ func collect(ctx context.Context) Snapshot {
 			}
 		}
 	}
+	s.Inventory.Disks = systemDisk()
 	return s
 }

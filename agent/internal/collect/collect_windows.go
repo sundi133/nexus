@@ -54,5 +54,6 @@ func collect(ctx context.Context) Snapshot {
 	if u, err := powershell(ctx, "(Get-CimInstance Win32_ComputerSystem).UserName"); err == nil {
 		s.Inventory.ConsoleUser = u
 	}
+	s.Inventory.Disks = systemDisk()
 	return s
 }

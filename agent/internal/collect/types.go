@@ -41,8 +41,16 @@ type LocalUser struct {
 	Admin bool   `json:"admin"`
 }
 
+// Disk is a volume's size and free space (the system volume, for low-disk alerts).
+type Disk struct {
+	Mount     string `json:"mount"`
+	SizeBytes uint64 `json:"size_bytes"`
+	FreeBytes uint64 `json:"free_bytes"`
+}
+
 type Inventory struct {
 	CPU           string       `json:"cpu,omitempty"`
+	Disks         []Disk       `json:"disks,omitempty"`
 	MemoryBytes   uint64       `json:"memory_bytes,omitempty"`
 	LocalUsers    []LocalUser  `json:"local_users,omitempty"`
 	ConsoleUser   string       `json:"console_user,omitempty"`

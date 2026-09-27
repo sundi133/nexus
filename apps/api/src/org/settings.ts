@@ -19,13 +19,15 @@ export const OrgSettings = z
     process_events: z
       .boolean()
       .openapi({ description: "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days." }),
+    device_offline_hours: z.number().int().min(1).max(720).openapi({ description: "A device that hasn't checked in for this long is reported offline (the Device offline alert)" }),
+    disk_low_percent: z.number().int().min(1).max(50).openapi({ description: "A device whose system disk has less free space than this is reported (the Disk nearly full alert)" }),
   })
   .openapi("OrgSettings");
 
 export type OrgSettings = z.infer<typeof OrgSettings>;
 
 // Secure by default: admins must use MFA from day one.
-export const DEFAULT_SETTINGS: OrgSettings = { mfa_policy: "admins", session_ttl_hours: 12, restrict_to_verified_domains: false, owners_require_passkey: false, audit_retention_days: 365, process_events: false };
+export const DEFAULT_SETTINGS: OrgSettings = { mfa_policy: "admins", session_ttl_hours: 12, restrict_to_verified_domains: false, owners_require_passkey: false, audit_retention_days: 365, process_events: false, device_offline_hours: 72, disk_low_percent: 10 };
 
 export async function getSettings(tx: Tx, orgId: string): Promise<OrgSettings> {
   const row = await tx.selectFrom("organizations").select("settings").where("id", "=", orgId).executeTakeFirstOrThrow();

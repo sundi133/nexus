@@ -21,6 +21,7 @@ import { OSQUERY_INTERVAL_S, OsqueryReport, storeOsquery } from "./osquery.js";
 import { recordUpdates, UpdatesReport } from "./patching.js";
 import { passwordsFor, storeEncKey } from "./local-accounts.js";
 import { PostureFacts } from "./posture.js";
+import { checkinHealth } from "./health.js";
 import { releaseStore } from "./releases.js";
 import { offerFor, recordResult } from "./updates.js";
 
@@ -62,7 +63,7 @@ const Inventory = z
   .object({
     cpu: z.string().max(200).optional(),
     memory_bytes: z.number().int().nonnegative().optional(),
-    disks: z.array(z.object({ mount: z.string().max(200), size_bytes: z.number().int().nonnegative(), encrypted: z.boolean().nullable().optional() })).max(50).optional(),
+    disks: z.array(z.object({ mount: z.string().max(200), size_bytes: z.number().int().nonnegative(), free_bytes: z.number().int().nonnegative().optional(), encrypted: z.boolean().nullable().optional() })).max(50).optional(),
     local_users: z.array(z.object({ name: z.string().max(100), admin: z.boolean() })).max(200).optional(),
     console_user: z.string().max(100).nullable().optional(),
     uptime_seconds: z.number().int().nonnegative().optional(),
@@ -329,6 +330,7 @@ export function registerAgentRoutes(app: App) {
         .executeTakeFirstOrThrow();
       if (ai?.success) await auditAIChanges(tx, d, before, ai.data, meta);
       if (updates?.success) await recordUpdates(tx, d.id, updates.data); // before evaluating: the os_updates check reads it
+      await checkinHealth(tx, d, input.inventory?.disks, meta); // back online; disk filling up
       if (input.enc_key) await storeEncKey(tx, d, input.enc_key);
       const { compliance } = await evaluateDevice(tx, d, await getPolicies(tx), { meta });
       if (input.update_result) await recordResult(tx, dev.org_id, d, input.update_result, meta);

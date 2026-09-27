@@ -12338,6 +12338,10 @@ export interface paths {
                         audit_retention_days?: number;
                         /** @description Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days. */
                         process_events?: boolean;
+                        /** @description A device that hasn't checked in for this long is reported offline (the Device offline alert) */
+                        device_offline_hours?: number;
+                        /** @description A device whose system disk has less free space than this is reported (the Disk nearly full alert) */
+                        disk_low_percent?: number;
                     };
                 };
             };
@@ -31981,6 +31985,10 @@ export interface components {
                 audit_retention_days?: number;
                 /** @description Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days. */
                 process_events?: boolean;
+                /** @description A device that hasn't checked in for this long is reported offline (the Device offline alert) */
+                device_offline_hours?: number;
+                /** @description A device whose system disk has less free space than this is reported (the Disk nearly full alert) */
+                disk_low_percent?: number;
             };
             groups?: {
                 name: string;
@@ -32582,6 +32590,10 @@ export interface components {
             audit_retention_days: number;
             /** @description Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days. */
             process_events: boolean;
+            /** @description A device that hasn't checked in for this long is reported offline (the Device offline alert) */
+            device_offline_hours: number;
+            /** @description A device whose system disk has less free space than this is reported (the Disk nearly full alert) */
+            disk_low_percent: number;
         };
         PolicyImpact: {
             users_to_enroll: number;

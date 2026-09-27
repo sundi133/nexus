@@ -242,6 +242,8 @@ export interface Database {
     security_updates_since: NullableTimestamp;
     third_party_pending: Generated<number>;
     third_party_since: NullableTimestamp;
+    offline_since: NullableTimestamp;
+    disk_low_since: NullableTimestamp;
     enrolled_at: Generated<Date>;
     last_seen_at: NullableTimestamp;
     last_ip: Generated<string>;

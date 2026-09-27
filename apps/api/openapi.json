@@ -2900,6 +2900,18 @@
               "process_events": {
                 "type": "boolean",
                 "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
+              },
+              "device_offline_hours": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 720,
+                "description": "A device that hasn't checked in for this long is reported offline (the Device offline alert)"
+              },
+              "disk_low_percent": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 50,
+                "description": "A device whose system disk has less free space than this is reported (the Disk nearly full alert)"
               }
             }
           },
@@ -4986,6 +4998,18 @@
           "process_events": {
             "type": "boolean",
             "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
+          },
+          "device_offline_hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 720,
+            "description": "A device that hasn't checked in for this long is reported offline (the Device offline alert)"
+          },
+          "disk_low_percent": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "A device whose system disk has less free space than this is reported (the Disk nearly full alert)"
           }
         },
         "required": [
@@ -4994,7 +5018,9 @@
           "restrict_to_verified_domains",
           "owners_require_passkey",
           "audit_retention_days",
-          "process_events"
+          "process_events",
+          "device_offline_hours",
+          "disk_low_percent"
         ]
       },
       "PolicyImpact": {
@@ -27444,6 +27470,18 @@
                   "process_events": {
                     "type": "boolean",
                     "description": "Devices report every program they start, in real time, with command lines (secrets redacted), so Nexus can spot AI tools running network tools. Kept 7 days."
+                  },
+                  "device_offline_hours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 720,
+                    "description": "A device that hasn't checked in for this long is reported offline (the Device offline alert)"
+                  },
+                  "disk_low_percent": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "description": "A device whose system disk has less free space than this is reported (the Disk nearly full alert)"
                   }
                 }
               }
