@@ -12,6 +12,8 @@ export const PERMISSIONS = [
   "users:read",
   "users:write",
   "users:lifecycle", // suspend / activate / contain / revoke sessions
+  "users:erase", // permanently delete a person and their personal data (privacy requests)
+  "data:export", // export all of the organization's data
   "groups:read",
   "groups:write",
   "audit:read",

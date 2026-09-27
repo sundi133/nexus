@@ -1,3 +1,5 @@
+import { registerOrgExportRoutes } from "./data/org-export.js";
+import { registerPersonDataRoutes } from "./data/person.js";
 import type { JobRunner } from "./platform/jobs.js";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { getConnInfo } from "@hono/node-server/conninfo";
@@ -266,6 +268,8 @@ export function createApp(deps: Deps) {
   registerEnforcementRoutes(app);
   registerRiskRoutes(app);
   registerProcessEventRoutes(app);
+  registerPersonDataRoutes(app);
+  registerOrgExportRoutes(app);
   registerDeviceRoutes(app);
   registerDeviceTrustRoutes(app);
   registerAccessPolicyRoutes(app);
