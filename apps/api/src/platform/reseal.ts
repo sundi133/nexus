@@ -16,6 +16,12 @@ export const SEALED: Target[] = [
   { table: "app_provisioning", pk: "app_id", column: "token", aad: (r) => `app_provisioning:${r.app_id}` },
   { table: "event_destinations", pk: "id", column: "secret", aad: (r) => `event_destination:${r.id}` },
   { table: "org_alert_channels", pk: "org_id", column: "slack_webhook", aad: (r) => `org_alert_channels:${r.org_id}` },
+  { table: "mdm_connections", pk: "id", column: "secret", aad: (r) => `mdm_connection:${r.id}` },
+  { table: "identity_providers", pk: "id", column: "client_secret", aad: (r) => `identity_provider:${r.id}` },
+  { table: "mcp_servers", pk: "id", column: "secret", aad: (r) => `mcp-server:${r.id}` },
+  { table: "oncall_integrations", pk: "id", column: "secret", aad: (r) => `oncall:${r.id}` },
+  { table: "command_keys", pk: "org_id", column: "private_key", aad: (r) => `command_key:${r.org_id}` },
+  { table: "device_recovery_keys", pk: "id", column: "sealed", aad: (r) => `recovery_key:${r.id}` },
 ];
 
 export type ResealReport = { table: string; checked: number; resealed: number; failed: string[] }[];

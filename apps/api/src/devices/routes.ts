@@ -75,6 +75,13 @@ const DeviceDetail = DeviceSummary.extend({
     .openapi({ description: "What each connected MDM (Intune, Jamf) reports about this device" }),
   ai: DeviceAI,
   inventory: z.record(z.string(), z.unknown()),
+  settings: z
+    .object({
+      reported_at: z.string().nullable(),
+      results: z.array(z.object({ key: z.string(), status: z.string(), detail: z.string() })),
+      recovery_keys: z.number().int().openapi({ description: "Escrowed BitLocker recovery keys still in use (reveal with GET /v1/devices/{id}/recovery-keys)" }),
+    })
+    .openapi({ description: "Device settings the agent enforces (device policies set to fix, not just report) and what it did" }),
 }).openapi("DeviceDetail");
 
 type Row = Awaited<ReturnType<ReturnType<typeof deviceQuery>["execute"]>>[number];
@@ -131,6 +138,13 @@ async function detail(tx: Tx, id: string): Promise<z.infer<typeof DeviceDetail>>
     inventory: d.inventory as Record<string, unknown>,
     mdm: await mdmForDevice(tx, { id, serial: d.serial }),
     ai: await deviceAI(tx, d.inventory),
+    settings: {
+      reported_at: isoOrNull(d.settings_reported_at),
+      results: ((d.settings_report as { key: string; status: string; detail?: string }[] | undefined) ?? []).map((r) => ({ key: r.key, status: r.status, detail: r.detail ?? "" })),
+      recovery_keys: Number(
+        (await tx.selectFrom("device_recovery_keys").select((eb) => eb.fn.countAll<number>().as("n")).where("device_id", "=", id).where("retired_at", "is", null).executeTakeFirstOrThrow()).n,
+      ),
+    },
     checks: checks
       .sort((a, b) => order(a.check_key) - order(b.check_key))
       .map((ch) => {

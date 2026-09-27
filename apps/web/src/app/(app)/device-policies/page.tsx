@@ -14,6 +14,13 @@ import { cn, pluralize } from "@/lib/utils";
 
 type Policy = Schemas["DevicePolicy"];
 
+/** What "Fix it on devices" does, per policy (the agent applies it and re-applies it hourly). */
+const FIX_ON_DEVICE: Record<string, string> = {
+  firewall: "The agent turns the firewall on where it's off, and back on if someone turns it off: macOS, Windows, and Linux with ufw or firewalld (SSH stays reachable).",
+  screen_lock: "The agent sets the inactivity lock on Windows and on Linux GNOME desktops. macOS needs a configuration profile from your MDM.",
+  disk_encryption: "The agent turns BitLocker on for Windows devices with a TPM, after adding a recovery password. FileVault and LUKS can't be turned on remotely: use your MDM, or re-provision.",
+};
+
 export default function DevicePoliciesPage() {
   const policies = useQuery({ queryKey: ["device-policies"], queryFn: () => unwrap(api.GET("/v1/device-policies")) });
   const can = useCan();
@@ -124,6 +131,26 @@ function PolicyCard({ policy, editable }: { policy: Policy; editable: boolean })
                   </option>
                 ))}
               </Select>
+            </div>
+          ) : null}
+          {enabled && FIX_ON_DEVICE[policy.key] ? (
+            <div className="mt-3 space-y-2 text-[13px]">
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-0.5" disabled={!editable} checked={params.remediate === true} onChange={(e) => setParams({ ...params, remediate: e.target.checked })} />
+                <span>
+                  Fix it on devices
+                  <span className="block text-xs text-fg-muted">{FIX_ON_DEVICE[policy.key]}</span>
+                </span>
+              </label>
+              {policy.key === "disk_encryption" ? (
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" className="mt-0.5" disabled={!editable} checked={params.escrow_recovery_keys !== false} onChange={(e) => setParams({ ...params, escrow_recovery_keys: e.target.checked })} />
+                  <span>
+                    Escrow BitLocker recovery keys
+                    <span className="block text-xs text-fg-muted">Sealed in Nexus. Help desk and admins can reveal a device&apos;s key to unlock it; every reveal is in the audit log.</span>
+                  </span>
+                </label>
+              ) : null}
             </div>
           ) : null}
           {enabled && policy.key === "ai_mcp_governed" ? (

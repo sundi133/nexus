@@ -40,6 +40,7 @@ import (
 	"github.com/votal-ai/nexus/agent/internal/release"
 	"github.com/votal-ai/nexus/agent/internal/run"
 	"github.com/votal-ai/nexus/agent/internal/service"
+	"github.com/votal-ai/nexus/agent/internal/settings"
 	"github.com/votal-ai/nexus/agent/internal/state"
 	"github.com/votal-ai/nexus/agent/internal/update"
 )
@@ -258,7 +259,10 @@ func runAgent(ctx context.Context, store state.Store, once bool, log *slog.Logge
 		ownHost = u.Hostname()
 	}
 	enforcer := &enforce.Enforcer{StateDir: store.Dir, DeviceID: e.DeviceID, Key: runner.Key, OwnHost: ownHost, Log: log,
-		Processes: enforce.ListProcesses, Kill: enforce.KillProcess, FlushDNS: enforce.FlushDNS}
+		Processes: enforce.ListProcesses, Kill: enforce.KillProcess, FlushDNS: enforce.FlushDNS,
+		ApplySettings: func(d settings.Desired) settings.Outcome {
+			return settings.Apply(settings.OS{Root: requireAdmin() == nil}, runtime.GOOS, d)
+		}}
 	enforcer.Load() // the last rules apply from boot, before the first check-in
 	loop := &run.Loop{Client: c, Version: version, Log: log, Collect: collect.Collect, OnCheckin: onCheckin, Enforcer: enforcer,
 		Commands: runner,
