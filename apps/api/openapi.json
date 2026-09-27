@@ -408,6 +408,7 @@
           "devices:query",
           "devices:enforce",
           "devices:recovery_keys",
+          "devices:scripts",
           "directory:sync",
           "api_keys:manage",
           "integrations:manage",
@@ -947,7 +948,8 @@
               "lock",
               "restart",
               "wipe",
-              "osquery"
+              "osquery",
+              "script"
             ]
           },
           "channel": {
@@ -3611,6 +3613,7 @@
                       "devices:query",
                       "devices:enforce",
                       "devices:recovery_keys",
+                      "devices:scripts",
                       "directory:sync",
                       "api_keys:manage",
                       "integrations:manage",
@@ -3672,6 +3675,7 @@
                     "devices:query",
                     "devices:enforce",
                     "devices:recovery_keys",
+                    "devices:scripts",
                     "directory:sync",
                     "api_keys:manage",
                     "integrations:manage",
@@ -3748,6 +3752,7 @@
                 "devices:query",
                 "devices:enforce",
                 "devices:recovery_keys",
+                "devices:scripts",
                 "directory:sync",
                 "api_keys:manage",
                 "integrations:manage",
@@ -9335,6 +9340,110 @@
           "radius_mfa",
           "ldap",
           "radius"
+        ]
+      },
+      "DeviceScript": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "default": ""
+          },
+          "shell": {
+            "type": "string",
+            "enum": [
+              "sh",
+              "bash",
+              "zsh",
+              "powershell"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 262144
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "shell",
+          "body",
+          "id",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "ScriptRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shell": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "devices": {
+            "type": "integer"
+          },
+          "succeeded": {
+            "type": "integer"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "pending": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "shell",
+          "reason",
+          "requested_by",
+          "created_at",
+          "expires_at",
+          "devices",
+          "succeeded",
+          "failed",
+          "pending"
         ]
       },
       "DevicePage": {
@@ -20579,6 +20688,7 @@
                         "devices:query",
                         "devices:enforce",
                         "devices:recovery_keys",
+                        "devices:scripts",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -20735,6 +20845,7 @@
                         "devices:query",
                         "devices:enforce",
                         "devices:recovery_keys",
+                        "devices:scripts",
                         "directory:sync",
                         "api_keys:manage",
                         "integrations:manage",
@@ -38293,6 +38404,834 @@
         "responses": {
           "204": {
             "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/device-scripts": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "The script library",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DeviceScript"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Add a script to the library",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  },
+                  "shell": {
+                    "type": "string",
+                    "enum": [
+                      "sh",
+                      "bash",
+                      "zsh",
+                      "powershell"
+                    ]
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 262144
+                  }
+                },
+                "required": [
+                  "name",
+                  "shell",
+                  "body"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceScript"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/device-scripts/{id}": {
+      "put": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Change a library script",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "default": ""
+                  },
+                  "shell": {
+                    "type": "string",
+                    "enum": [
+                      "sh",
+                      "bash",
+                      "zsh",
+                      "powershell"
+                    ]
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 262144
+                  }
+                },
+                "required": [
+                  "name",
+                  "shell",
+                  "body"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceScript"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Remove a library script (past runs keep their copy)",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/script-runs": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Run a script on devices",
+        "description": "Sends the script to the chosen devices whose OS can run it (sh/bash/zsh: macOS and Linux; PowerShell: Windows) as signed commands. Each runs it as root/SYSTEM on its next check-in (offline devices within a day) and returns its exit code and output (up to 64 KB). Needs `devices:scripts` and a recent MFA.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "script_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                  },
+                  "script": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "shell": {
+                        "type": "string",
+                        "enum": [
+                          "sh",
+                          "bash",
+                          "zsh",
+                          "powershell"
+                        ]
+                      },
+                      "body": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 262144
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "shell",
+                      "body"
+                    ],
+                    "description": "A one-off script, instead of one from the library"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "device_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid",
+                          "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                        },
+                        "maxItems": 1000
+                      },
+                      "group_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                      },
+                      "all": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    }
+                  },
+                  "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 1800,
+                    "default": 300
+                  }
+                },
+                "required": [
+                  "reason",
+                  "target"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ScriptRun"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "skipped_incompatible": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "skipped_incompatible"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Recent script runs",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ScriptRun"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/script-runs/{id}": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A script run: the script, and each device's exit code and output",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ScriptRun"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "body": {
+                          "type": "string"
+                        },
+                        "body_sha256": {
+                          "type": "string"
+                        },
+                        "results": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "device_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+                              },
+                              "hostname": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "exit_code": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "output": {
+                                "type": "string"
+                              },
+                              "truncated": {
+                                "type": "boolean"
+                              },
+                              "duration_ms": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "finished_at": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "device_id",
+                              "hostname",
+                              "status",
+                              "exit_code",
+                              "output",
+                              "truncated",
+                              "duration_ms",
+                              "finished_at"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "body",
+                        "body_sha256",
+                        "results"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid request",

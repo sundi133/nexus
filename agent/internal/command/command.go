@@ -202,7 +202,7 @@ func (r *Runner) Handle(ctx context.Context, cmds []Signed) []Result {
 			r.Log.Info("running command", "id", c.ID, "action", c.Action)
 			msg, data, err := ax(ctx, c.Args)
 			if err != nil {
-				out = append(out, Result{ID: c.ID, Status: "failed", Output: err.Error()})
+				out = append(out, Result{ID: c.ID, Status: "failed", Output: err.Error(), Data: data}) // e.g. a script's output when it failed
 			} else {
 				out = append(out, Result{ID: c.ID, Status: "done", Output: msg, Data: data})
 			}

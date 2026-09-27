@@ -285,6 +285,32 @@ export interface Database {
     last_used_at: Date | null;
     revoked_at: Date | null;
   };
+  device_scripts: {
+    id: string;
+    org_id: string;
+    name: string;
+    description: Generated<string>;
+    shell: "sh" | "bash" | "zsh" | "powershell";
+    body: string;
+    created_by: string | null;
+    created_at: Generated<Date>;
+    updated_at: Generated<Date>;
+  };
+  script_runs: {
+    id: string;
+    org_id: string;
+    script_id: string | null;
+    name: string;
+    shell: string;
+    body: string;
+    body_sha256: string;
+    reason: string;
+    target: Json;
+    device_count: number;
+    requested_by: string | null;
+    created_at: Generated<Date>;
+    expires_at: Date;
+  };
   mcp_clients: {
     id: string;
     org_id: string;
@@ -387,7 +413,7 @@ export interface Database {
     id: string;
     org_id: string;
     device_id: string;
-    action: "refresh" | "lock" | "restart" | "wipe" | "osquery";
+    action: "refresh" | "lock" | "restart" | "wipe" | "osquery" | "script";
     channel: "agent" | "mdm";
     status: Generated<"queued" | "sent" | "done" | "failed" | "expired" | "canceled">;
     reason: Generated<string>;
@@ -400,6 +426,7 @@ export interface Database {
     args: Json;
     result: Json<unknown> | null;
     query_id: string | null;
+    script_run_id: Generated<string | null>;
   };
   device_osquery: {
     org_id: string;
