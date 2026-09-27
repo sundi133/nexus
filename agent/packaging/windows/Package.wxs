@@ -50,12 +50,9 @@
                           Account="LocalSystem"
                           Arguments="run --state-dir &quot;[CommonAppDataFolder]Nexus&quot;"
                           Vital="yes">
-            <!-- Restart on exit, including the deliberate exit after a self-update (the agent also sets this itself). -->
-            <ServiceConfigFailureActions OnInstall="yes" OnReinstall="yes" ResetPeriod="86400">
-              <Failure Action="restartService" Delay="5000" />
-              <Failure Action="restartService" Delay="5000" />
-              <Failure Action="restartService" Delay="5000" />
-            </ServiceConfigFailureActions>
+            <!-- Restart-on-failure is set by the agent itself each time the service starts (ensureRecovery),
+                 including restarting after a clean exit (a self-update), which the MSI can't express.
+                 Setting it here as well made Windows Installer fail with error 1939. -->
           </ServiceInstall>
           <!-- [CommonAppDataFolder]Nexus, not [STATEFOLDER]: that ends in a backslash, which would escape the closing quote. -->
           <ServiceControl Id="AgentServiceControl" Name="NexusAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />

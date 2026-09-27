@@ -30,8 +30,9 @@ LATEST=$(ls "$(dirname "$0")/../../apps/api/migrations" | sort | tail -1)
 GOT=$(psql_to -c "SELECT max(version) FROM schema_migrations")
 [ "$GOT" = "$LATEST" ] && echo "  ok   schema at $GOT" || echo "  note schema at $GOT (this checkout ships $LATEST)"
 
+# rate_limits is exempt: shared counters, no tenant data (migration 0038).
 UNPROTECTED=$(psql_to -c "SELECT string_agg(c.relname, ', ') FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> 'schema_migrations'
+  WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname NOT IN ('schema_migrations', 'rate_limits')
     AND (NOT c.relrowsecurity OR NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))")
 [ -z "$UNPROTECTED" ] && echo "  ok   row-level security and policies restored on every table" || { echo "  FAIL tables without RLS after restore: $UNPROTECTED"; exit 1; }
 
