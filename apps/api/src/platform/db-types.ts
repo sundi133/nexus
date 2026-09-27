@@ -879,14 +879,14 @@ export interface Database {
   directory_connections: {
     id: string;
     org_id: string;
-    provider: "google" | "entra" | "scim" | "ldap";
+    provider: "google" | "entra" | "scim" | "ldap" | "bamboohr" | "workday";
     name: string;
     config: Json;
     secret: Buffer | null;
     enabled: Generated<boolean>;
     sync_groups: Generated<boolean>;
     group_filter: Generated<string[]>;
-    deprovision: Generated<"suspend" | "none">;
+    deprovision: Generated<"suspend" | "offboard" | "none">;
     invite_new_users: Generated<boolean>;
     interval_minutes: Generated<number>;
     last_sync_at: NullableTimestamp;

@@ -16,8 +16,9 @@ import { PROVIDER_NAME, summarize, type Plan, type Remote } from "./plan.js";
 import { EntraConfig, fetchDirectory, GoogleConfig, GoogleKey, ProviderError } from "./providers.js";
 import { loadConnection, loadLocal, planFor, remoteFor, secretAad, syncDedupeKey } from "./service.js";
 import { fetchLdap, LdapConfigSchema } from "./ldap.js";
+import { BambooConfig, fetchBambooHR, fetchWorkday, WorkdayConfig } from "./hr.js";
 
-const Provider = z.enum(["google", "entra", "scim", "ldap"]);
+const Provider = z.enum(["google", "entra", "scim", "ldap", "bamboohr", "workday"]);
 const GoogleCreds = z.object({
   provider: z.literal("google"),
   admin_email: z.email(),
@@ -34,12 +35,21 @@ const LdapCreds = LdapConfigSchema.extend({
   provider: z.literal("ldap"),
   bind_password: z.string().min(1).max(1000).openapi({ description: "The service account's password (read-only account)" }),
 });
-const Creds = z.discriminatedUnion("provider", [GoogleCreds, EntraCreds, LdapCreds]);
+const BambooCreds = BambooConfig.extend({
+  provider: z.literal("bamboohr"),
+  api_key: z.string().min(1).max(200).openapi({ description: "A BambooHR API key of a user who can run reports on all employees" }),
+});
+const WorkdayCreds = WorkdayConfig.extend({
+  provider: z.literal("workday"),
+  username: z.string().min(1).max(200).openapi({ description: "The integration system user (ISU) the report is shared with" }),
+  password: z.string().min(1).max(500),
+});
+const Creds = z.discriminatedUnion("provider", [GoogleCreds, EntraCreds, LdapCreds, BambooCreds, WorkdayCreds]);
 const SettingsIn = z.object({
   enabled: z.boolean().default(false).openapi({ description: "Scheduled syncs. New connections start off so you can preview first." }),
   sync_groups: z.boolean().default(true),
   group_filter: z.array(z.string().max(200)).max(100).default([]).openapi({ description: "Remote group IDs to sync; empty = whole directory" }),
-  deprovision: z.enum(["suspend", "none"]).default("suspend"),
+  deprovision: z.enum(["suspend", "offboard", "none"]).default("suspend").openapi({ description: "What happens to leavers: suspend, offboard (sessions, roles, groups, apps and devices, for good), or nothing" }),
   invite_new_users: z.boolean().default(true),
   interval_minutes: z.number().int().min(15).max(1440).default(60),
 });
@@ -81,6 +91,8 @@ const PlanOut = z
     link_users: z.array(z.object({ email: z.string() })),
     update_users: z.array(z.object({ email: z.string(), changes: z.record(z.string(), z.object({ from: z.string(), to: z.string() })) })),
     suspend_users: z.array(z.object({ email: z.string(), reason: z.string() })),
+    offboard_users: z.array(z.object({ email: z.string(), reason: z.string() })),
+    managers: z.array(z.object({ email: z.string(), from: z.string().nullable(), to: z.string().nullable() })),
     reactivate_users: z.array(z.object({ email: z.string() })),
     groups: z.array(z.object({ name: z.string(), action: z.enum(["create", "link", "update", "members"]), add: z.number().int(), remove: z.number().int() })),
     skipped: z.array(z.object({ email: z.string(), reason: z.string() })),
@@ -88,6 +100,11 @@ const PlanOut = z
   .openapi("DirectoryPlan");
 
 function credentials(c: z.infer<typeof Creds>): { config: Record<string, unknown>; secret: string } {
+  if (c.provider === "bamboohr") return { config: { subdomain: c.subdomain }, secret: c.api_key };
+  if (c.provider === "workday") {
+    const { provider: _p, username, password, ...config } = c;
+    return { config: WorkdayConfig.parse(config), secret: JSON.stringify({ username, password }) };
+  }
   if (c.provider === "ldap") {
     const { provider: _p, bind_password, ...config } = c;
     return { config: LdapConfigSchema.parse(config), secret: bind_password };
@@ -133,6 +150,8 @@ function planOut(p: Plan): z.infer<typeof PlanOut> {
     link_users: p.link_users.slice(0, CAP).map((u) => ({ email: u.email })),
     update_users: p.update_users.slice(0, CAP).map((u) => ({ email: u.email, changes: u.changes as Record<string, { from: string; to: string }> })),
     suspend_users: p.suspend_users.slice(0, 500).map((u) => ({ email: u.email, reason: u.reason })),
+    offboard_users: p.offboard_users.slice(0, 500).map((u) => ({ email: u.email, reason: u.reason })),
+    managers: p.managers.slice(0, CAP).map((m) => ({ email: m.email, from: m.from, to: m.to })),
     reactivate_users: p.reactivate_users.slice(0, CAP).map((u) => ({ email: u.email })),
     groups: [
       ...p.create_groups.map((g) => ({ name: g.name, action: "create" as const, add: 0, remove: 0 })),
@@ -158,7 +177,10 @@ async function listOut(tx: Tx, apiPublicUrl = ""): Promise<z.infer<typeof Connec
       provider: r.provider,
       provider_name: PROVIDER_NAME[r.provider],
       name: r.name,
-      account: r.provider === "google" ? cfg.admin_email ?? "" : r.provider === "entra" ? cfg.tenant_id ?? "" : r.provider === "ldap" ? `${cfg.url ?? ""} (${cfg.base_dn ?? ""})${(cfg as { password_auth?: boolean }).password_auth ? ", directory passwords" : ""}` : "",
+      account:
+        r.provider === "bamboohr" ? `${cfg.subdomain ?? ""}.bamboohr.com`
+        : r.provider === "workday" ? (() => { try { return new URL(cfg.report_url ?? "").hostname; } catch { return ""; } })()
+        : r.provider === "google" ? cfg.admin_email ?? "" : r.provider === "entra" ? cfg.tenant_id ?? "" : r.provider === "ldap" ? `${cfg.url ?? ""} (${cfg.base_dn ?? ""})${(cfg as { password_auth?: boolean }).password_auth ? ", directory passwords" : ""}` : "",
       enabled: r.enabled,
       sync_groups: r.sync_groups,
       group_filter: r.group_filter,
@@ -286,7 +308,16 @@ export function registerDirectorySyncRoutes(app: App) {
       requirePermission(c, "directory:sync");
       const { config, secret } = credentials(c.req.valid("json"));
       const provider = c.req.valid("json").provider;
-      return c.json(await probe(() => (provider === "ldap" ? fetchLdap(c.get("deps"), config, secret, { groups: true }) : fetchDirectory(c.get("deps").cfg, provider, config, secret, { groups: true }))), 200);
+      const deps = c.get("deps");
+      return c.json(
+        await probe(() =>
+          provider === "ldap" ? fetchLdap(deps, config, secret, { groups: true })
+          : provider === "bamboohr" ? fetchBambooHR(deps.cfg, config, secret, { groups: true })
+          : provider === "workday" ? fetchWorkday(deps.cfg, config, secret, { groups: true })
+          : fetchDirectory(deps.cfg, provider, config, secret, { groups: true }),
+        ),
+        200,
+      );
     },
   );
 

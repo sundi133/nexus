@@ -6257,7 +6257,9 @@
               "google",
               "entra",
               "scim",
-              "ldap"
+              "ldap",
+              "bamboohr",
+              "workday"
             ]
           },
           "provider_name": {
@@ -6291,9 +6293,11 @@
             "type": "string",
             "enum": [
               "suspend",
+              "offboard",
               "none"
             ],
-            "default": "suspend"
+            "default": "suspend",
+            "description": "What happens to leavers: suspend, offboard (sessions, roles, groups, apps and devices, for good), or nothing"
           },
           "invite_new_users": {
             "type": "boolean",
@@ -6646,6 +6650,52 @@
               ]
             }
           },
+          "offboard_users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "reason"
+              ]
+            }
+          },
+          "managers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "to": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "email",
+                "from",
+                "to"
+              ]
+            }
+          },
           "reactivate_users": {
             "type": "array",
             "items": {
@@ -6718,6 +6768,8 @@
           "link_users",
           "update_users",
           "suspend_users",
+          "offboard_users",
+          "managers",
           "reactivate_users",
           "groups",
           "skipped"
@@ -29489,6 +29541,126 @@
                         ]
                       }
                     ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "subdomain": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "bamboohr"
+                        ]
+                      },
+                      "api_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "A BambooHR API key of a user who can run reports on all employees"
+                      }
+                    },
+                    "required": [
+                      "subdomain",
+                      "provider",
+                      "api_key"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "report_url": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "format": "uri",
+                        "description": "The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})"
+                      },
+                      "fields": {
+                        "type": "object",
+                        "properties": {
+                          "employee_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "email": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "given_name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "family_name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "department": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "manager_id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "active": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          },
+                          "termination_date": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100,
+                            "pattern": "^[A-Za-z0-9_.-]+$"
+                          }
+                        },
+                        "default": {}
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "workday"
+                        ]
+                      },
+                      "username": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "The integration system user (ISU) the report is shared with"
+                      },
+                      "password": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "report_url",
+                      "provider",
+                      "username",
+                      "password"
+                    ]
                   }
                 ]
               }
@@ -29749,6 +29921,126 @@
                             ]
                           }
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "subdomain": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "bamboohr"
+                            ]
+                          },
+                          "api_key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "A BambooHR API key of a user who can run reports on all employees"
+                          }
+                        },
+                        "required": [
+                          "subdomain",
+                          "provider",
+                          "api_key"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "report_url": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "format": "uri",
+                            "description": "The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})"
+                          },
+                          "fields": {
+                            "type": "object",
+                            "properties": {
+                              "employee_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "email": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "given_name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "family_name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "department": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "manager_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "active": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "termination_date": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              }
+                            },
+                            "default": {}
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "workday"
+                            ]
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "The integration system user (ISU) the report is shared with"
+                          },
+                          "password": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": [
+                          "report_url",
+                          "provider",
+                          "username",
+                          "password"
+                        ]
                       }
                     ]
                   },
@@ -29778,9 +30070,11 @@
                         "type": "string",
                         "enum": [
                           "suspend",
+                          "offboard",
                           "none"
                         ],
-                        "default": "suspend"
+                        "default": "suspend",
+                        "description": "What happens to leavers: suspend, offboard (sessions, roles, groups, apps and devices, for good), or nothing"
                       },
                       "invite_new_users": {
                         "type": "boolean",
@@ -29930,6 +30224,7 @@
                     "type": "string",
                     "enum": [
                       "suspend",
+                      "offboard",
                       "none"
                     ]
                   },
@@ -30034,6 +30329,126 @@
                               "bind_password"
                             ]
                           }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "subdomain": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "bamboohr"
+                            ]
+                          },
+                          "api_key": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "A BambooHR API key of a user who can run reports on all employees"
+                          }
+                        },
+                        "required": [
+                          "subdomain",
+                          "provider",
+                          "api_key"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "report_url": {
+                            "type": "string",
+                            "maxLength": 2000,
+                            "format": "uri",
+                            "description": "The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})"
+                          },
+                          "fields": {
+                            "type": "object",
+                            "properties": {
+                              "employee_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "email": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "given_name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "family_name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "department": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "manager_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "active": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              },
+                              "termination_date": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "pattern": "^[A-Za-z0-9_.-]+$"
+                              }
+                            },
+                            "default": {}
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "workday"
+                            ]
+                          },
+                          "username": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "The integration system user (ISU) the report is shared with"
+                          },
+                          "password": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          }
+                        },
+                        "required": [
+                          "report_url",
+                          "provider",
+                          "username",
+                          "password"
                         ]
                       }
                     ]

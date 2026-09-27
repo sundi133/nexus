@@ -15121,7 +15121,36 @@ export interface paths {
                         provider: "ldap";
                         /** @description The service account's password (read-only account) */
                         bind_password: string;
-                    });
+                    }) | {
+                        subdomain: string;
+                        /** @enum {string} */
+                        provider: "bamboohr";
+                        /** @description A BambooHR API key of a user who can run reports on all employees */
+                        api_key: string;
+                    } | {
+                        /**
+                         * Format: uri
+                         * @description The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})
+                         */
+                        report_url: string;
+                        /** @default {} */
+                        fields?: {
+                            employee_id?: string;
+                            email?: string;
+                            given_name?: string;
+                            family_name?: string;
+                            title?: string;
+                            department?: string;
+                            manager_id?: string;
+                            active?: string;
+                            termination_date?: string;
+                        };
+                        /** @enum {string} */
+                        provider: "workday";
+                        /** @description The integration system user (ISU) the report is shared with */
+                        username: string;
+                        password: string;
+                    };
                 };
             };
             responses: {
@@ -15294,7 +15323,36 @@ export interface paths {
                         provider: "ldap";
                         /** @description The service account's password (read-only account) */
                         bind_password: string;
-                    })) & {
+                    }) | {
+                        subdomain: string;
+                        /** @enum {string} */
+                        provider: "bamboohr";
+                        /** @description A BambooHR API key of a user who can run reports on all employees */
+                        api_key: string;
+                    } | {
+                        /**
+                         * Format: uri
+                         * @description The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})
+                         */
+                        report_url: string;
+                        /** @default {} */
+                        fields?: {
+                            employee_id?: string;
+                            email?: string;
+                            given_name?: string;
+                            family_name?: string;
+                            title?: string;
+                            department?: string;
+                            manager_id?: string;
+                            active?: string;
+                            termination_date?: string;
+                        };
+                        /** @enum {string} */
+                        provider: "workday";
+                        /** @description The integration system user (ISU) the report is shared with */
+                        username: string;
+                        password: string;
+                    }) & {
                         /**
                          * @description Scheduled syncs. New connections start off so you can preview first.
                          * @default false
@@ -15308,10 +15366,11 @@ export interface paths {
                          */
                         group_filter?: string[];
                         /**
+                         * @description What happens to leavers: suspend, offboard (sessions, roles, groups, apps and devices, for good), or nothing
                          * @default suspend
                          * @enum {string}
                          */
-                        deprovision?: "suspend" | "none";
+                        deprovision?: "suspend" | "offboard" | "none";
                         /** @default true */
                         invite_new_users?: boolean;
                         /** @default 60 */
@@ -15484,7 +15543,7 @@ export interface paths {
                         sync_groups?: boolean;
                         group_filter?: string[];
                         /** @enum {string} */
-                        deprovision?: "suspend" | "none";
+                        deprovision?: "suspend" | "offboard" | "none";
                         invite_new_users?: boolean;
                         interval_minutes?: number;
                         name?: string;
@@ -15509,7 +15568,36 @@ export interface paths {
                             provider: "ldap";
                             /** @description The service account's password (read-only account) */
                             bind_password: string;
-                        });
+                        }) | {
+                            subdomain: string;
+                            /** @enum {string} */
+                            provider: "bamboohr";
+                            /** @description A BambooHR API key of a user who can run reports on all employees */
+                            api_key: string;
+                        } | {
+                            /**
+                             * Format: uri
+                             * @description The custom report's JSON web-service URL (…/ccx/service/customreport2/{tenant}/{owner}/{report})
+                             */
+                            report_url: string;
+                            /** @default {} */
+                            fields?: {
+                                employee_id?: string;
+                                email?: string;
+                                given_name?: string;
+                                family_name?: string;
+                                title?: string;
+                                department?: string;
+                                manager_id?: string;
+                                active?: string;
+                                termination_date?: string;
+                            };
+                            /** @enum {string} */
+                            provider: "workday";
+                            /** @description The integration system user (ISU) the report is shared with */
+                            username: string;
+                            password: string;
+                        };
                         /** @description LDAP: rotate the service account's password (other settings unchanged) */
                         ldap_bind_password?: string;
                         /** @description LDAP: people sign in with their directory password */
@@ -28216,7 +28304,7 @@ export interface components {
              */
             id: string;
             /** @enum {string} */
-            provider: "google" | "entra" | "scim" | "ldap";
+            provider: "google" | "entra" | "scim" | "ldap" | "bamboohr" | "workday";
             provider_name: string;
             name: string;
             /** @description Admin email (Google) or tenant (Entra) the connection reads */
@@ -28230,10 +28318,11 @@ export interface components {
              */
             group_filter: string[];
             /**
+             * @description What happens to leavers: suspend, offboard (sessions, roles, groups, apps and devices, for good), or nothing
              * @default suspend
              * @enum {string}
              */
-            deprovision: "suspend" | "none";
+            deprovision: "suspend" | "offboard" | "none";
             /** @default true */
             invite_new_users: boolean;
             /** @default 60 */
@@ -28332,6 +28421,15 @@ export interface components {
             suspend_users: {
                 email: string;
                 reason: string;
+            }[];
+            offboard_users: {
+                email: string;
+                reason: string;
+            }[];
+            managers: {
+                email: string;
+                from: string | null;
+                to: string | null;
             }[];
             reactivate_users: {
                 email: string;
