@@ -8,6 +8,32 @@ export type Tx = Transaction<Database>;
 pg.types.setTypeParser(20, (v) => Number(v));
 
 /**
+ * Connections that survive a database going away. A query that timed out is on a dead
+ * connection (its answer may never come): destroy it, so the pool drops it instead of queueing
+ * the next query behind the lost one.
+ */
+class GuardedClient extends pg.Client {
+  constructor(config?: string | pg.ClientConfig) {
+    super(config);
+    // The pool listens for errors only while a connection is idle. One that breaks while in use
+    // (the server restarting or failing over) would emit an unhandled 'error' and crash the
+    // process; its queries have already been rejected to their callers, so this only needs to
+    // be heard. The pool drops the broken connection when it's released.
+    this.on("error", () => {});
+  }
+
+  override query(...args: unknown[]): never {
+    const r = (super.query as (...a: unknown[]) => unknown)(...args);
+    if (r && typeof (r as Promise<unknown>).catch === "function") {
+      (r as Promise<unknown>).catch((e: Error) => {
+        if (/timeout/i.test(e?.message ?? "")) (this as unknown as { connection: { stream: { destroy(): void } } }).connection.stream.destroy();
+      });
+    }
+    return r as never;
+  }
+}
+
+/**
  * Tenant-scoped database access.
  *
  * `tenant()` opens a transaction and sets app.org_id so Postgres row-level
@@ -18,19 +44,20 @@ export class Db {
   readonly pool: pg.Pool;
   readonly kysely: Kysely<Database>;
 
-  constructor(url: string) {
+  constructor(url: string, opts: { queryTimeoutMs?: number; poolSize?: number } = {}) {
     this.pool = new pg.Pool({
       connectionString: url,
-      max: Number(process.env.NEXUS_DB_POOL_SIZE) || 20,
+      max: opts.poolSize ?? (Number(process.env.NEXUS_DB_POOL_SIZE) || 20),
       // During a database failover, fail fast instead of hanging: new connections time out, and
       // TCP keepalive finds connections to the old primary that died without a goodbye.
       connectionTimeoutMillis: Number(process.env.NEXUS_DB_CONNECT_TIMEOUT_MS) || 5000,
       keepAlive: true,
       keepAliveInitialDelayMillis: 10_000,
+      // A server that vanished (a failover, a deleted pod) never answers: without a limit, the
+      // queries in flight hold every connection forever and nothing recovers.
+      query_timeout: opts.queryTimeoutMs ?? (Number(process.env.NEXUS_DB_QUERY_TIMEOUT_MS) || 30_000),
+      Client: GuardedClient,
     });
-    // A connection the server drops while idle (a restart, a failover) is reported here; without a
-    // listener Node would crash the whole process. The pool discards it and reconnects on next use.
-    this.pool.on("error", (err) => console.error(JSON.stringify({ level: "warn", msg: "database connection lost; reconnecting", error: err.message })));
     this.kysely = new Kysely<Database>({ dialect: new PostgresDialect({ pool: this.pool }) });
   }
 

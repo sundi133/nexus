@@ -24,7 +24,8 @@ if (problems.length) {
 // In production, migrations run as a separate release step (`pnpm --filter @nexus/api migrate`).
 if (cfg.env !== "prod") await migrate(cfg.databaseOwnerUrl, (m) => console.log(`[migrate] ${m}`));
 
-const db = new Db(cfg.databaseUrl);
+// API requests get 30 s per query; workers run long jobs (deleting an organization, retention).
+const db = new Db(cfg.databaseUrl, { queryTimeoutMs: Number(process.env.NEXUS_DB_QUERY_TIMEOUT_MS) || (cfg.role === "api" ? 30_000 : 300_000) });
 const realtime = new Realtime(cfg.databaseUrl);
 const mailer = new SmtpMailer(cfg.smtpUrl, cfg.mailFrom);
 // Real APNs/FCM when configured; otherwise pushes are logged (the app also gets challenges live over SSE).
@@ -43,7 +44,9 @@ const runsApi = cfg.role === "all" || cfg.role === "api";
 const runsWorker = cfg.role === "all" || cfg.role === "worker";
 
 // Workers serve only health and metrics over HTTP; API nodes serve everything.
-if (runsApi) await realtime.start();
+// Booting while the database is down (an outage, a failover) mustn't crash-loop: readiness
+// reports not-ready until it's back, and live updates connect when it is.
+if (runsApi) realtime.startOrRetry();
 // Rate limits count across every replica (login, MFA, API keys, MCP gateway...).
 useSharedRateLimits(deps.db);
 // Outbound HTTP checks the address it connects to (DNS rebinding) unless private access is allowed (dev).
