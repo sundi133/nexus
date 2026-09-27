@@ -56,13 +56,15 @@ export type Config = {
 export function validateProd(cfg: Config, env = process.env): string[] {
   if (cfg.env !== "prod") return [];
   const problems: string[] = [];
-  const need = ["NEXUS_DATABASE_URL", "NEXUS_DATABASE_OWNER_URL", "NEXUS_PUBLIC_URL", "NEXUS_API_PUBLIC_URL", "NEXUS_SMTP_URL", "NEXUS_MAIL_FROM", "NEXUS_METRICS_TOKEN"];
+  // Not NEXUS_DATABASE_OWNER_URL: the running API never needs the schema owner; only the migrate and
+  // reseal commands do, so an orchestrator can keep those credentials out of the API's pods.
+  const need = ["NEXUS_DATABASE_URL", "NEXUS_PUBLIC_URL", "NEXUS_API_PUBLIC_URL", "NEXUS_SMTP_URL", "NEXUS_MAIL_FROM", "NEXUS_METRICS_TOKEN"];
   for (const k of need) if (!env[k]) problems.push(`${k} is required`);
   if (!env.NEXUS_SEAL_KEY && !env.NEXUS_SEAL_KEYS) problems.push("NEXUS_SEAL_KEY (or NEXUS_SEAL_KEYS for rotation) is required");
   for (const [k, v] of [["NEXUS_PUBLIC_URL", cfg.publicUrl], ["NEXUS_API_PUBLIC_URL", cfg.apiPublicUrl]] as const) {
     if (!v.startsWith("https://")) problems.push(`${k} must be https (got ${v})`);
   }
-  if (/nexus_(app|owner):nexus_(app|owner)@/.test(cfg.databaseUrl + cfg.databaseOwnerUrl)) problems.push("Database URLs still use the development passwords");
+  if (/nexus_(app|owner):nexus_(app|owner)@/.test(cfg.databaseUrl + (env.NEXUS_DATABASE_OWNER_URL ? cfg.databaseOwnerUrl : ""))) problems.push("Database URLs still use the development passwords");
   if (cfg.allowPrivateOutbound) problems.push("NEXUS_ALLOW_PRIVATE_OUTBOUND must not be enabled in production");
   if (!cfg.hibpBase) problems.push("Breached-password checks are off (NEXUS_HIBP_BASE is empty)");
   if (!["all", "api", "worker"].includes(cfg.role)) problems.push(`NEXUS_ROLE must be all, api or worker (got ${cfg.role})`);

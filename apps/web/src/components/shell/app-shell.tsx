@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useLiveUpdates } from "@/lib/stream";
@@ -51,6 +52,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onSearch={() => setPalette(true)} />
+        {me.data?.organization.deletion_scheduled_for ? (
+          <div role="alert" className="border-b border-danger/30 bg-danger-soft px-4 py-2 text-[13px] text-danger md:px-8">
+            <strong className="font-semibold">{me.data.organization.name} and all its data will be deleted on {new Date(me.data.organization.deletion_scheduled_for).toLocaleDateString(undefined, { dateStyle: "long" })}.</strong>{" "}
+            <Link href="/settings/organization#data" className="underline underline-offset-2">
+              Review or cancel
+            </Link>
+          </div>
+        ) : null}
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">{children}</div>
         </main>

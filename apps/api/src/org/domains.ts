@@ -213,10 +213,7 @@ registerJobHandler("domain.recheck", async (deps, job) => {
 });
 
 export function scheduleDomainRechecks(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 3600_000) return; // hourly scan; each domain is rechecked daily
-    last = Date.now();
+  jobs.every("domains.recheck", 3600_000, async () => { // hourly scan; each domain is rechecked daily
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; domain_id: string }>`SELECT * FROM nexus_domains_to_recheck()`.execute(tx)).rows);
     for (const d of due) await deps.db.tenant(d.org_id, (tx) => enqueue(tx, d.org_id, "domain.recheck", { domain_id: d.domain_id }, { dedupeKey: `domain.recheck:${d.domain_id}` }));
   });

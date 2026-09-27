@@ -1,6 +1,7 @@
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { backoff, enqueue, PermanentJobError, registerJobHandler } from "../src/platform/jobs.js";
+import { randomUUID } from "node:crypto";
+import { backoff, enqueue, JobRunner, PermanentJobError, registerJobHandler } from "../src/platform/jobs.js";
 import { bootApp, PASSWORD, uniqueEmail } from "./harness.js";
 
 let h: Awaited<ReturnType<typeof bootApp>>;
@@ -109,5 +110,37 @@ describe("background jobs", () => {
     expect(mine.length).toBeGreaterThan(0);
     const visible = await h.deps.db.tenant(otherOrg, (tx) => tx.selectFrom("jobs").select("id").where("kind", "like", "test.%").execute());
     expect(visible).toEqual([]);
+  });
+});
+
+describe("periodic work across workers", () => {
+  it("runs once per interval across every worker, and a restart doesn't rerun it", async () => {
+    const name = `test.every:${randomUUID()}`;
+    let runs = 0;
+    const worker = () => {
+      const w = new JobRunner(h.deps);
+      w.every(name, 60 * 60_000, async () => void runs++);
+      return w;
+    };
+    const [a, b] = [worker(), worker()];
+    await Promise.all([a.tick(), b.tick(), a.tick(), b.tick()]);
+    expect(runs).toBe(1); // two workers, racing: once
+
+    await worker().tick(); // a worker that just started (a deploy): not due yet
+    expect(runs).toBe(1);
+
+    await owner.query("UPDATE schedule_runs SET last_run = now() - interval '61 minutes' WHERE name = $1", [name]);
+    await Promise.all([worker().tick(), worker().tick()]); // an hour later: due again, once
+    expect(runs).toBe(2);
+  });
+
+  it("keeps the schedule table out of the application's reach", async () => {
+    const app = new pg.Client({ connectionString: process.env.NEXUS_DATABASE_URL });
+    await app.connect();
+    try {
+      await expect(app.query("SELECT * FROM schedule_runs")).rejects.toThrow(/permission denied/);
+    } finally {
+      await app.end();
+    }
   });
 });

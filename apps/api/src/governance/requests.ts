@@ -219,10 +219,7 @@ registerJobHandler("access.expire", async (deps, job) => {
 
 /** Every minute: grants past their end are taken away. */
 export function scheduleAccessExpiry(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 60_000) return;
-    last = Date.now();
+  jobs.every("access.expire", 60_000, async () => {
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; request_id: string }>`SELECT * FROM nexus_access_grants_expired()`.execute(tx)).rows);
     for (const d of due) await deps.db.tenant(d.org_id, (tx) => enqueue(tx, d.org_id, "access.expire", { request_id: d.request_id }, { dedupeKey: `access.expire:${d.request_id}` }));
   });

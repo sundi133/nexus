@@ -178,20 +178,13 @@ registerJobHandler("audit.verify", async (deps, job) => {
 
 /** Seals hourly, verifies and applies retention daily. */
 export function scheduleAuditIntegrity(jobs: JobRunner, deps: Deps) {
-  let lastSeal = 0;
-  let lastDaily = 0;
-  jobs.onTick(async () => {
-    const now = Date.now();
-    if (now - lastSeal >= 60 * 60_000) {
-      lastSeal = now;
-      const orgs = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string }>`SELECT * FROM nexus_audit_unsealed()`.execute(tx)).rows);
-      for (const o of orgs) await deps.db.tenant(o.org_id, (tx) => enqueue(tx, o.org_id, "audit.seal", {}, { dedupeKey: "audit.seal" }));
-    }
-    if (now - lastDaily >= 24 * 60 * 60_000) {
-      lastDaily = now;
-      await deps.db.unscoped((tx) => sql`SELECT * FROM nexus_prune_audit(500)`.execute(tx));
-      const orgs = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string }>`SELECT * FROM nexus_audit_chained_orgs()`.execute(tx)).rows);
-      for (const o of orgs) await deps.db.tenant(o.org_id, (tx) => enqueue(tx, o.org_id, "audit.verify", {}, { dedupeKey: "audit.verify" }));
-    }
+  jobs.every("audit.seal", 60 * 60_000, async () => {
+    const orgs = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string }>`SELECT * FROM nexus_audit_unsealed()`.execute(tx)).rows);
+    for (const o of orgs) await deps.db.tenant(o.org_id, (tx) => enqueue(tx, o.org_id, "audit.seal", {}, { dedupeKey: "audit.seal" }));
+  });
+  jobs.every("audit.daily", 24 * 60 * 60_000, async () => {
+    await deps.db.unscoped((tx) => sql`SELECT * FROM nexus_prune_audit(500)`.execute(tx));
+    const orgs = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string }>`SELECT * FROM nexus_audit_chained_orgs()`.execute(tx)).rows);
+    for (const o of orgs) await deps.db.tenant(o.org_id, (tx) => enqueue(tx, o.org_id, "audit.verify", {}, { dedupeKey: "audit.verify" }));
   });
 }

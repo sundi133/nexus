@@ -61,7 +61,9 @@ export const AuthResult = z
 const Me = z
   .object({
     user: User,
-    organization: Organization,
+    organization: Organization.extend({
+      deletion_scheduled_for: z.string().nullable().openapi({ description: "Set when an owner has scheduled the organization's deletion" }),
+    }),
     roles: z.array(RoleSchema),
     permissions: z.array(Permission),
     scoped_permissions: z.record(z.string(), z.array(z.string())).openapi({ description: "Permissions held only for people in these groups (scoped roles)" }),
@@ -529,7 +531,7 @@ export function registerAuthRoutes(app: App) {
       return c.json(
         {
           user: toUser(user),
-          organization: { id: org.id, name: org.name, slug: org.slug, created_at: iso(org.created_at) },
+          organization: { id: org.id, name: org.name, slug: org.slug, created_at: iso(org.created_at), deletion_scheduled_for: org.deletion_scheduled_for ? iso(org.deletion_scheduled_for) : null },
           roles: p.roles,
           ...(() => {
             const d = describeGrants(p.grants ?? resolveGrants(p.roles, []));

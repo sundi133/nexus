@@ -109,10 +109,7 @@ registerJobHandler("mdm.sync", async (deps, job) => {
 const syncKey = (id: string) => `mdm.sync:${id}`;
 
 export function scheduleMdmSyncs(jobs: JobRunner, deps: Deps) {
-  let last = 0;
-  jobs.onTick(async () => {
-    if (Date.now() - last < 60_000) return;
-    last = Date.now();
+  jobs.every("mdm.sync", 60_000, async () => {
     const due = await deps.db.unscoped(async (tx) => (await sql<{ org_id: string; connection_id: string }>`SELECT * FROM nexus_due_mdm_syncs()`.execute(tx)).rows);
     for (const d of due) await deps.db.tenant(d.org_id, (tx) => enqueue(tx, d.org_id, "mdm.sync", { connection_id: d.connection_id }, { dedupeKey: syncKey(d.connection_id), maxAttempts: 2 }));
   });

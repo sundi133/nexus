@@ -159,7 +159,26 @@
             "$ref": "#/components/schemas/User"
           },
           "organization": {
-            "$ref": "#/components/schemas/Organization"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Organization"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "deletion_scheduled_for": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Set when an owner has scheduled the organization's deletion"
+                  }
+                },
+                "required": [
+                  "deletion_scheduled_for"
+                ]
+              }
+            ]
           },
           "roles": {
             "type": "array",
@@ -372,6 +391,8 @@
           "users:read",
           "users:write",
           "users:lifecycle",
+          "users:erase",
+          "data:export",
           "groups:read",
           "groups:write",
           "audit:read",
@@ -3569,6 +3590,8 @@
                       "users:read",
                       "users:write",
                       "users:lifecycle",
+                      "users:erase",
+                      "data:export",
                       "groups:read",
                       "groups:write",
                       "audit:read",
@@ -3627,6 +3650,8 @@
                     "users:read",
                     "users:write",
                     "users:lifecycle",
+                    "users:erase",
+                    "data:export",
                     "groups:read",
                     "groups:write",
                     "audit:read",
@@ -3700,6 +3725,8 @@
                 "users:read",
                 "users:write",
                 "users:lifecycle",
+                "users:erase",
+                "data:export",
                 "groups:read",
                 "groups:write",
                 "audit:read",
@@ -8233,6 +8260,215 @@
           "signer",
           "detection",
           "severity"
+        ]
+      },
+      "PersonExport": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "nexus-person-export/1"
+            ]
+          },
+          "exported_at": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            },
+            "description": "Rows by table: the profile, memberships, roles, factors (no secrets), sessions, devices, requests…"
+          },
+          "audit_events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "description": "Audit events where the person is the actor or the target (up to 50,000)"
+          },
+          "audit_truncated": {
+            "type": "boolean"
+          },
+          "omitted": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Columns left out as secrets (password hashes, sealed keys, token hashes)"
+          }
+        },
+        "required": [
+          "format",
+          "exported_at",
+          "user_id",
+          "data",
+          "audit_events",
+          "audit_truncated",
+          "omitted"
+        ]
+      },
+      "EraseResult": {
+        "type": "object",
+        "properties": {
+          "erased": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "removed": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Rows deleted, by table"
+          },
+          "detached": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Records kept (they belong to the organization) with the person removed from them, by table and column"
+          },
+          "directory_managed": {
+            "type": "boolean",
+            "description": "True if a directory sync created them: remove them from the directory too, or the next sync adds them again"
+          }
+        },
+        "required": [
+          "erased",
+          "removed",
+          "detached",
+          "directory_managed"
+        ]
+      },
+      "EraseInput": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "string",
+            "description": "The person's email address, typed to confirm"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500,
+            "example": "Erasure request under GDPR Art. 17, ticket PRIV-1042"
+          }
+        },
+        "required": [
+          "confirm",
+          "reason"
+        ]
+      },
+      "OrgDeletionStatus": {
+        "type": "object",
+        "properties": {
+          "scheduled_for": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When everything will be deleted; null if no deletion is scheduled"
+          },
+          "requested_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Who scheduled it (email)"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grace_days": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scheduled_for",
+          "requested_at",
+          "requested_by",
+          "reason",
+          "grace_days"
+        ]
+      },
+      "OrgDeletionInput": {
+        "type": "object",
+        "properties": {
+          "confirm_name": {
+            "type": "string",
+            "description": "The organization's name, typed exactly"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "confirm_name",
+          "reason"
+        ]
+      },
+      "DataRetention": {
+        "type": "object",
+        "properties": {
+          "audit_retention_days": {
+            "type": "integer"
+          },
+          "classes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kept": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "name",
+                "kept",
+                "notes"
+              ]
+            }
+          }
+        },
+        "required": [
+          "audit_retention_days",
+          "classes"
         ]
       },
       "DevicePage": {
@@ -19306,6 +19542,8 @@
                         "users:read",
                         "users:write",
                         "users:lifecycle",
+                        "users:erase",
+                        "data:export",
                         "groups:read",
                         "groups:write",
                         "audit:read",
@@ -19459,6 +19697,8 @@
                         "users:read",
                         "users:write",
                         "users:lifecycle",
+                        "users:erase",
+                        "data:export",
                         "groups:read",
                         "groups:write",
                         "audit:read",
@@ -34424,6 +34664,576 @@
                   "required": [
                     "data"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{id}/data-export": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Everything Nexus holds about one person (privacy access request)",
+        "description": "Profile, group and role memberships, MFA factors and sessions (metadata only, never secrets), devices, requests and reviews, notifications, and audit events about them. Recorded in the audit log.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonExport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{id}/erase": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Permanently delete a person and their personal data (privacy erasure request)",
+        "description": "Irreversible. The person must be suspended or offboarded first, so their access everywhere is gone, and their accounts in provisioned apps must be deactivated. Their profile, memberships, roles, factors, sessions, devices' assignment, requests and notifications are deleted; records that belong to the organization (policies they created, decisions they made) are kept without them. Audit events stay: the log is append-only and ages out with audit retention.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "01926f4e-7b3a-7c1e-9d2f-3a4b5c6d7e8f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EraseInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EraseResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/org/export": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Export all of the organization's data",
+        "description": "Gzipped JSON lines from one consistent snapshot: a manifest, then each table's columns and rows, then an `end` line with row counts (missing if the download was cut short). Secrets (password hashes, sealed credentials, key material, token hashes) are left out and listed per table. Needs `data:export`; recorded in the audit log.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "nexus-org-export/1 (application/gzip)",
+            "content": {
+              "application/gzip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/org/deletion": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Whether the organization is scheduled for deletion",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgDeletionStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Schedule the deletion of the organization and all its data",
+        "description": "Owners only, with a recent MFA (a passkey if the organization requires it for owners), never an API key. Everything is deleted after the grace period (default 30 days); until then the organization works as usual and any owner can cancel. Owners and admins are told now, and owners get a deletion certificate by email afterwards. Export your data first (`GET /v1/org/export`).",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrgDeletionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgDeletionStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Cancel a scheduled deletion",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgDeletionStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/org/data-retention": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "What Nexus keeps about the organization, and for how long",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRetention"
                 }
               }
             }
