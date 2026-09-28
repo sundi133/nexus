@@ -1,13 +1,13 @@
-import * as Notifications from "expo-notifications";
 import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { unwrap } from "@/lib/api";
 import { requestIdFromLink } from "@/lib/biometrics";
+import { Notifications } from "@/lib/notifications";
 import { SessionProvider, useSession } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({ shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
 });
 
@@ -18,6 +18,7 @@ Notifications.setNotificationHandler({
 function PushRouter() {
   const session = useSession();
   useEffect(() => {
+    if (!Notifications) return; // no pushes here (Expo Go on Android): nothing to tap
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as { category?: string; id?: string };
       if (data.category === "auth.mfa_challenge" && data.id) router.push({ pathname: "/approve/[id]", params: { id: data.id } });

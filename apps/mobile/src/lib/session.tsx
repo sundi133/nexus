@@ -1,9 +1,9 @@
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 import { ApiProblem, clientFor, unwrap, type Api } from "./api";
 import { generateDeviceKey } from "./keys";
+import { Notifications } from "./notifications";
 import { clearPairing, loadPairing, savePairing, type Pairing } from "./store";
 
 type State =
@@ -29,7 +29,7 @@ export function useSession() {
 /** Best effort: Expo Go on Android and simulators can't get a device push token. Approvals still arrive by polling. */
 async function devicePushToken(): Promise<string | undefined> {
   try {
-    if (!Device.isDevice || Platform.OS === "web") return undefined;
+    if (!Notifications || !Device.isDevice || Platform.OS === "web") return undefined;
     const perm = await Notifications.requestPermissionsAsync();
     if (!perm.granted) return undefined;
     return (await Notifications.getDevicePushTokenAsync()).data as string;
