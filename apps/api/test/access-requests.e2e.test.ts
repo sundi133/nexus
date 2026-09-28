@@ -69,7 +69,7 @@ describe("the catalog", () => {
 
   it("shows people what they can ask for", async () => {
     const list = (await h.call("GET", "/v1/access/catalog", { token: as("dave") })).body.data;
-    expect(list.map((x: any) => x.name).sort()).toEqual(["Salesforce", "admin role"]);
+    expect(list.map((x: any) => x.name).sort()).toEqual(["Admin role", "Salesforce"]);
     expect(list.find((x: any) => x.resource_type === "role").you).toEqual({ eligible: true, has_access: false, open_request: null });
   });
 });
@@ -148,7 +148,7 @@ describe("just-in-time admin", () => {
     expect((await request("alice", { catalog_id: adminEntry, justification: "rotate keys", duration_hours: 8 })).body.code).toBe("too_long");
     const r = (await request("alice", { catalog_id: adminEntry, justification: "rotate keys", duration_hours: 3 })).body;
     expect(r).toMatchObject({ status: "pending", approvers: [people.root!.email] });
-    expect((await inbox("root")).find((n) => n.category === "access.approval")!.title).toBe(`${people.alice!.email} requests admin role`);
+    expect((await inbox("root")).find((n) => n.category === "access.approval")!.title).toBe(`${people.alice!.email} requests Admin role`);
     expect((await decide("root", r.id, "approve")).body.status).toBe("active");
     expect((await h.call("GET", "/v1/me", { token: as("alice") })).body.roles).toContain("admin");
     // Giving it back early.

@@ -50,17 +50,23 @@ const eligibleOf = (c: CatalogRow): Eligible => {
   return { users: e.users ?? [], groups: e.groups ?? [] };
 };
 
-/** What the request is for, in words. */
+/**
+ * What the request is for: the app, group, rule or package's own name, or "Security analyst role".
+ * What it does (unblocked, installed) is said separately, where it's shown.
+ */
 export async function resourceName(tx: Tx, c: Pick<CatalogRow, "resource_type" | "resource_id" | "role">) {
-  if (c.resource_type === "role") return `${String(c.role).replace("_", " ")} role`;
+  if (c.resource_type === "role") {
+    const role = String(c.role).replace(/_/g, " ");
+    return `${role.charAt(0).toUpperCase()}${role.slice(1)} role`;
+  }
   if (c.resource_type === "app") return (await tx.selectFrom("applications").select("name").where("id", "=", c.resource_id!).executeTakeFirst())?.name ?? "a removed app";
   if (c.resource_type === "block_exception") {
     const r = await tx.selectFrom("enforcement_rules").select("name").where("id", "=", c.resource_id!).executeTakeFirst();
-    return r ? `${r.name} (unblocked on your devices)` : "a removed block rule";
+    return r ? r.name : "a removed block rule";
   }
   if (c.resource_type === "software") {
     const p = await tx.selectFrom("software_packages").select("name").where("id", "=", c.resource_id!).executeTakeFirst();
-    return p ? `${p.name} (installed on your devices)` : "a removed app";
+    return p ? p.name : "a removed app";
   }
   return (await tx.selectFrom("groups").select("name").where("id", "=", c.resource_id!).executeTakeFirst())?.name ?? "a removed group";
 }
@@ -117,7 +123,7 @@ export async function notifyApprovers(tx: Tx, c: CatalogRow, req: RequestRow) {
   await notifyUsers(tx, req.org_id, ids, {
     category: "access.approval",
     severity: c.resource_type === "role" ? "warning" : "info",
-    title: `${who} requests ${what}`,
+    title: c.resource_type === "block_exception" ? `${who} asks to use ${what}, which is blocked` : c.resource_type === "software" ? `${who} asks for ${what} to be installed` : `${who} requests ${what}`,
     body: `${req.justification}${req.duration_hours ? ` · for ${req.duration_hours} h` : " · permanently"}${stages.length > 1 ? ` · approval ${req.stage + 1} of ${stages.length}` : ""}`,
     entity: { type: "access_request", id: req.id },
     link: `/access-requests?view=approvals`,
@@ -154,7 +160,7 @@ export async function grant(tx: Tx, c: CatalogRow, req: RequestRow, meta: Reques
   });
   await notifyUsers(tx, req.org_id, [req.requester_id], {
     category: "access.granted",
-    title: `You have ${what}${expires ? ` until ${expires.toUTCString().slice(0, 22)} UTC` : ""}`,
+    title: `${c.resource_type === "block_exception" ? `${what} is unblocked on your devices` : c.resource_type === "software" ? `${what} is being installed on your devices` : `You have ${what}`}${expires ? ` until ${expires.toUTCString().slice(0, 22)} UTC` : ""}`,
     body: why,
     entity: { type: "access_request", id: req.id },
     link: c.resource_type === "app" ? "/my-apps" : c.resource_type === "block_exception" || c.resource_type === "software" ? "/my-devices" : "/access-requests",
@@ -189,7 +195,12 @@ export async function endGrant(tx: Tx, c: CatalogRow, req: RequestRow, meta: Req
   });
   await notifyUsers(tx, req.org_id, [req.requester_id], {
     category: "access.ended",
-    title: how.status === "ended" ? `Your access to ${what} ended` : `${how.by?.email ?? "An admin"} removed your access to ${what}`,
+    title:
+      c.resource_type === "block_exception"
+        ? `${what} is blocked again on your devices`
+        : how.status === "ended"
+          ? `Your access to ${what} ended`
+          : `${how.by?.email ?? "An admin"} removed your access to ${what}`,
     body: how.reason,
     entity: { type: "access_request", id: req.id },
     link: "/access-requests",

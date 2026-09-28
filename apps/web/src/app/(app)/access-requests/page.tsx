@@ -104,7 +104,7 @@ function RequestTab() {
               <Icon className="size-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold capitalize">{c.name}</p>
+              <p className="text-[13px] font-semibold">{c.name}</p>
               <p className="text-xs text-fg-muted">{c.description || KIND_TEXT[c.resource_type]}</p>
               <p className="mt-1 text-xs text-fg-subtle">
                 Up to {hours(c.max_hours)}
@@ -226,7 +226,7 @@ function RequestCard({ r, view }: { r: Req; view: "mine" | "approvals" | "all" }
         </div>
         <div className="min-w-0 flex-1 text-[13px]">
           <p className="flex flex-wrap items-center gap-2 font-semibold">
-            <span className="capitalize">{r.resource.name}</span>
+            <span>{r.resource.name}</span>
             {!mine ? <span className="font-normal text-fg-muted">for {r.requester.email}</span> : null}
             <StatusPill tone={STATUS[r.status].tone}>{STATUS[r.status].label}</StatusPill>
             {r.auto_approved ? <span className="text-xs font-normal text-fg-subtle">pre-approved</span> : null}
@@ -327,7 +327,7 @@ function CatalogTab() {
               <Icon className="size-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2 font-semibold capitalize">
+              <p className="flex items-center gap-2 font-semibold">
                 {c.name} {!c.enabled ? <StatusPill>Off</StatusPill> : null}
               </p>
               <p className="text-xs text-fg-muted">
