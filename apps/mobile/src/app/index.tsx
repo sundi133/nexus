@@ -100,6 +100,10 @@ export default function Home() {
               <Text style={[styles.shortcutTitle, { color: t.fg }]}>Authenticator codes</Text>
               <Text style={{ color: t.fgMuted, fontSize: 13 }}>Work without a connection</Text>
             </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => router.push("/requests")} style={[styles.shortcut, { backgroundColor: t.bg, borderColor: t.border }]}>
+              <Text style={[styles.shortcutTitle, { color: t.fg }]}>My requests</Text>
+              <Text style={{ color: t.fgMuted, fontSize: 13 }}>What you asked for, and ask</Text>
+            </Pressable>
           </View>
 
           {error ? <Text style={{ color: t.danger }}>{error}</Text> : null}
@@ -111,11 +115,12 @@ export default function Home() {
       renderItem={({ item }) => (
         <Pressable
           accessibilityRole="button"
-          disabled={!requestIdFromLink(item.link) && item.category !== "access.approval"}
+          disabled={!requestIdFromLink(item.link) && item.category !== "access.approval" && !MY_REQUEST.has(item.category)}
           onPress={() => {
             const request = requestIdFromLink(item.link);
             if (request) router.push({ pathname: "/request/[id]", params: { id: request } });
             else if (item.category === "access.approval") router.push("/approvals");
+            else if (MY_REQUEST.has(item.category)) router.push("/requests");
           }}
           style={[styles.row, { borderColor: t.border, backgroundColor: t.bg }]}
         >
@@ -146,6 +151,9 @@ export default function Home() {
     />
   );
 }
+
+// Notifications about your own requests (decided, ended) open My requests.
+const MY_REQUEST = new Set(["access.granted", "access.denied", "access.ended"]);
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 8 },

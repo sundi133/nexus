@@ -24,6 +24,7 @@ function PushRouter() {
       const data = response.notification.request.content.data as { category?: string; id?: string };
       if (data.category === "auth.mfa_challenge" && data.id) router.push({ pathname: "/approve/[id]", params: { id: data.id } });
       else if (data.category === "access.approval") router.push("/approvals");
+      else if (data.category === "access.granted" || data.category === "access.denied" || data.category === "access.ended") router.push("/requests");
       else if (data.category === "device.app_blocked" && data.id && session.status === "paired") {
         void unwrap(session.api.GET("/v1/me/notifications", { params: { query: { limit: 50, filter: "all" } } }))
           .then((r) => {
@@ -59,6 +60,8 @@ export default function RootLayout() {
         <Stack.Screen name="approvals" options={{ title: "To approve" }} />
         <Stack.Screen name="request/[id]" options={{ title: "Request access", presentation: "modal" }} />
         <Stack.Screen name="codes" options={{ title: "Authenticator codes" }} />
+        <Stack.Screen name="requests" options={{ title: "My requests" }} />
+        <Stack.Screen name="catalog" options={{ title: "Ask for access" }} />
       </Stack>
     </SessionProvider>
   );

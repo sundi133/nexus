@@ -23,6 +23,15 @@ It uses the same generated API client as the web console (`@nexus/api-client`).
 - **Approving:** the console shows a number and the phone shows three. Tapping one triggers Face ID / Touch ID, then the app signs `nexus-push-v1\n{id}\n{decision}\n{choice}`. The server checks both the number and the signature.
 - **"This wasn't me":** revokes the waiting sign-in and alerts the security team.
 
+## My requests
+
+**My requests** (on the home screen) shows what you've asked for:
+- **Active:** granted, with the end time and **Give back** to end it early.
+- **Waiting:** who it's waiting on, and at which approval step, with **Withdraw**.
+- **Earlier:** denied (with the approver's comment), withdrawn and ended requests.
+
+**Ask for access** lists the catalog: apps, groups, software and blocked apps. Admin roles need a fresh sign-in check, so they're requested in the console. When a request is approved, denied or ends, the notification (or push) opens My requests.
+
 ## Authenticator codes
 
 **Authenticator codes** (on the home screen) works as a standard authenticator app. Codes are made on the phone, so they work with no connection.
