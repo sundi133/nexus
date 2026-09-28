@@ -122,9 +122,9 @@ describe("push and email", () => {
     const ios = apnsSeen.find((x) => x.path === `/3/device/${GOOD.ios}`)!;
     expect(ios.headers["apns-topic"]).toBe("ai.votal.nexus");
     expect(ios.headers["apns-priority"]).toBe("10");
-    expect(ios.body).toEqual({ aps: { alert: { title: "Security alert" }, sound: "default", "thread-id": "security.alert" }, category: "security.alert", id: n.id });
+    expect(ios.body).toEqual({ aps: { alert: { title: "Security alert" }, sound: "default", "thread-id": "security.alert", "interruption-level": "active" }, category: "security.alert", id: n.id });
     const android = fcmSeen.find((x) => x.token === GOOD.android)!;
-    expect(android.body.message).toMatchObject({ notification: { title: "Security alert" }, data: { category: "security.alert", id: n.id }, android: { priority: "HIGH" } });
+    expect(android.body.message).toMatchObject({ notification: { title: "Security alert" }, data: { category: "security.alert", id: n.id }, android: { priority: "HIGH", notification: { channel_id: "updates" } } });
     expect(JSON.stringify([...apnsSeen, ...fcmSeen])).not.toContain("Secret details");
 
     const mail = [...h.mailer.sent].reverse().find((m) => m.subject.includes("Admin account contained"))!;

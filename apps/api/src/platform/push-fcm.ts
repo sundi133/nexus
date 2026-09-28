@@ -1,5 +1,5 @@
 import { importPKCS8, SignJWT } from "jose";
-import type { PushPayload, PushSender, PushTarget } from "./push.js";
+import { pushChannel, type PushPayload, type PushSender, type PushTarget } from "./push.js";
 
 /** Firebase Cloud Messaging HTTP v1 with a service account (OAuth 2 JWT bearer). */
 export type FcmConfig = { projectId: string; clientEmail: string; privateKey: string; tokenUrl?: string; base?: string };
@@ -54,7 +54,11 @@ export class FcmSender implements PushSender {
             token: target.token,
             notification: { title: payload.title },
             data: { category: payload.category, id: payload.id },
-            android: { priority: payload.priority === "high" ? "HIGH" : "NORMAL", ttl: payload.priority === "high" ? "120s" : "86400s", notification: { tag: payload.category } },
+            android: {
+              priority: payload.priority === "high" || pushChannel(payload.category) !== "updates" ? "HIGH" : "NORMAL",
+              ttl: payload.priority === "high" ? "120s" : "86400s",
+              notification: { tag: payload.category, channel_id: pushChannel(payload.category) },
+            },
           },
         }),
         signal: AbortSignal.timeout(10_000),

@@ -112,6 +112,37 @@ export function registerPushRoutes(app: App) {
 
   app.openapi(
     createRoute({
+      method: "put",
+      path: "/v1/me/push-token",
+      tags: ["Nexus Mobile"],
+      summary: "Update this phone's push token (the app calls it at start and when the OS rotates the token)",
+      description: "Only from a Nexus Mobile session. Replaces the token registered for this phone, so pushes follow it to a new build or a rotated token.",
+      security: bearer,
+      request: body(z.object({ platform: z.enum(["ios", "android"]), push_token: z.string().min(8).max(4096) })),
+      responses: { 204: { description: "Registered" }, ...problemResponses },
+    }),
+    async (c) => {
+      const p = requireSession(c);
+      const input = c.req.valid("json");
+      await c.get("deps").db.tenant(p.orgId, async (tx) => {
+        const s = await tx.selectFrom("sessions").select(["factor_id", "client"]).where("id", "=", p.sessionId).executeTakeFirst();
+        if (!s?.factor_id || s.client !== "mobile") throw badRequest("not_mobile", "Only a paired Nexus Mobile app can register a push token");
+        const now = new Date();
+        await sql`SELECT nexus_release_push_token(${input.platform}, ${input.push_token}, ${p.orgId}::uuid)`.execute(tx);
+        // One token per phone: the new one replaces whatever this phone had.
+        await tx.deleteFrom("push_registrations").where("factor_id", "=", s.factor_id).where("token", "<>", input.push_token).execute();
+        await tx
+          .insertInto("push_registrations")
+          .values({ id: newId(), org_id: p.orgId, user_id: p.userId, factor_id: s.factor_id, platform: input.platform, token: input.push_token, last_seen_at: now })
+          .onConflict((oc) => oc.columns(["platform", "token"]).doUpdateSet({ user_id: p.userId, factor_id: s.factor_id, last_seen_at: now }))
+          .execute();
+      });
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "post",
       path: "/v1/devices/pair",
       tags: ["Nexus Mobile"],
@@ -181,6 +212,7 @@ export function registerPushRoutes(app: App) {
           })
           .execute();
         if (input.push_token) {
+          await sql`SELECT nexus_release_push_token(${input.platform}, ${input.push_token}, ${pairing.org_id}::uuid)`.execute(tx);
           await tx
             .insertInto("push_registrations")
             .values({ id: newId(), org_id: pairing.org_id, user_id: pairing.user_id, factor_id: factorId, platform: input.platform, token: input.push_token, last_seen_at: now })

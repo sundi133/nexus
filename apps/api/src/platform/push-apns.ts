@@ -1,6 +1,6 @@
 import http2 from "node:http2";
 import { importPKCS8, SignJWT } from "jose";
-import type { PushPayload, PushSender, PushTarget } from "./push.js";
+import { pushChannel, type PushPayload, type PushSender, type PushTarget } from "./push.js";
 
 /**
  * Apple Push Notification service over HTTP/2 with a token-based (.p8)
@@ -39,7 +39,13 @@ export class ApnsSender implements PushSender {
   async send(target: PushTarget, payload: PushPayload): Promise<{ ok: boolean; invalidToken?: boolean }> {
     if (target.platform !== "ios") return { ok: false };
     const body = JSON.stringify({
-      aps: { alert: { title: payload.title }, sound: "default", "thread-id": payload.category },
+      aps: {
+        alert: { title: payload.title },
+        sound: "default",
+        "thread-id": payload.category,
+        // Sign-ins and approvals break through Focus modes; everything else waits its turn.
+        "interruption-level": pushChannel(payload.category) === "updates" ? "active" : "time-sensitive",
+      },
       category: payload.category,
       id: payload.id,
     });

@@ -6,6 +6,18 @@
 export type PushTarget = { platform: "ios" | "android" | "web"; token: string };
 export type PushPayload = { title: string; category: string; id: string; priority: "high" | "normal" };
 
+/**
+ * How urgently a notification should interrupt: sign-in approvals must reach someone within
+ * seconds; requests waiting for them soon; the rest whenever. The phone app creates matching
+ * Android notification channels with these IDs.
+ */
+export type PushChannel = "sign-ins" | "approvals" | "updates";
+export function pushChannel(category: string): PushChannel {
+  if (category === "auth.mfa_challenge") return "sign-ins";
+  if (category === "access.approval") return "approvals";
+  return "updates";
+}
+
 export interface PushSender {
   send(target: PushTarget, payload: PushPayload): Promise<{ ok: boolean; invalidToken?: boolean }>;
 }

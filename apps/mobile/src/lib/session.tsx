@@ -1,9 +1,9 @@
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 import { ApiProblem, clientFor, unwrap, type Api } from "./api";
 import { generateDeviceKey } from "./keys";
+import { Notifications } from "./notifications";
 import { clearPairing, loadPairing, savePairing, type Pairing } from "./store";
 
 type State =
@@ -29,7 +29,7 @@ export function useSession() {
 /** Best effort: Expo Go on Android and simulators can't get a device push token. Approvals still arrive by polling. */
 async function devicePushToken(): Promise<string | undefined> {
   try {
-    if (!Device.isDevice || Platform.OS === "web") return undefined;
+    if (!Notifications || !Device.isDevice || Platform.OS === "web") return undefined;
     const perm = await Notifications.requestPermissionsAsync();
     if (!perm.granted) return undefined;
     return (await Notifications.getDevicePushTokenAsync()).data as string;
@@ -46,6 +46,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       .then((p) => setState(p ? { status: "paired", pairing: p, api: clientFor(p.apiUrl, p.token) } : { status: "unpaired" }))
       .catch(() => setState({ status: "unpaired" }));
   }, []);
+
+  // Keep the server's push token for this phone current: send it at every start (a new build,
+  // or a phone first paired in Expo Go, gets one), and whenever the OS rotates it.
+  useEffect(() => {
+    if (state.status !== "paired" || !Notifications || (Platform.OS !== "ios" && Platform.OS !== "android")) return;
+    const api = state.api;
+    const platform = Platform.OS;
+    const send = (token: string) => void api.PUT("/v1/me/push-token", { body: { platform, push_token: token } }).catch(() => undefined);
+    void devicePushToken().then((t) => t && send(t));
+    const sub = Notifications.addPushTokenListener((t) => typeof t.data === "string" && send(t.data));
+    return () => sub.remove();
+  }, [state]);
 
   const pair = useCallback(async (apiUrl: string, code: string) => {
     const key = generateDeviceKey();
