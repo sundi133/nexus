@@ -27,6 +27,6 @@ It uses the same generated API client as the web console (`@nexus/api-client`).
 
 - **Push delivery:** the API currently records pushes (`RecordingPushSender`) instead of calling APNs/FCM. The app polls every 3 seconds while open, so approvals still arrive. Real APNs/FCM delivery is next.
 - **Expo Go:**
-  - Android can't receive remote pushes there; use a development build (`npx expo run:android`).
+  - Android can't receive remote pushes there, so the app doesn't load push support at all in Expo Go on Android. Notifications and approvals still appear in the app within a few seconds while it's open. For pushes, use a development build (`npx expo run:android`).
   - Keystore items can't be biometric-locked. The app instead gates each signature with `expo-local-authentication`.
 - **Hardware key:** planned upgrade is a non-exportable Secure Enclave / StrongBox key via a native module, plus DPoP-bound tokens (ARCHITECTURE §10.3).
