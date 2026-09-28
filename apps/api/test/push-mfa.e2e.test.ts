@@ -64,6 +64,26 @@ describe("push MFA", () => {
     expect(again.body.code).toBe("pairing_invalid");
   });
 
+  it("lets the phone refresh its push token, and only the phone", async () => {
+    const first = `fcm-rotated-${Math.random()}`;
+    const second = `fcm-rotated-${Math.random()}`;
+    expect((await h.call("PUT", "/v1/me/push-token", { token: phone.token, body: { platform: "android", push_token: first } })).status).toBe(204);
+    expect((await h.call("PUT", "/v1/me/push-token", { token: phone.token, body: { platform: "android", push_token: second } })).status).toBe(204);
+    const orgId = (await h.call("GET", "/v1/me", { token: webToken })).body.organization.id;
+    const regs = await h.deps.db.tenant(orgId, (tx) => tx.selectFrom("push_registrations").select(["token", "platform"]).where("factor_id", "=", phone.factorId).execute());
+    expect(regs).toEqual([{ token: second, platform: "android" }]); // one token per phone: the latest
+    expect((await h.call("PUT", "/v1/me/push-token", { token: webToken, body: { platform: "ios", push_token: "from-a-browser" } })).body.code).toBe("not_mobile");
+
+    // The same phone paired to another organization takes its token along.
+    const other = (await h.call("POST", "/v1/signup", { body: { organization_name: "Raviga", email: uniqueEmail("laurie"), password: PASSWORD, given_name: "Laurie" } })).body.token;
+    const elsewhere = new SoftPhone();
+    await pair(other, elsewhere, "Shared test phone");
+    expect((await h.call("PUT", "/v1/me/push-token", { token: elsewhere.token, body: { platform: "android", push_token: second } })).status).toBe(204);
+    expect(await h.deps.db.tenant(orgId, (tx) => tx.selectFrom("push_registrations").select("token").where("token", "=", second).execute())).toEqual([]);
+    // Back to a token of its own for the tests that follow.
+    await h.call("PUT", "/v1/me/push-token", { token: phone.token, body: { platform: "ios", push_token: `apns-${Math.random()}` } });
+  });
+
   it("approves a sign-in when the right number is tapped", async () => {
     const pushesBefore = h.push.sent.length;
     const s = await startSignIn();

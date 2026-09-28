@@ -3,10 +3,11 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { unwrap } from "@/lib/api";
 import { requestIdFromLink } from "@/lib/biometrics";
-import { Notifications } from "@/lib/notifications";
+import { Notifications, setUpChannels } from "@/lib/notifications";
 import { SessionProvider, useSession } from "@/lib/session";
 import { useTheme } from "@/lib/theme";
 
+void setUpChannels();
 Notifications?.setNotificationHandler({
   handleNotification: async () => ({ shouldPlaySound: true, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true }),
 });

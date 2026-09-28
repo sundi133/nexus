@@ -47,6 +47,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       .catch(() => setState({ status: "unpaired" }));
   }, []);
 
+  // Keep the server's push token for this phone current: send it at every start (a new build,
+  // or a phone first paired in Expo Go, gets one), and whenever the OS rotates it.
+  useEffect(() => {
+    if (state.status !== "paired" || !Notifications || (Platform.OS !== "ios" && Platform.OS !== "android")) return;
+    const api = state.api;
+    const platform = Platform.OS;
+    const send = (token: string) => void api.PUT("/v1/me/push-token", { body: { platform, push_token: token } }).catch(() => undefined);
+    void devicePushToken().then((t) => t && send(t));
+    const sub = Notifications.addPushTokenListener((t) => typeof t.data === "string" && send(t.data));
+    return () => sub.remove();
+  }, [state]);
+
   const pair = useCallback(async (apiUrl: string, code: string) => {
     const key = generateDeviceKey();
     const pushToken = await devicePushToken();

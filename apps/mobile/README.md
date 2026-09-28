@@ -25,7 +25,7 @@ It uses the same generated API client as the web console (`@nexus/api-client`).
 
 ## Known limitations
 
-- **Push delivery:** the API currently records pushes (`RecordingPushSender`) instead of calling APNs/FCM. The app polls every 3 seconds while open, so approvals still arrive. Real APNs/FCM delivery is next.
+- **Push delivery:** real pushes need a development or release build, plus APNs and FCM keys on the API: see [docs/MOBILE-PUSH.md](../../docs/MOBILE-PUSH.md). Without them the API logs pushes, and the app checks every 3 seconds while it's open.
 - **Expo Go:**
   - Android can't receive remote pushes there, so the app doesn't load push support at all in Expo Go on Android. Notifications and approvals still appear in the app within a few seconds while it's open. For pushes, use a development build (`npx expo run:android`).
   - Keystore items can't be biometric-locked. The app instead gates each signature with `expo-local-authentication`.
