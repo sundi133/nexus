@@ -23,6 +23,15 @@ It uses the same generated API client as the web console (`@nexus/api-client`).
 - **Approving:** the console shows a number and the phone shows three. Tapping one triggers Face ID / Touch ID, then the app signs `nexus-push-v1\n{id}\n{decision}\n{choice}`. The server checks both the number and the signature.
 - **"This wasn't me":** revokes the waiting sign-in and alerts the security team.
 
+## Authenticator codes
+
+**Authenticator codes** (on the home screen) works as a standard authenticator app. Codes are made on the phone, so they work with no connection.
+
+- **Nexus:** in the console, go to **My security → Add method → Authenticator app**, then scan its QR code with the app.
+- **Other services:** scan any time-based authenticator QR code (`otpauth://totp/…`, with SHA-1, SHA-256 or SHA-512, 6–8 digits), or type a key.
+- **Storage:** each account's secret is in the device keystore, on this device only, and kept if the phone is unpaired.
+- **Tests:** `pnpm --filter @nexus/mobile test` checks the codes against RFC 6238's test vectors.
+
 ## Known limitations
 
 - **Push delivery:** real pushes need a development or release build, plus APNs and FCM keys on the API: see [docs/MOBILE-PUSH.md](../../docs/MOBILE-PUSH.md). Without them the API logs pushes, and the app checks every 3 seconds while it's open.

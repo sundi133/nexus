@@ -95,6 +95,13 @@ export default function Home() {
             </Pressable>
           ) : null}
 
+          <View style={styles.shortcuts}>
+            <Pressable accessibilityRole="button" onPress={() => router.push("/codes")} style={[styles.shortcut, { backgroundColor: t.bg, borderColor: t.border }]}>
+              <Text style={[styles.shortcutTitle, { color: t.fg }]}>Authenticator codes</Text>
+              <Text style={{ color: t.fgMuted, fontSize: 13 }}>Work without a connection</Text>
+            </Pressable>
+          </View>
+
           {error ? <Text style={{ color: t.danger }}>{error}</Text> : null}
           <Text style={[styles.section, { color: t.fgMuted }]}>NOTIFICATIONS</Text>
         </View>
@@ -146,6 +153,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "700", marginTop: 2 },
   badge: { alignSelf: "flex-start", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginTop: 12 },
   pending: { borderRadius: 14, padding: 18 },
+  shortcuts: { flexDirection: "row", gap: 10 },
+  shortcut: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 14, gap: 2 },
+  shortcutTitle: { fontSize: 15, fontWeight: "600" },
   pendingTitle: { color: "#fff", fontSize: 17, fontWeight: "700" },
   pendingBody: { color: "#E0E7FF", marginTop: 2 },
   section: { fontSize: 12, fontWeight: "600", letterSpacing: 0.6, marginTop: 8 },

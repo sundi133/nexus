@@ -58,6 +58,7 @@ export default function RootLayout() {
         <Stack.Screen name="approve/[id]" options={{ title: "Sign-in request", presentation: "fullScreenModal", gestureEnabled: false }} />
         <Stack.Screen name="approvals" options={{ title: "To approve" }} />
         <Stack.Screen name="request/[id]" options={{ title: "Request access", presentation: "modal" }} />
+        <Stack.Screen name="codes" options={{ title: "Authenticator codes" }} />
       </Stack>
     </SessionProvider>
   );
