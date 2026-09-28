@@ -70,7 +70,7 @@ describe("requests for apps on devices", () => {
     const b = await h.call("POST", "/v1/access/catalog", { token: admin, body: { resource_type: "software", resource_id: pkgId, allow_permanent: true, stages: [{ kind: "manager" }] } });
     catalog.htop = b.body.data.find((x: any) => x.resource_type === "software").id;
     const seen = (await h.call("GET", "/v1/access/catalog", { token: people.alice!.token })).body.data.map((x: any) => x.name).sort();
-    expect(seen).toEqual(["Chess (unblocked on your devices)", "htop (installed on your devices)"]);
+    expect(seen).toEqual(["Chess", "htop"]); // the thing's own name; the card says it's a blocked app or software
   });
 
   it("tells the device's user when an app is stopped, once a day, with a way to ask for it", async () => {
@@ -87,8 +87,8 @@ describe("requests for apps on devices", () => {
     const r = await h.call("POST", "/v1/access/requests", { token: people.alice!.token, body: { catalog_id: catalog.chess, justification: "Chess club demo for a customer", duration_hours: 2 } });
     expect(r.status, JSON.stringify(r.body)).toBe(201);
     const approvals = (await h.call("GET", "/v1/access/requests?view=approvals", { token: people.mia!.token })).body.data;
-    expect(approvals.map((x: any) => x.resource.name)).toEqual(["Chess (unblocked on your devices)"]);
-    expect((await notes("mia", "access.approval"))[0].title).toContain("Chess");
+    expect(approvals.map((x: any) => x.resource.name)).toEqual(["Chess"]);
+    expect((await notes("mia", "access.approval"))[0].title).toMatch(/asks to use Chess, which is blocked$/);
     expect((await h.call("POST", `/v1/access/requests/${r.body.id}/decision`, { token: people.mia!.token, body: { decision: "approve", comment: "ok" } })).status).toBe(200);
 
     expect((await policy("alice-pc")).rules.map((x: any) => x.id)).not.toContain(ruleId);
