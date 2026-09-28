@@ -48,6 +48,7 @@ docs/                 Spec, architecture, UI and roadmap
 | [docs/UI.md](docs/UI.md) | UX principles, SecOps experience, key screens, mobile app, design system |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Release A (top 30%) → B (30–80%) → C; epics, owners, how we build, progress |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Deploying, configuration, monitoring and alerts, backups and restore, key rotation, capacity, incident quick reference |
+| [docs/RAILWAY.md](docs/RAILWAY.md) | Deploying on Railway from the Dockerfiles: services, database role, variables, domains, what works there |
 | [docs/SECURITY.md](docs/SECURITY.md) | For security reviewers: tenant isolation, authentication, secrets, SSRF, audit, hardening, pentest scope, vulnerability reporting |
 
 ## Status
